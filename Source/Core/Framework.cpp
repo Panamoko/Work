@@ -6,6 +6,7 @@
 #include "Graphics/Graphics.h"
 #include "UI/ImGuiRenderer.h"
 #include "Scene/SceneGame.h"
+#include "Core/Input.h" // ★ 入力システムをインクルード
 
 // 垂直同期間隔設定
 static const int syncInterval = 1;
@@ -19,6 +20,9 @@ Framework::Framework(HWND hWnd)
 
 	// IMGUI初期化
 	ImGuiRenderer::Initialize(hWnd, Graphics::Instance().GetDevice(), Graphics::Instance().GetDeviceContext());
+
+	// ★ 入力システムの初期化（必ずSceneの生成より前に行う）
+	Input::Instance().Initialize(hWnd);
 
 	// シーン初期化（コンポーネント指向テスト用）
 	scene = std::make_unique<SceneGame>();
@@ -34,6 +38,9 @@ Framework::~Framework()
 // 更新処理
 void Framework::Update(float elapsedTime)
 {
+	// ★ 最優先処理：ゲームロジックが動く前に、全入力デバイスの状態を最新にする！
+	Input::Instance().Update();
+
 	ImGuiRenderer::NewFrame();
 	scene->Update(elapsedTime);
 }
@@ -138,6 +145,13 @@ LRESULT CALLBACK Framework::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LP
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE) PostMessage(hWnd, WM_CLOSE, 0, 0);
 		break;
+
+		// ★ 落とし穴の修正：マウスホイールの回転をOSから受け取り、Inputシステムに流す
+	case WM_MOUSEWHEEL:
+		// WHEEL_DELTA(120)で割ることで、手前にカリッと回すと -1、奥に回すと 1 が入る
+		Input::Instance().GetMouse().SetWheel(GET_WHEEL_DELTA_WPARAM(wParam) / WHEEL_DELTA);
+		break;
+
 	case WM_ENTERSIZEMOVE:
 		timer.Stop();
 		break;

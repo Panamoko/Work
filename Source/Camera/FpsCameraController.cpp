@@ -2,7 +2,7 @@
 #include <algorithm>
 #include "Camera/FpsCameraController.h"
 
-FpsCameraController::FpsCameraController() : angleX(0.0f), angleY(0.0f), isFpsMode(false) {}
+FpsCameraController::FpsCameraController() = default; // ★ ヘッダでの初期化に統一
 
 void FpsCameraController::SyncCameraToController(const Camera& camera)
 {
@@ -24,7 +24,6 @@ void FpsCameraController::Update(HWND hWnd, const DirectX::XMFLOAT3& playerPosit
 		isFpsMode = true;
 		ShowCursor(FALSE);
 
-		// 【重要】切り替え直後にカーソルを中央にワープさせ、初回の暴走を防ぐ
 		RECT rect;
 		GetClientRect(hWnd, &rect);
 		POINT center = { (rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2 };
@@ -39,21 +38,17 @@ void FpsCameraController::Update(HWND hWnd, const DirectX::XMFLOAT3& playerPosit
 
 	if (isFpsMode)
 	{
-		// 【罠の解消】ImGuiを完全に無視し、OS(Win32)から直接生のカーソル座標を取得する
 		POINT pt;
 		GetCursorPos(&pt);
 
-		// ウィンドウ中央のスクリーン座標を計算
 		RECT rect;
 		GetClientRect(hWnd, &rect);
 		POINT center = { (rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2 };
 		ClientToScreen(hWnd, &center);
 
-		// 中央からの移動ピクセル数を直接算出
-		float moveX = static_cast<float>(pt.x - center.x) * 0.002f; // 0.002fはマウス感度
+		float moveX = static_cast<float>(pt.x - center.x) * 0.002f;
 		float moveY = static_cast<float>(pt.y - center.y) * 0.002f;
 
-		// 視点の角度に加算
 		angleY += moveX;
 		angleX += moveY;
 
@@ -61,7 +56,6 @@ void FpsCameraController::Update(HWND hWnd, const DirectX::XMFLOAT3& playerPosit
 		const float limitX = DirectX::XM_PIDIV2 - 0.01f;
 		angleX = std::clamp(angleX, -limitX, limitX);
 
-		// カーソルを物理的に中央に戻す（次回もptとcenterの差分だけで計算できる）
 		SetCursorPos(center.x, center.y);
 	}
 

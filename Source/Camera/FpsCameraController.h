@@ -14,13 +14,13 @@ public:
     void Update(HWND hWnd, const DirectX::XMFLOAT3& playerPosition, float eyeHeight);
 
 private:
-    DirectX::XMFLOAT3 eye;
-    DirectX::XMFLOAT3 focus;
-    DirectX::XMFLOAT3 up;
-    DirectX::XMFLOAT3 front;
+    DirectX::XMFLOAT3 eye = { 0, 0, 0 };   // ★ 初期化漏れ防止
+    DirectX::XMFLOAT3 focus = { 0, 0, 0 }; // ★ 初期化漏れ防止
+    DirectX::XMFLOAT3 up = { 0, 1, 0 };    // ★ 初期化漏れ防止
+    DirectX::XMFLOAT3 front = { 0, 0, 1 }; // ★ 初期化漏れ防止
 
-    float angleX; // ピッチ（上下）
-    float angleY; // ヨー（左右）
+    float angleX = 0.0f; // ピッチ（上下）
+    float angleY = 0.0f; // ヨー（左右）
 
-    bool isFpsMode; // FPS操作中かどうか
+    bool isFpsMode = false; // FPS操作中かどうか
 };

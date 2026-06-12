@@ -1,149 +1,184 @@
 #include <algorithm>
 #include <imgui.h>
-#include "PlayerControllerComponent.h"
+#include "GameObject/Components/PlayerControllerComponent.h"
 #include "Physics/SphereCast.h"
 #include "Graphics/Graphics.h"
+#include "Core/Input.h"
+#include "GameObject/Actor.h"
 
-PlayerControllerComponent::PlayerControllerComponent(Camera* camera, FpsCameraController* cameraController, const CollisionMesh& collisionMesh)
-	: camera(camera), cameraController(cameraController), collisionMesh(collisionMesh)
+PlayerControllerComponent::PlayerControllerComponent(Camera* camera, FpsCameraController* cameraController, const CollisionMesh& collisionMesh, Actor* weaponActor)
+	: camera(camera), cameraController(cameraController), collisionMesh(collisionMesh), weaponActor(weaponActor)
 {
 }
 
 void PlayerControllerComponent::Start()
 {
-	// アタッチされた瞬間に、モデルコンポーネントから初期アニメーションを取得
-	auto modelComp = GetActor()->GetComponent<ModelComponent>();
-	if (modelComp && modelComp->GetModel())
-	{
-		modelComp->GetModel()->GetNodePoses(nodePoses);
-		animationIndex = modelComp->GetModel()->GetAnimationIndex(animIdle);
-	}
+	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
+	animator = GetActor()->GetComponent<AnimatorComponent>().get();
+}
+
+bool PlayerControllerComponent::CheckGrounded()
+{
+	DirectX::XMVECTOR Origin = DirectX::XMVectorAdd(
+		DirectX::XMLoadFloat3(&position),
+		DirectX::XMVectorSet(0.0f, radius + stepOffset, 0.0f, 0.0f)
+	);
+	DirectX::XMFLOAT3 originF; DirectX::XMStoreFloat3(&originF, Origin);
+	DirectX::XMFLOAT3 hitPos, hitNormal;
+	float checkDistance = stepOffset + skinWidth + 0.1f;
+	return SphereCast(originF, { 0.0f, -1.0f, 0.0f }, radius, checkDistance, hitPos, hitNormal);
 }
 
 void PlayerControllerComponent::Update(float elapsedTime)
 {
-	auto modelComp = GetActor()->GetComponent<ModelComponent>();
-	if (!modelComp) return;
-
-	Model* characterModel = modelComp->GetModel().get();
+	if (!cachedModelComponent) return;
+	Model* characterModel = cachedModelComponent->GetModel().get();
 	if (!characterModel) return;
 
-	int newAnimationIndex = animationIndex;
-	DirectX::XMFLOAT3 manualVec = { 0, 0, 0 };
-
-	// WASD入力
-	if (GetAsyncKeyState('W') & 0x8000) { newAnimationIndex = characterModel->GetAnimationIndex(animWalkF); manualVec.z += 1.0f; }
-	else if (GetAsyncKeyState('S') & 0x8000) { newAnimationIndex = characterModel->GetAnimationIndex(animWalkB); manualVec.z -= 1.0f; }
-	else if (GetAsyncKeyState('D') & 0x8000) { newAnimationIndex = characterModel->GetAnimationIndex(animWalkR); manualVec.x += 1.0f; }
-	else if (GetAsyncKeyState('A') & 0x8000) { newAnimationIndex = characterModel->GetAnimationIndex(animWalkL); manualVec.x -= 1.0f; }
-	else { newAnimationIndex = characterModel->GetAnimationIndex(animIdle); }
-
-	debugAnimIndex = newAnimationIndex;
-
-	if (animationIndex != newAnimationIndex)
+	// =======================================================
+	// 0. プロのFPS技術：[TAB]キーによるカーソルロック切り替え
+	// =======================================================
+	// TABキーが押された瞬間を検知してロック状態を反転
+	bool currTabKey = (GetAsyncKeyState(VK_TAB) & 0x8000) != 0;
+	if (currTabKey && !prevTabKey)
 	{
-		animationIndex = newAnimationIndex;
-		animationSeconds = 0.0f;
-		oldAnimationSeconds = 0.0f;
+		isCursorLocked = !isCursorLocked;
 	}
+	prevTabKey = currTabKey;
 
-	DirectX::XMVECTOR vRootMotionTranslation = DirectX::XMVectorZero();
-
-	// アニメーション更新とルートモーション抽出
-	if (animationIndex >= 0)
+	HWND hWnd = GetActiveWindow();
+	if (hWnd == GetForegroundWindow())
 	{
-		const Model::Animation& animation = characterModel->GetAnimations().at(animationIndex);
-		characterModel->ComputeAnimation(animationIndex, animationSeconds, nodePoses);
-
-		const int rootMotionNodeIndex = characterModel->GetNodeIndex(rootNodeName);
-
-		if (rootMotionNodeIndex >= 0)
+		if (isCursorLocked)
 		{
-			std::vector<Model::NodePose> beginPoses = nodePoses;
-			characterModel->ComputeAnimation(animationIndex, 0.0f, beginPoses);
-			Model::NodePose beginPose = beginPoses.at(rootMotionNodeIndex);
+			// カーソルがまだ表示されていれば隠す
+			if (cursorVisibilityState) { ShowCursor(FALSE); cursorVisibilityState = false; }
 
-			if (useRootMotion)
-			{
-				std::vector<Model::NodePose> oldPoses = nodePoses;
-				characterModel->ComputeAnimation(animationIndex, oldAnimationSeconds, oldPoses);
-				Model::NodePose oldPose = oldPoses.at(rootMotionNodeIndex);
-				Model::NodePose newPose = nodePoses.at(rootMotionNodeIndex);
+			float screenW = Graphics::Instance().GetScreenWidth();
+			float screenH = Graphics::Instance().GetScreenHeight();
+			POINT center = { static_cast<LONG>(screenW / 2.0f), static_cast<LONG>(screenH / 2.0f) };
+			ClientToScreen(hWnd, &center);
 
-				DirectX::XMFLOAT3 localTranslation = { 0, 0, 0 };
-				if (oldAnimationSeconds > animationSeconds)
-				{
-					std::vector<Model::NodePose> endPoses = nodePoses;
-					characterModel->ComputeAnimation(animationIndex, animation.secondsLength, endPoses);
-					Model::NodePose endPose = endPoses.at(rootMotionNodeIndex);
+			POINT currentMousePos;
+			GetCursorPos(&currentMousePos);
 
-					std::vector<Model::NodePose> beginPoses = nodePoses;
-					characterModel->ComputeAnimation(animationIndex, 0.0f, beginPoses);
-					Model::NodePose beginPose = beginPoses.at(rootMotionNodeIndex);
+			float deltaX = static_cast<float>(currentMousePos.x - center.x);
+			float deltaY = static_cast<float>(currentMousePos.y - center.y);
 
-					localTranslation.x = (endPose.position.x - oldPose.position.x) + (newPose.position.x - beginPose.position.x);
-					localTranslation.z = (endPose.position.z - oldPose.position.z) + (newPose.position.z - beginPose.position.z);
-				}
-				else
-				{
-					localTranslation.x = newPose.position.x - oldPose.position.x;
-					localTranslation.y = newPose.position.y - oldPose.position.y;
-					localTranslation.z = newPose.position.z - oldPose.position.z;
-				}
+			characterYaw += deltaX * mouseSensitivity;
+			cameraPitch += deltaY * mouseSensitivity;
+			cameraPitch = std::clamp(cameraPitch, -DirectX::XM_PIDIV2 + 0.05f, DirectX::XM_PIDIV2 - 0.05f);
 
-				Model::Node& rootMotionNode = characterModel->GetNodes().at(rootMotionNodeIndex);
-				DirectX::XMVECTOR vLocalTranslation = DirectX::XMLoadFloat3(&localTranslation);
-				vRootMotionTranslation = vLocalTranslation;
-
-				if (rootMotionNode.parentIndex >= 0)
-				{
-					Model::NodePose parentPose = nodePoses.at(rootMotionNode.parentIndex);
-					DirectX::XMVECTOR parentRot = DirectX::XMLoadFloat4(&parentPose.rotation);
-					vRootMotionTranslation = DirectX::XMVector3Rotate(vLocalTranslation, parentRot);
-				}
-
-				vRootMotionTranslation = DirectX::XMVectorScale(vRootMotionTranslation, rootMotionScale);
-			}
-
-			nodePoses.at(rootMotionNodeIndex).position.x = beginPose.position.x;
-			nodePoses.at(rootMotionNodeIndex).position.z = beginPose.position.z;
+			SetCursorPos(center.x, center.y);
 		}
-
-		oldAnimationSeconds = animationSeconds;
-		animationSeconds += elapsedTime * animSpeed;
-		if (animationSeconds > animation.secondsLength) animationSeconds -= animation.secondsLength;
-		characterModel->SetNodePoses(nodePoses);
+		else
+		{
+			// ロック解除時：カーソルを再び表示する
+			if (!cursorVisibilityState) { ShowCursor(TRUE); cursorVisibilityState = true; }
+		}
 	}
 
-	DirectX::XMVECTOR vManualTranslation = DirectX::XMVectorSet(
-		manualVec.x * manualMoveSpeed * elapsedTime, 0.0f,
-		manualVec.z * manualMoveSpeed * elapsedTime, 0.0f
-	);
+	DirectX::XMFLOAT3 manualVec = { 0, 0, 0 };
+	GamePad& pad = Input::Instance().GetGamePad();
+	float inputX = pad.GetAxisLX();
+	float inputZ = pad.GetAxisLY();
 
-	DirectX::XMVECTOR vGlobalTranslation = DirectX::XMVectorAdd(vRootMotionTranslation, vManualTranslation);
+	if (GetAsyncKeyState('W')) inputZ = 1.0f;
+	if (GetAsyncKeyState('S')) inputZ = -1.0f;
+	if (GetAsyncKeyState('A')) inputX = -1.0f;
+	if (GetAsyncKeyState('D')) inputX = 1.0f;
 
-	DirectX::XMStoreFloat3(&debugRootMotion, vRootMotionTranslation);
-	DirectX::XMStoreFloat3(&debugManualMotion, vManualTranslation);
+	DirectX::XMVECTOR vInput = DirectX::XMVectorSet(inputX, 0.0f, inputZ, 0.0f);
+	DirectX::XMVECTOR vInputLengthSq = DirectX::XMVector3LengthSq(vInput);
+	bool currentlyMoving = (vInputLengthSq.m128_f32[0] > 0.001f);
 
-	const DirectX::XMFLOAT3& front = camera->GetFront();
-	float targetYaw = atan2f(front.x, front.z);
+	if (currentlyMoving)
+	{
+		if (vInputLengthSq.m128_f32[0] > 1.0f) vInput = DirectX::XMVector3Normalize(vInput);
+		DirectX::XMStoreFloat3(&manualVec, vInput);
+	}
 
-	float diff = targetYaw - characterYaw;
-	while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
-	while (diff > DirectX::XM_PI) diff -= DirectX::XM_2PI;
-	characterYaw += diff * (std::min)(10.0f * elapsedTime, 1.0f);
-
-	vGlobalTranslation = DirectX::XMVectorSetY(vGlobalTranslation, 0.0f);
-	DirectX::XMMATRIX R = DirectX::XMMatrixRotationY(characterYaw);
-	DirectX::XMVECTOR vWorldTranslation = DirectX::XMVector3TransformNormal(vGlobalTranslation, R);
-
-	DirectX::XMFLOAT3 move;
-	DirectX::XMStoreFloat3(&move, vWorldTranslation);
-
-	// 物理演算
 	if (usePhysics)
 	{
-		move.y = -3.0f * elapsedTime;
+		if (velocityY > 0.0f) isGrounded = false;
+		else isGrounded = CheckGrounded();
+	}
+	else isGrounded = true;
+
+	PlayerState nextState = currentState;
+
+	if (isGrounded)
+	{
+		if (currentState == PlayerState::Jump || currentState == PlayerState::Fall) velocityY = 0.0f;
+		if ((pad.GetButtonDown() & GamePad::BTN_A) || GetAsyncKeyState(VK_SPACE))
+		{
+			velocityY = jumpPower;
+			nextState = PlayerState::Jump;
+		}
+		else nextState = currentlyMoving ? PlayerState::Walk : PlayerState::Idle;
+	}
+	else
+	{
+		if (velocityY > 0.0f) nextState = PlayerState::Jump;
+		else                  nextState = PlayerState::Fall;
+	}
+
+	bool stateChanged = (currentState != nextState);
+	currentState = nextState;
+
+	if (animator)
+	{
+		animator->SetAnimSpeed(animSpeed);
+		if (currentState == PlayerState::Walk)
+		{
+			int animZ = characterModel->GetAnimationIndex((manualVec.z >= 0.0f) ? animWalkF : animWalkB);
+			int animX = characterModel->GetAnimationIndex((manualVec.x >= 0.0f) ? animWalkR : animWalkL);
+
+			float weightZ = std::abs(manualVec.z);
+			float weightX = std::abs(manualVec.x);
+			float ratio = (weightZ + weightX > 0.001f) ? (weightX / (weightZ + weightX)) : 0.0f;
+
+			if (stateChanged || animZ != currentAnimZIndex || animX != currentAnimXIndex)
+			{
+				currentAnimZIndex = animZ;
+				currentAnimXIndex = animX;
+				animator->PlayBlend(animZ, animX, ratio, crossFadeTime, true);
+			}
+			else animator->UpdateBlendRatio(ratio);
+		}
+		else
+		{
+			if (stateChanged)
+			{
+				currentAnimZIndex = -1;
+				currentAnimXIndex = -1;
+				int animIdx = -1;
+				bool loop = true;
+				float clampTime = -1.0f;
+
+				switch (currentState)
+				{
+				case PlayerState::Idle: animIdx = characterModel->GetAnimationIndex(animIdle); loop = true; break;
+				case PlayerState::Jump: animIdx = characterModel->GetAnimationIndex(animJump); loop = false; break;
+				case PlayerState::Fall: animIdx = characterModel->GetAnimationIndex(animFall); loop = false; clampTime = fallClampSeconds; break;
+				}
+
+				if (animIdx < 0) animIdx = characterModel->GetAnimationIndex(animIdle);
+				animator->Play(animIdx, crossFadeTime, loop, clampTime);
+			}
+		}
+	}
+
+	DirectX::XMVECTOR vManualTranslation = DirectX::XMVectorSet(manualVec.x * manualMoveSpeed * elapsedTime, 0.0f, manualVec.z * manualMoveSpeed * elapsedTime, 0.0f);
+	DirectX::XMMATRIX R_Yaw = DirectX::XMMatrixRotationY(characterYaw);
+	DirectX::XMVECTOR vWorldTranslation = DirectX::XMVector3TransformNormal(vManualTranslation, R_Yaw);
+	DirectX::XMStoreFloat3(&debugManualMotion, vManualTranslation);
+	DirectX::XMFLOAT3 move; DirectX::XMStoreFloat3(&move, vWorldTranslation);
+
+	if (usePhysics)
+	{
+		if (!isGrounded) velocityY -= gravity * elapsedTime;
+		move.y = velocityY * elapsedTime;
 		MoveAndSlide({ move.x, 0, move.z }, false);
 		MoveAndSlide({ 0, move.y, 0 }, true);
 	}
@@ -153,57 +188,102 @@ void PlayerControllerComponent::Update(float elapsedTime)
 		position.z += move.z;
 	}
 
-	// 自身の所属するアクターに座標と回転を反映させる
 	GetActor()->SetPosition(position);
 
 	DirectX::XMFLOAT4 rot;
 	DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, characterYaw, 0.0f));
 	GetActor()->SetRotation(rot);
 
-	// カメラ更新
-	HWND hWnd = GetActiveWindow();
-	float eyeHeight = 0.0f;
-	DirectX::XMFLOAT3 cameraTargetPos = position;
+	// =======================================================
+	// 4. カメラの更新（GUIで操作できるように修正）
+	// =======================================================
+	// ★プロの修正：足元から「cameraOffsetPos」分だけカメラを持ち上げる
+	DirectX::XMVECTOR vEyePos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), DirectX::XMLoadFloat3(&cameraOffsetPos));
+	DirectX::XMMATRIX R_Camera = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, characterYaw, 0.0f);
+	DirectX::XMVECTOR vTargetDirection = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Camera);
+	DirectX::XMVECTOR vTargetPos = DirectX::XMVectorAdd(vEyePos, vTargetDirection);
+
+	DirectX::XMFLOAT3 eyeF, targetF;
+	DirectX::XMStoreFloat3(&eyeF, vEyePos);
+	DirectX::XMStoreFloat3(&targetF, vTargetPos);
+	camera->SetLookAt(eyeF, targetF, { 0.0f, 1.0f, 0.0f });
+
+	float screenW = Graphics::Instance().GetScreenWidth();
+	float screenH = Graphics::Instance().GetScreenHeight();
+	camera->SetPerspectiveFov(DirectX::XMConvertToRadians(60), screenW / screenH, 0.35f, 1000.0f);
+
+	// =======================================================
+	// 5. ボーンアタッチメント（GUIのボーン名を使用）
+	// =======================================================
+	if (weaponActor)
 	{
-		DirectX::XMVECTOR FrontXZ = DirectX::XMVectorSet(front.x, 0.0f, front.z, 0.0f);
-		if (DirectX::XMVector3LengthSq(FrontXZ).m128_f32[0] < 0.001f) FrontXZ = DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
-		FrontXZ = DirectX::XMVector3Normalize(FrontXZ);
-		DirectX::XMVECTOR Offset = DirectX::XMVectorAdd(DirectX::XMVectorScale(FrontXZ, -3.0f), DirectX::XMVectorSet(0.0f, 1.2f, 0.0f, 0.0f));
-		DirectX::XMStoreFloat3(&cameraTargetPos, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), Offset));
+		// ★プロの修正：GUIから入力されたボーン名(handBoneName)を使って検索する
+		int handBoneIndex = characterModel->GetNodeIndex(handBoneName);
+		if (handBoneIndex >= 0)
+		{
+			const Model::Node& handNode = characterModel->GetNodes().at(handBoneIndex);
+			DirectX::XMMATRIX mHandWorld = DirectX::XMLoadFloat4x4(&handNode.worldTransform);
+			DirectX::XMMATRIX mPlayerWorld = DirectX::XMMatrixRotationRollPitchYaw(0.0f, characterYaw, 0.0f) *
+				DirectX::XMMatrixTranslation(position.x, position.y, position.z);
+
+			DirectX::XMMATRIX mFinalWeaponWorld = mHandWorld * mPlayerWorld;
+			DirectX::XMMATRIX mOffset = DirectX::XMMatrixRotationRollPitchYaw(weaponOffsetRot.x, weaponOffsetRot.y, weaponOffsetRot.z) *
+				DirectX::XMMatrixTranslation(weaponOffsetPos.x, weaponOffsetPos.y, weaponOffsetPos.z);
+			DirectX::XMMATRIX mCameraPitch = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, 0.0f, 0.0f);
+
+			mFinalWeaponWorld = mOffset * mCameraPitch * mFinalWeaponWorld;
+
+			// ★プロのハック：スケール値を「武器オフセット」から取得するように変更
+			// ※現在、weaponOffsetPos/Rotしかないので、スケール用変数も作ります
+			DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(weaponOffsetScale.x, weaponOffsetScale.y, weaponOffsetScale.z);
+
+			// 行列計算にスケールを含める
+			mFinalWeaponWorld = mScale * mFinalWeaponWorld;
+
+			DirectX::XMVECTOR scaleVec, rotQuatVec, transVec;
+			DirectX::XMMatrixDecompose(&scaleVec, &rotQuatVec, &transVec, mFinalWeaponWorld);
+
+			DirectX::XMFLOAT3 wPos; DirectX::XMStoreFloat3(&wPos, transVec);
+			DirectX::XMFLOAT4 wRot; DirectX::XMStoreFloat4(&wRot, rotQuatVec);
+			DirectX::XMFLOAT3 wScale; DirectX::XMStoreFloat3(&wScale, scaleVec);
+
+			weaponActor->SetPosition(wPos);
+			weaponActor->SetRotation(wRot);
+			weaponActor->SetScale(wScale);
+		}
 	}
-	cameraController->Update(hWnd, cameraTargetPos, eyeHeight);
-	cameraController->SyncControllerToCamera(*camera);
 }
 
 void PlayerControllerComponent::OnGUI()
 {
-	ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), u8"▼ 移動のブレンド設定");
-	ImGui::Checkbox(u8"アニメ由来の移動(ルートモーション)", &useRootMotion);
-	ImGui::Checkbox(u8"物理演算(床との衝突)", &usePhysics);
+	ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), u8"▼ FPS設定・操作");
+	ImGui::Text(u8"【TABキー】を押してマウス操作 / ImGui操作 を切り替え");
+	ImGui::Checkbox(u8"マウスロック(FPS操作中)", &isCursorLocked);
+
+	// ★追加：カメラの位置をリアルタイムでいじれるように
+	ImGui::DragFloat3(u8"カメラ 位置オフセット", &cameraOffsetPos.x, 0.01f, -5.0f, 5.0f);
+
+	ImGui::DragFloat(u8"移動速度", &manualMoveSpeed, 0.1f, 0.0f, 20.0f);
+	ImGui::DragFloat(u8"ジャンプ力", &jumpPower, 0.1f, 0.0f, 20.0f);
+	ImGui::DragFloat(u8"マウス感度", &mouseSensitivity, 0.0001f, 0.0f, 0.01f, "%.4f");
 
 	ImGui::Separator();
-	ImGui::DragFloat(u8"Manual Speed", &manualMoveSpeed, 0.1f, 0.0f, 20.0f);
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ FPS武器アタッチメント設定");
 
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ アニメーション名");
-	ImGui::InputText(u8"待機(Idle)", animIdle, sizeof(animIdle));
-	ImGui::InputText(u8"前進(W)", animWalkF, sizeof(animWalkF));
-	ImGui::InputText(u8"後退(S)", animWalkB, sizeof(animWalkB));
-	ImGui::InputText(u8"左(A)", animWalkL, sizeof(animWalkL));
-	ImGui::InputText(u8"右(D)", animWalkR, sizeof(animWalkR));
-
-	ImGui::InputText(u8"ノード名", rootNodeName, sizeof(rootNodeName));
-	ImGui::DragFloat(u8"ルートモーション倍率", &rootMotionScale, 0.1f, -10.0f, 10.0f);
-	ImGui::SliderFloat(u8"アニメ再生速度", &animSpeed, 0.1f, 5.0f);
+	// ★追加：ボーン名が間違っていると描画されないため、GUIで打ち込めるように
+	ImGui::InputText(u8"右手ボーン名", handBoneName, sizeof(handBoneName));
+	// OnGUIの中にこれを追加
+	
+	ImGui::DragFloat3(u8"武器 位置オフセット", &weaponOffsetPos.x, 0.01f, -2.0f, 2.0f);
+	ImGui::DragFloat3(u8"武器 回転オフセット", &weaponOffsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
 
 	ImGui::Separator();
 	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"▼ 内部状態モニター");
-	ImGui::Text(u8"現在のアニメIndex: %d", debugAnimIndex);
-	ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1), u8"① アニメ由来: (%.4f, %.4f)", debugRootMotion.x, debugRootMotion.z);
-	ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.8f, 1), u8"② WASD由来 : (%.4f, %.4f)", debugManualMotion.x, debugManualMotion.z);
+	ImGui::Text(u8"カメラ Pitch (上下): %.2f", cameraPitch);
+	ImGui::Text(u8"プレイヤー Yaw (左右): %.2f", characterYaw);
 }
 
-// 物理演算部（移植）
+// 物理演算部（変更なし）
 bool PlayerControllerComponent::SphereCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal)
 {
 	bool hit = false;

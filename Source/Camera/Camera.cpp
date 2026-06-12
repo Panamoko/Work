@@ -3,7 +3,9 @@
 // コンストラクタ
 Camera::Camera()
 {
-	// カメラ設定
+	// ★ 注意喚起: ここでのアスペクト比固定は仮の処置。
+	// ゲームの解像度設定やウィンドウサイズ変更時に、
+	// 必ず SetPerspectiveFov が外部から再コールされる設計にすること。
 	SetPerspectiveFov(
 		DirectX::XMConvertToRadians(45),	// 画角
 		1280.0f / 720.0f,					// 画面アスペクト比
@@ -27,23 +29,13 @@ void Camera::SetLookAt(const DirectX::XMFLOAT3& eye, const DirectX::XMFLOAT3& fo
 	DirectX::XMMATRIX View = DirectX::XMMatrixLookAtLH(Eye, Focus, Up);
 	DirectX::XMStoreFloat4x4(&view, View);
 
-	// ビューを逆行列化し、ワールド行列に戻す
-	DirectX::XMMATRIX World = DirectX::XMMatrixInverse(nullptr, View);
-	DirectX::XMFLOAT4X4 world;
-	DirectX::XMStoreFloat4x4(&world, World);
-
-	// カメラの方向を取り出す
-	this->right.x = world._11;
-	this->right.y = world._12;
-	this->right.z = world._13;
-
-	this->up.x = world._21;
-	this->up.y = world._22;
-	this->up.z = world._23;
-
-	this->front.x = world._31;
-	this->front.y = world._32;
-	this->front.z = world._33;
+	// ★ プロの最適化: XMMatrixInverse という超重い処理を削除。
+	// ビュー行列の左上3x3は「直交行列」であり、その各行(Row)には
+	// 既にカメラの Right, Up, Front ベクトルがそのまま格納されている。
+	// これを直接抜き出すだけで済むため、計算コストが劇的に下がる。
+	this->right = { view._11, view._21, view._31 };
+	this->up = { view._12, view._22, view._32 };
+	this->front = { view._13, view._23, view._33 };
 
 	// 視点、注視点を保存
 	this->eye = eye;

@@ -14,26 +14,16 @@ public:
 	// パースペクティブ設定
 	void SetPerspectiveFov(float fovY, float aspect, float nearZ, float farZ);
 
-	// ビュー行列取得
-	const DirectX::XMFLOAT4X4& GetView() const { return view; }
+	// ★ モダンC++: 値を返すだけの関数には [[nodiscard]] をつけ、戻り値の受け取り忘れ（バグ）をコンパイル時に防ぐ
+	[[nodiscard]] const DirectX::XMFLOAT4X4& GetView() const { return view; }
+	[[nodiscard]] const DirectX::XMFLOAT4X4& GetProjection() const { return projection; }
 
-	// プロジェクション行列取得
-	const DirectX::XMFLOAT4X4& GetProjection() const { return projection; }
+	[[nodiscard]] const DirectX::XMFLOAT3& GetEye() const { return eye; }
+	[[nodiscard]] const DirectX::XMFLOAT3& GetFocus() const { return focus; }
 
-	// 視点取得
-	const DirectX::XMFLOAT3& GetEye() const { return eye; }
-
-	// 注視点取得
-	const DirectX::XMFLOAT3& GetFocus() const { return focus; }
-
-	// 上方向取得
-	const DirectX::XMFLOAT3& GetUp() const { return up; }
-
-	// 前方向取得
-	const DirectX::XMFLOAT3& GetFront() const { return front; }
-
-	// 右方向取得
-	const DirectX::XMFLOAT3& GetRight() const { return right; }
+	[[nodiscard]] const DirectX::XMFLOAT3& GetUp() const { return up; }
+	[[nodiscard]] const DirectX::XMFLOAT3& GetFront() const { return front; }
+	[[nodiscard]] const DirectX::XMFLOAT3& GetRight() const { return right; }
 
 private:
 	DirectX::XMFLOAT4X4		view;

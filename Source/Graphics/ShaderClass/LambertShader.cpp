@@ -7,7 +7,7 @@ LambertShader::LambertShader(ID3D11Device* device)
 	// 頂点シェーダー
 	GpuResourceUtils::LoadVertexShader(
 		device,
-		"Data/Shader/LambertVS.cso",
+		"Data/CompiledShader/LambertVS.cso",
 		Model::InputElementDescs.data(),
 		static_cast<UINT>(Model::InputElementDescs.size()),
 		inputLayout.GetAddressOf(),
@@ -16,7 +16,7 @@ LambertShader::LambertShader(ID3D11Device* device)
 	// ピクセルシェーダー
 	GpuResourceUtils::LoadPixelShader(
 		device,
-		"Data/Shader/LambertPS.cso",
+		"Data/CompiledShader/LambertPS.cso",
 		pixelShader.GetAddressOf());
 
 	// メッシュ用定数バッファ

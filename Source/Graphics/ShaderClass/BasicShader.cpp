@@ -1,6 +1,6 @@
 #include "Core/Misc.h"
 #include "Graphics/GpuResourceUtils.h"
-#include "Graphics/Shader/BasicShader.h"
+#include "Graphics/ShaderClass/BasicShader.h"
 
 BasicShader::BasicShader(ID3D11Device* device)
 {

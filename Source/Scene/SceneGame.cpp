@@ -2,6 +2,7 @@
 #include "Scene/SceneGame.h"
 #include "GameObject/Components/ModelComponent.h"
 #include "GameObject/Components/PlayerControllerComponent.h" // コンポーネントをインクルード
+#include "GameObject/Components/AnimatorComponent.h" // ★追加：アニメーターをインクルード
 
 SceneGame::SceneGame()
 {
@@ -56,16 +57,23 @@ SceneGame::SceneGame()
 		}
 	}
 
-	// =======================================================
-	// プレイヤーアクターの生成とコンポーネントのアタッチ
-	// =======================================================
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
 	playerActor->AddComponent<ModelComponent>("Data/Model/Mr.Incredible/Player.glb");
 
-	// ★ ここで「脳みそ（移動と物理）」をアタッチ！
-	// さきほど構築したカメラとcollisionMeshを渡すことで、コンポーネント内で独立して動けるようになる
-	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
+	// ★追加忘れ注意！：アニメーターコンポーネント
+	playerActor->AddComponent<AnimatorComponent>();
+
+	// =======================================================
+	// ★ここを追加：武器アクターを作り、PlayerControllerに渡す！
+	// =======================================================
+	std::shared_ptr<Actor> weaponActor = ActorManager::Instance().Create();
+	weaponActor->SetName("Weapon");
+	// ※ライフルのファイルパスはあなたの環境に合わせてください
+	weaponActor->AddComponent<ModelComponent>("Data/Model/Weapon/Rifle.glb");
+
+	// ★ここを修正：第4引数として `weaponActor.get()` を渡す！
+	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh, weaponActor.get());
 }
 
 SceneGame::~SceneGame()

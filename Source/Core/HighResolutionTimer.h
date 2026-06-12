@@ -5,7 +5,8 @@
 class HighResolutionTimer
 {
 public:
-	HighResolutionTimer() : delta_time(-1.0), paused_time(0), stopped(false)
+	HighResolutionTimer()
+		: seconds_per_count(0.0), delta_time(-1.0), base_time(0), paused_time(0), stop_time(0), last_time(0), this_time(0), stopped(false)
 	{
 		LONGLONG counts_per_sec;
 		QueryPerformanceFrequency(reinterpret_cast<LARGE_INTEGER*>(&counts_per_sec));
