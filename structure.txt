@@ -1,0 +1,777 @@
+[Project Structure] 
+ 
+Folder PATH listing for volume Windows
+Volume serial number is 000000C1 0255:C8DA
+C:.
+│   .gitignore
+│   Game.sln
+│   Game.vcxproj
+│   Game.vcxproj.filters
+│   Game.vcxproj.user
+│   imgui.ini
+│   structure.txt
+│   ファイル階層構造テキスト出力ツール.bat
+│   
+├───bin
+│   └───x64
+│       ├───Debug
+│       │       Game.exe
+│       │       Game.pdb
+│       │       InstancedLambert_vs.cso
+│       │       
+│       └───Release
+│               Game.exe
+│               Game.pdb
+│               
+├───Data
+│   │   FBX2glTF-windows-x64.exe
+│   │   FBX2glTF.bat
+│   │   
+│   ├───CompiledShader
+│   │       BasicPS.cso
+│   │       BasicVS.cso
+│   │       LambertPS.cso
+│   │       LambertVS.cso
+│   │       PrimitiveRendererPS.cso
+│   │       PrimitiveRendererVS.cso
+│   │       ShapeRendererPS.cso
+│   │       ShapeRendererVS.cso
+│   │       SpritePS.cso
+│   │       SpriteVS.cso
+│   │       
+│   ├───Font
+│   │       ArialUni.ttf
+│   │       
+│   ├───Model
+│   │   ├───Greybox
+│   │   │       Greybox.glb
+│   │   │       
+│   │   ├───Mr.Incredible
+│   │   │       Gun.glb
+│   │   │       Mr.Incredible.glb
+│   │   │       Player.glb
+│   │   │       
+│   │   ├───RPG-Character
+│   │   │       2Hand-Sword.glb
+│   │   │       RPG-Character.glb
+│   │   │       
+│   │   ├───Shape
+│   │   │       Sphere.glb
+│   │   │       
+│   │   ├───Stage
+│   │   │       au.glb
+│   │   │       Demo.glb
+│   │   │       ExampleStage.glb
+│   │   │       MP_Island.glb
+│   │   │       Stage.glb
+│   │   │       
+│   │   ├───unitychan
+│   │   │       unitychan.glb
+│   │   │       
+│   │   └───Weapon
+│   │           Pistol.glb
+│   │           Staff.glb
+│   │           
+│   ├───Shader
+│   │       BasicPS.cso
+│   │       BasicVS.cso
+│   │       LambertPS.cso
+│   │       LambertVS.cso
+│   │       PrimitiveRendererPS.cso
+│   │       PrimitiveRendererVS.cso
+│   │       ShapeRendererPS.cso
+│   │       ShapeRendererVS.cso
+│   │       SpritePS.cso
+│   │       SpriteVS.cso
+│   │       
+│   └───Sprite
+│           InputKeyIcon.png
+│           
+├───External
+│   ├───cereal
+│   │   │   .gitignore
+│   │   │   .travis.yml
+│   │   │   appveyor.yml
+│   │   │   CMakeLists.txt
+│   │   │   Config.cmake.in
+│   │   │   LICENSE
+│   │   │   README.md
+│   │   │   
+│   │   ├───doc
+│   │   │       CMakeLists.txt
+│   │   │       doxygen.in
+│   │   │       DoxygenLayout.xml
+│   │   │       footer.html
+│   │   │       mainpage.dox
+│   │   │       
+│   │   ├───include
+│   │   │   └───cereal
+│   │   │       │   access.hpp
+│   │   │       │   cereal.hpp
+│   │   │       │   macros.hpp
+│   │   │       │   specialize.hpp
+│   │   │       │   version.hpp
+│   │   │       │   
+│   │   │       ├───archives
+│   │   │       │       adapters.hpp
+│   │   │       │       binary.hpp
+│   │   │       │       json.hpp
+│   │   │       │       portable_binary.hpp
+│   │   │       │       xml.hpp
+│   │   │       │       
+│   │   │       ├───details
+│   │   │       │       helpers.hpp
+│   │   │       │       polymorphic_impl.hpp
+│   │   │       │       polymorphic_impl_fwd.hpp
+│   │   │       │       static_object.hpp
+│   │   │       │       traits.hpp
+│   │   │       │       util.hpp
+│   │   │       │       
+│   │   │       ├───external
+│   │   │       │   │   base64.hpp
+│   │   │       │   │   LICENSE
+│   │   │       │   │   
+│   │   │       │   ├───rapidjson
+│   │   │       │   │   │   allocators.h
+│   │   │       │   │   │   cursorstreamwrapper.h
+│   │   │       │   │   │   document.h
+│   │   │       │   │   │   encodedstream.h
+│   │   │       │   │   │   encodings.h
+│   │   │       │   │   │   filereadstream.h
+│   │   │       │   │   │   filewritestream.h
+│   │   │       │   │   │   fwd.h
+│   │   │       │   │   │   istreamwrapper.h
+│   │   │       │   │   │   LICENSE
+│   │   │       │   │   │   memorybuffer.h
+│   │   │       │   │   │   memorystream.h
+│   │   │       │   │   │   ostreamwrapper.h
+│   │   │       │   │   │   pointer.h
+│   │   │       │   │   │   prettywriter.h
+│   │   │       │   │   │   rapidjson.h
+│   │   │       │   │   │   reader.h
+│   │   │       │   │   │   schema.h
+│   │   │       │   │   │   stream.h
+│   │   │       │   │   │   stringbuffer.h
+│   │   │       │   │   │   writer.h
+│   │   │       │   │   │   
+│   │   │       │   │   ├───error
+│   │   │       │   │   │       en.h
+│   │   │       │   │   │       error.h
+│   │   │       │   │   │       
+│   │   │       │   │   ├───internal
+│   │   │       │   │   │       biginteger.h
+│   │   │       │   │   │       diyfp.h
+│   │   │       │   │   │       dtoa.h
+│   │   │       │   │   │       ieee754.h
+│   │   │       │   │   │       itoa.h
+│   │   │       │   │   │       meta.h
+│   │   │       │   │   │       pow10.h
+│   │   │       │   │   │       regex.h
+│   │   │       │   │   │       stack.h
+│   │   │       │   │   │       strfunc.h
+│   │   │       │   │   │       strtod.h
+│   │   │       │   │   │       swap.h
+│   │   │       │   │   │       
+│   │   │       │   │   └───msinttypes
+│   │   │       │   │           inttypes.h
+│   │   │       │   │           LICENSE
+│   │   │       │   │           stdint.h
+│   │   │       │   │           
+│   │   │       │   └───rapidxml
+│   │   │       │           license.txt
+│   │   │       │           manual.html
+│   │   │       │           rapidxml.hpp
+│   │   │       │           rapidxml_iterators.hpp
+│   │   │       │           rapidxml_print.hpp
+│   │   │       │           rapidxml_utils.hpp
+│   │   │       │           
+│   │   │       └───types
+│   │   │           │   array.hpp
+│   │   │           │   atomic.hpp
+│   │   │           │   base_class.hpp
+│   │   │           │   bitset.hpp
+│   │   │           │   boost_variant.hpp
+│   │   │           │   chrono.hpp
+│   │   │           │   common.hpp
+│   │   │           │   complex.hpp
+│   │   │           │   deque.hpp
+│   │   │           │   forward_list.hpp
+│   │   │           │   functional.hpp
+│   │   │           │   list.hpp
+│   │   │           │   map.hpp
+│   │   │           │   memory.hpp
+│   │   │           │   optional.hpp
+│   │   │           │   polymorphic.hpp
+│   │   │           │   queue.hpp
+│   │   │           │   set.hpp
+│   │   │           │   stack.hpp
+│   │   │           │   string.hpp
+│   │   │           │   tuple.hpp
+│   │   │           │   unordered_map.hpp
+│   │   │           │   unordered_set.hpp
+│   │   │           │   utility.hpp
+│   │   │           │   valarray.hpp
+│   │   │           │   variant.hpp
+│   │   │           │   vector.hpp
+│   │   │           │   
+│   │   │           └───concepts
+│   │   │                   pair_associative_container.hpp
+│   │   │                   
+│   │   ├───sandbox
+│   │   │   │   CMakeLists.txt
+│   │   │   │   performance.cpp
+│   │   │   │   sandbox.cpp
+│   │   │   │   sandbox_json.cpp
+│   │   │   │   sandbox_rtti.cpp
+│   │   │   │   sandbox_vs.cpp
+│   │   │   │   
+│   │   │   └───sandbox_shared_lib
+│   │   │           base.cpp
+│   │   │           base.hpp
+│   │   │           CMakeLists.txt
+│   │   │           derived.cpp
+│   │   │           derived.hpp
+│   │   │           
+│   │   ├───scripts
+│   │   │       add_rapidjson_prefix.sh
+│   │   │       appveyor.bat
+│   │   │       renameincludes.sh
+│   │   │       updatecoverage.sh
+│   │   │       updatedoc.in
+│   │   │       
+│   │   └───unittests
+│   │       │   array.cpp
+│   │       │   array.hpp
+│   │       │   atomic.cpp
+│   │       │   atomic.hpp
+│   │       │   basic_string.cpp
+│   │       │   basic_string.hpp
+│   │       │   bitset.cpp
+│   │       │   bitset.hpp
+│   │       │   chrono.cpp
+│   │       │   chrono.hpp
+│   │       │   cmake-config-module.cmake
+│   │       │   CMakeLists.txt
+│   │       │   common.hpp
+│   │       │   complex.cpp
+│   │       │   complex.hpp
+│   │       │   defer.cpp
+│   │       │   defer.hpp
+│   │       │   deque.cpp
+│   │       │   deque.hpp
+│   │       │   doctest.h
+│   │       │   forward_list.cpp
+│   │       │   forward_list.hpp
+│   │       │   list.cpp
+│   │       │   list.hpp
+│   │       │   load_construct.cpp
+│   │       │   load_construct.hpp
+│   │       │   map.cpp
+│   │       │   map.hpp
+│   │       │   memory.cpp
+│   │       │   memory.hpp
+│   │       │   memory_cycles.cpp
+│   │       │   memory_cycles.hpp
+│   │       │   multimap.cpp
+│   │       │   multimap.hpp
+│   │       │   multiset.cpp
+│   │       │   multiset.hpp
+│   │       │   pair.cpp
+│   │       │   pair.hpp
+│   │       │   pod.cpp
+│   │       │   pod.hpp
+│   │       │   polymorphic.cpp
+│   │       │   polymorphic.hpp
+│   │       │   portability_test.cpp
+│   │       │   portable_binary_archive.cpp
+│   │       │   portable_binary_archive.hpp
+│   │       │   priority_queue.cpp
+│   │       │   priority_queue.hpp
+│   │       │   queue.cpp
+│   │       │   queue.hpp
+│   │       │   run_portability_test.cmake
+│   │       │   run_valgrind.sh
+│   │       │   set.cpp
+│   │       │   set.hpp
+│   │       │   stack.cpp
+│   │       │   stack.hpp
+│   │       │   structs.cpp
+│   │       │   structs.hpp
+│   │       │   structs_minimal.cpp
+│   │       │   structs_minimal.hpp
+│   │       │   structs_specialized.cpp
+│   │       │   structs_specialized.hpp
+│   │       │   tuple.cpp
+│   │       │   tuple.hpp
+│   │       │   unordered_loads.cpp
+│   │       │   unordered_loads.hpp
+│   │       │   unordered_map.cpp
+│   │       │   unordered_map.hpp
+│   │       │   unordered_multimap.cpp
+│   │       │   unordered_multimap.hpp
+│   │       │   unordered_multiset.cpp
+│   │       │   unordered_multiset.hpp
+│   │       │   unordered_set.cpp
+│   │       │   unordered_set.hpp
+│   │       │   user_data_adapters.cpp
+│   │       │   user_data_adapters.hpp
+│   │       │   valarray.cpp
+│   │       │   valarray.hpp
+│   │       │   vector.cpp
+│   │       │   vector.hpp
+│   │       │   versioning.cpp
+│   │       │   versioning.hpp
+│   │       │   
+│   │       ├───boost
+│   │       │       boost_variant.cpp
+│   │       │       boost_variant.hpp
+│   │       │       CMakeLists.txt
+│   │       │       
+│   │       └───cpp17
+│   │               CMakeLists.txt
+│   │               optional.cpp
+│   │               optional.hpp
+│   │               variant.cpp
+│   │               variant.hpp
+│   │               
+│   ├───DirectXTex
+│   │   │   BC.cpp
+│   │   │   BC.h
+│   │   │   BC4BC5.cpp
+│   │   │   BC6HBC7.cpp
+│   │   │   BCDirectCompute.cpp
+│   │   │   BCDirectCompute.h
+│   │   │   d3dx12.h
+│   │   │   DDS.h
+│   │   │   DirectXTex.h
+│   │   │   DirectXTex.inl
+│   │   │   DirectXTexCompress.cpp
+│   │   │   DirectXTexCompressGPU.cpp
+│   │   │   DirectXTexConvert.cpp
+│   │   │   DirectXTexD3D11.cpp
+│   │   │   DirectXTexD3D12.cpp
+│   │   │   DirectXTexDDS.cpp
+│   │   │   DirectXTexFlipRotate.cpp
+│   │   │   DirectXTexHDR.cpp
+│   │   │   DirectXTexImage.cpp
+│   │   │   DirectXTexMipmaps.cpp
+│   │   │   DirectXTexMisc.cpp
+│   │   │   DirectXTexNormalMaps.cpp
+│   │   │   DirectXTexP.h
+│   │   │   DirectXTexPMAlpha.cpp
+│   │   │   DirectXTexResize.cpp
+│   │   │   DirectXTexTGA.cpp
+│   │   │   DirectXTexUtil.cpp
+│   │   │   DirectXTexWIC.cpp
+│   │   │   DirectXTex_Desktop_2019.vcxproj
+│   │   │   DirectXTex_Desktop_2019.vcxproj.filters
+│   │   │   DirectXTex_Desktop_2019_Win10.vcxproj
+│   │   │   DirectXTex_Desktop_2019_Win10.vcxproj.filters
+│   │   │   DirectXTex_Desktop_2022.vcxproj
+│   │   │   DirectXTex_Desktop_2022.vcxproj.filters
+│   │   │   DirectXTex_Desktop_2022.vcxproj.user
+│   │   │   DirectXTex_Desktop_2022_Win10.vcxproj
+│   │   │   DirectXTex_Desktop_2022_Win10.vcxproj.filters
+│   │   │   DirectXTex_GDK_2019.vcxproj
+│   │   │   DirectXTex_GDK_2019.vcxproj.filters
+│   │   │   DirectXTex_GDK_2022.vcxproj
+│   │   │   DirectXTex_GDK_2022.vcxproj.filters
+│   │   │   DirectXTex_GXDK_PC_2019.vcxproj
+│   │   │   DirectXTex_GXDK_PC_2019.vcxproj.filters
+│   │   │   DirectXTex_GXDK_PC_2022.vcxproj
+│   │   │   DirectXTex_GXDK_PC_2022.vcxproj.filters
+│   │   │   DirectXTex_Windows10_2022.vcxproj
+│   │   │   DirectXTex_Windows10_2022.vcxproj.filters
+│   │   │   filters.h
+│   │   │   scoped.h
+│   │   │   
+│   │   ├───Bin
+│   │   │   └───Desktop_2022
+│   │   │       └───x64
+│   │   │           ├───Debug
+│   │   │           │   │   BC.obj
+│   │   │           │   │   BC4BC5.obj
+│   │   │           │   │   BC6HBC7.obj
+│   │   │           │   │   BCDirectCompute.obj
+│   │   │           │   │   DirectXTex.lib
+│   │   │           │   │   DirectXTex.lib.recipe
+│   │   │           │   │   DirectXTex.pch
+│   │   │           │   │   DirectXTex.pdb
+│   │   │           │   │   DirectXTexCompress.obj
+│   │   │           │   │   DirectXTexCompressGPU.obj
+│   │   │           │   │   DirectXTexConvert.obj
+│   │   │           │   │   DirectXTexD3D11.obj
+│   │   │           │   │   DirectXTexDDS.obj
+│   │   │           │   │   DirectXTexFlipRotate.obj
+│   │   │           │   │   DirectXTexHDR.obj
+│   │   │           │   │   DirectXTexImage.obj
+│   │   │           │   │   DirectXTexMipMaps.obj
+│   │   │           │   │   DirectXTexMisc.obj
+│   │   │           │   │   DirectXTexNormalMaps.obj
+│   │   │           │   │   DirectXTexPMAlpha.obj
+│   │   │           │   │   DirectXTexResize.obj
+│   │   │           │   │   DirectXTexTGA.obj
+│   │   │           │   │   DirectXTexUtil.obj
+│   │   │           │   │   DirectXTexWIC.obj
+│   │   │           │   │   DirectXTex_Desktop_2022.log
+│   │   │           │   │   DirectXTex_Desktop_2022.vcxproj.FileListAbsolute.txt
+│   │   │           │   │   
+│   │   │           │   └───DirectXTex.tlog
+│   │   │           │           CL.command.1.tlog
+│   │   │           │           Cl.items.tlog
+│   │   │           │           CL.read.1.tlog
+│   │   │           │           CL.write.1.tlog
+│   │   │           │           DirectXTex.lastbuildstate
+│   │   │           │           Lib-link.read.1.tlog
+│   │   │           │           Lib-link.write.1.tlog
+│   │   │           │           Lib.command.1.tlog
+│   │   │           │           
+│   │   │           └───Release
+│   │   │               │   BC.obj
+│   │   │               │   BC4BC5.obj
+│   │   │               │   BC6HBC7.obj
+│   │   │               │   BCDirectCompute.obj
+│   │   │               │   DirectXTex.lib
+│   │   │               │   DirectXTex.lib.recipe
+│   │   │               │   DirectXTex.pch
+│   │   │               │   DirectXTex.pdb
+│   │   │               │   DirectXTexCompress.obj
+│   │   │               │   DirectXTexCompressGPU.obj
+│   │   │               │   DirectXTexConvert.obj
+│   │   │               │   DirectXTexD3D11.obj
+│   │   │               │   DirectXTexDDS.obj
+│   │   │               │   DirectXTexFlipRotate.obj
+│   │   │               │   DirectXTexHDR.obj
+│   │   │               │   DirectXTexImage.obj
+│   │   │               │   DirectXTexMipMaps.obj
+│   │   │               │   DirectXTexMisc.obj
+│   │   │               │   DirectXTexNormalMaps.obj
+│   │   │               │   DirectXTexPMAlpha.obj
+│   │   │               │   DirectXTexResize.obj
+│   │   │               │   DirectXTexTGA.obj
+│   │   │               │   DirectXTexUtil.obj
+│   │   │               │   DirectXTexWIC.obj
+│   │   │               │   DirectXTex_Desktop_2022.log
+│   │   │               │   DirectXTex_Desktop_2022.vcxproj.FileListAbsolute.txt
+│   │   │               │   
+│   │   │               └───DirectXTex.tlog
+│   │   │                       CL.command.1.tlog
+│   │   │                       Cl.items.tlog
+│   │   │                       CL.read.1.tlog
+│   │   │                       CL.write.1.tlog
+│   │   │                       DirectXTex.lastbuildstate
+│   │   │                       Lib-link.read.1.tlog
+│   │   │                       Lib-link.write.1.tlog
+│   │   │                       Lib.command.1.tlog
+│   │   │                       
+│   │   └───Shaders
+│   │       │   BC6HEncode.hlsl
+│   │       │   BC7Encode.hlsl
+│   │       │   CompileShaders.cmd
+│   │       │   
+│   │       └───Compiled
+│   │               BC6HEncode_EncodeBlockCS.inc
+│   │               BC6HEncode_EncodeBlockCS.pdb
+│   │               BC6HEncode_EncodeBlockCS_cs40.inc
+│   │               BC6HEncode_EncodeBlockCS_cs40.pdb
+│   │               BC6HEncode_TryModeG10CS.inc
+│   │               BC6HEncode_TryModeG10CS.pdb
+│   │               BC6HEncode_TryModeG10CS_cs40.inc
+│   │               BC6HEncode_TryModeG10CS_cs40.pdb
+│   │               BC6HEncode_TryModeLE10CS.inc
+│   │               BC6HEncode_TryModeLE10CS.pdb
+│   │               BC6HEncode_TryModeLE10CS_cs40.inc
+│   │               BC6HEncode_TryModeLE10CS_cs40.pdb
+│   │               BC7Encode_EncodeBlockCS.inc
+│   │               BC7Encode_EncodeBlockCS.pdb
+│   │               BC7Encode_EncodeBlockCS_cs40.inc
+│   │               BC7Encode_EncodeBlockCS_cs40.pdb
+│   │               BC7Encode_TryMode02CS.inc
+│   │               BC7Encode_TryMode02CS.pdb
+│   │               BC7Encode_TryMode02CS_cs40.inc
+│   │               BC7Encode_TryMode02CS_cs40.pdb
+│   │               BC7Encode_TryMode137CS.inc
+│   │               BC7Encode_TryMode137CS.pdb
+│   │               BC7Encode_TryMode137CS_cs40.inc
+│   │               BC7Encode_TryMode137CS_cs40.pdb
+│   │               BC7Encode_TryMode456CS.inc
+│   │               BC7Encode_TryMode456CS.pdb
+│   │               BC7Encode_TryMode456CS_cs40.inc
+│   │               BC7Encode_TryMode456CS_cs40.pdb
+│   │               
+│   ├───imgui-docking
+│   │       imconfig.h
+│   │       imgui.cpp
+│   │       imgui.h
+│   │       imgui_demo.cpp
+│   │       imgui_draw.cpp
+│   │       imgui_impl_dx11.cpp
+│   │       imgui_impl_dx11.h
+│   │       imgui_impl_win32.cpp
+│   │       imgui_impl_win32.h
+│   │       imgui_internal.h
+│   │       imgui_widgets.cpp
+│   │       imstb_rectpack.h
+│   │       imstb_textedit.h
+│   │       imstb_truetype.h
+│   │       
+│   ├───ImGuizmo
+│   │       ImCurveEdit.cpp
+│   │       ImCurveEdit.h
+│   │       ImGradient.cpp
+│   │       ImGradient.h
+│   │       ImGuizmo.cpp
+│   │       ImGuizmo.h
+│   │       ImSequencer.cpp
+│   │       ImSequencer.h
+│   │       
+│   └───tinygltf
+│           json.hpp
+│           loader_example.cc
+│           stb_image.h
+│           stb_image_write.h
+│           tiny_gltf.cc
+│           tiny_gltf.h
+│           
+├───obj
+│   └───x64
+│       ├───Debug
+│       │   │   Actor.obj
+│       │   │   BasicShader.obj
+│       │   │   Camera.obj
+│       │   │   ConfirmCommandScene.obj
+│       │   │   Dialog.obj
+│       │   │   FpsCameraController.obj
+│       │   │   Framework.obj
+│       │   │   FreeCameraController.obj
+│       │   │   Game.exe.recipe
+│       │   │   Game.ilk
+│       │   │   Game.log
+│       │   │   GLTFImporter.obj
+│       │   │   GpuResourceUtils.obj
+│       │   │   Graphics.obj
+│       │   │   ImCurveEdit.obj
+│       │   │   ImGradient.obj
+│       │   │   imgui.obj
+│       │   │   ImGuiRenderer.obj
+│       │   │   ImGuizmo.obj
+│       │   │   imgui_demo.obj
+│       │   │   imgui_draw.obj
+│       │   │   imgui_impl_dx11.obj
+│       │   │   imgui_impl_win32.obj
+│       │   │   imgui_widgets.obj
+│       │   │   ImSequencer.obj
+│       │   │   InstancedLambertShader.obj
+│       │   │   LambertShader.obj
+│       │   │   LookAtScene.obj
+│       │   │   Main.obj
+│       │   │   Model.obj
+│       │   │   ModelComponent.obj
+│       │   │   ModelRenderer.obj
+│       │   │   ModelViewerScene.obj
+│       │   │   PlayerControllerComponent.obj
+│       │   │   PrimitiveRenderer.obj
+│       │   │   RaceRankingScene.obj
+│       │   │   RenderState.obj
+│       │   │   RootMotionExScene.obj
+│       │   │   RootMotionScene.obj
+│       │   │   Scene.obj
+│       │   │   SceneGame.obj
+│       │   │   ShapeRenderer.obj
+│       │   │   SortingAndFilteringScene.obj
+│       │   │   SpaceDivisionRaycastScene.obj
+│       │   │   SphereCast.obj
+│       │   │   SphereCastMoveScene.obj
+│       │   │   SphereVsTriangleCollisionScene.obj
+│       │   │   Sprite.obj
+│       │   │   SwordTrailScene.obj
+│       │   │   TransformUtils.obj
+│       │   │   TwoBoneIKScene.obj
+│       │   │   vc143.idb
+│       │   │   vc143.pdb
+│       │   │   WeightedCollisionScene.obj
+│       │   │   
+│       │   └───Game.tlog
+│       │           CL.command.1.tlog
+│       │           Cl.items.tlog
+│       │           CL.read.1.tlog
+│       │           CL.write.1.tlog
+│       │           fxc.command.1.tlog
+│       │           fxc.read.1.tlog
+│       │           fxc.write.1.tlog
+│       │           Game.lastbuildstate
+│       │           link.command.1.tlog
+│       │           link.read.1.tlog
+│       │           link.secondary.1.tlog
+│       │           link.write.1.tlog
+│       │           
+│       └───Release
+│           │   Actor.obj
+│           │   BasicShader.obj
+│           │   Camera.obj
+│           │   ConfirmCommandScene.obj
+│           │   Dialog.obj
+│           │   FpsCameraController.obj
+│           │   Framework.obj
+│           │   FreeCameraController.obj
+│           │   Game.exe.recipe
+│           │   Game.iobj
+│           │   Game.ipdb
+│           │   Game.log
+│           │   GLTFImporter.obj
+│           │   GpuResourceUtils.obj
+│           │   Graphics.obj
+│           │   ImCurveEdit.obj
+│           │   ImGradient.obj
+│           │   imgui.obj
+│           │   ImGuiRenderer.obj
+│           │   ImGuizmo.obj
+│           │   imgui_demo.obj
+│           │   imgui_draw.obj
+│           │   imgui_impl_dx11.obj
+│           │   imgui_impl_win32.obj
+│           │   imgui_widgets.obj
+│           │   ImSequencer.obj
+│           │   LambertShader.obj
+│           │   LookAtScene.obj
+│           │   Main.obj
+│           │   Model.obj
+│           │   ModelComponent.obj
+│           │   ModelRenderer.obj
+│           │   ModelViewerScene.obj
+│           │   PlayerControllerComponent.obj
+│           │   PrimitiveRenderer.obj
+│           │   RaceRankingScene.obj
+│           │   RenderState.obj
+│           │   RootMotionExScene.obj
+│           │   RootMotionScene.obj
+│           │   Scene.obj
+│           │   SceneGame.obj
+│           │   ShapeRenderer.obj
+│           │   SortingAndFilteringScene.obj
+│           │   SpaceDivisionRaycastScene.obj
+│           │   SphereCast.obj
+│           │   SphereCastMoveScene.obj
+│           │   SphereVsTriangleCollisionScene.obj
+│           │   Sprite.obj
+│           │   SwordTrailScene.obj
+│           │   TransformUtils.obj
+│           │   TwoBoneIKScene.obj
+│           │   vc143.pdb
+│           │   WeightedCollisionScene.obj
+│           │   
+│           └───Game.tlog
+│                   CL.command.1.tlog
+│                   Cl.items.tlog
+│                   CL.read.1.tlog
+│                   CL.write.1.tlog
+│                   fxc.command.1.tlog
+│                   fxc.read.1.tlog
+│                   fxc.write.1.tlog
+│                   Game.lastbuildstate
+│                   link.command.1.tlog
+│                   link.read.1.tlog
+│                   link.secondary.1.tlog
+│                   link.write.1.tlog
+│                   
+├───Shader
+│       Basic.hlsli
+│       BasicPS.hlsl
+│       BasicVS.hlsl
+│       Lambert.hlsli
+│       LambertPS.hlsl
+│       LambertVS.hlsl
+│       PrimitiveRenderer.hlsli
+│       PrimitiveRendererPS.hlsl
+│       PrimitiveRendererVS.hlsl
+│       Scene.hlsli
+│       ShapeRenderer.hlsli
+│       ShapeRendererPS.hlsl
+│       ShapeRendererVS.hlsl
+│       Skinning.hlsli
+│       Sprite.hlsli
+│       SpritePS.hlsl
+│       SpriteVS.hlsl
+│       
+└───Source
+    │   export_to_text.bat
+    │   structure.txt
+    │   ファイル階層構造テキスト出力ツール.bat
+    │   
+    ├───Camera
+    │       Camera.cpp
+    │       Camera.h
+    │       FpsCameraController.cpp
+    │       FpsCameraController.h
+    │       FreeCameraController.cpp
+    │       FreeCameraController.h
+    │       
+    ├───Core
+    │       Framework.cpp
+    │       Framework.h
+    │       HighResolutionTimer.h
+    │       Main.cpp
+    │       Misc.h
+    │       RenderContext.h
+    │       
+    ├───GameObject
+    │   │   Actor.cpp
+    │   │   Actor.h
+    │   │   Component.h
+    │   │   
+    │   └───Components
+    │           ModelComponent.cpp
+    │           ModelComponent.h
+    │           PlayerControllerComponent.cpp
+    │           PlayerControllerComponent.h
+    │           
+    ├───Graphics
+    │   │   GpuResourceUtils.cpp
+    │   │   GpuResourceUtils.h
+    │   │   Graphics.cpp
+    │   │   Graphics.h
+    │   │   Light.h
+    │   │   RenderState.cpp
+    │   │   RenderState.h
+    │   │   
+    │   ├───Model
+    │   │       GLTFImporter.cpp
+    │   │       GLTFImporter.h
+    │   │       Model.cpp
+    │   │       Model.h
+    │   │       ModelRenderer.cpp
+    │   │       ModelRenderer.h
+    │   │       
+    │   ├───Renderer
+    │   │       PrimitiveRenderer.cpp
+    │   │       PrimitiveRenderer.h
+    │   │       ShapeRenderer.cpp
+    │   │       ShapeRenderer.h
+    │   │       Sprite.cpp
+    │   │       Sprite.h
+    │   │       
+    │   └───ShaderClass
+    │           BasicShader.cpp
+    │           BasicShader.h
+    │           LambertShader.cpp
+    │           LambertShader.h
+    │           Shader.h
+    │           
+    ├───Physics
+    │       SphereCast.cpp
+    │       SphereCast.h
+    │       TransformUtils.cpp
+    │       TransformUtils.h
+    │       
+    ├───Scene
+    │       Scene.cpp
+    │       Scene.h
+    │       SceneGame.cpp
+    │       SceneGame.h
+    │       
+    └───UI
+            Dialog.cpp
+            Dialog.h
+            ImGuiRenderer.cpp
+            ImGuiRenderer.h
+            

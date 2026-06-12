@@ -145,9 +145,9 @@
     <ClInclude Include="Source\Graphics\Renderer\ShapeRenderer.h" />
     <ClInclude Include="Source\Graphics\Renderer\Sprite.h" />
     <ClInclude Include="Source\Graphics\RenderState.h" />
-    <ClInclude Include="Source\Graphics\Shader\BasicShader.h" />
-    <ClInclude Include="Source\Graphics\Shader\LambertShader.h" />
-    <ClInclude Include="Source\Graphics\Shader\Shader.h" />
+    <ClInclude Include="Source\Graphics\ShaderClass\BasicShader.h" />
+    <ClInclude Include="Source\Graphics\ShaderClass\LambertShader.h" />
+    <ClInclude Include="Source\Graphics\ShaderClass\Shader.h" />
     <ClInclude Include="Source\Physics\SphereCast.h" />
     <ClInclude Include="Source\Physics\TransformUtils.h" />
     <ClInclude Include="Source\Scene\Scene.h" />
@@ -183,8 +183,8 @@
     <ClCompile Include="Source\Graphics\Renderer\ShapeRenderer.cpp" />
     <ClCompile Include="Source\Graphics\Renderer\Sprite.cpp" />
     <ClCompile Include="Source\Graphics\RenderState.cpp" />
-    <ClCompile Include="Source\Graphics\Shader\BasicShader.cpp" />
-    <ClCompile Include="Source\Graphics\Shader\LambertShader.cpp" />
+    <ClCompile Include="Source\Graphics\ShaderClass\BasicShader.cpp" />
+    <ClCompile Include="Source\Graphics\ShaderClass\LambertShader.cpp" />
     <ClCompile Include="Source\Physics\SphereCast.cpp" />
     <ClCompile Include="Source\Physics\TransformUtils.cpp" />
     <ClCompile Include="Source\Scene\Scene.cpp" />

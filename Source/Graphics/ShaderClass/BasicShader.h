@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Graphics/Shader/Shader.h"
+#include "Graphics/ShaderClass/Shader.h"
 
-class LambertShader : public Shader
+class BasicShader : public Shader
 {
 public:
-	LambertShader(ID3D11Device* device);
-	~LambertShader() override = default;
+	BasicShader(ID3D11Device* device);
+	~BasicShader() override = default;
 
 	// ŠJnˆ—
 	void Begin(const RenderContext& rc) override;

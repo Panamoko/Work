@@ -1,6 +1,6 @@
 #include "Core/Misc.h"
 #include "Graphics/GpuResourceUtils.h"
-#include "Graphics/Shader/LambertShader.h"
+#include "Graphics/ShaderClass/LambertShader.h"
 
 LambertShader::LambertShader(ID3D11Device* device)
 {

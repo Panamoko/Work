@@ -2,8 +2,8 @@
 #include "Core/Misc.h"
 #include "Graphics/GpuResourceUtils.h"
 #include "Graphics/Model/ModelRenderer.h"
-#include "Graphics/Shader/BasicShader.h"
-#include "Graphics/Shader/LambertShader.h"
+#include "Graphics/ShaderClass/BasicShader.h"
+#include "Graphics/ShaderClass/LambertShader.h"
 
 // コンストラクタ
 ModelRenderer::ModelRenderer(ID3D11Device* device)
