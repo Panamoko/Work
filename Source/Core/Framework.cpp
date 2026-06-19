@@ -158,6 +158,20 @@ LRESULT CALLBACK Framework::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LP
 	case WM_EXITSIZEMOVE:
 		timer.Start();
 		break;
+	case WM_SIZE:
+		if (wParam != SIZE_MINIMIZED && Graphics::Instance().GetDevice() != nullptr)
+		{
+			UINT width = LOWORD(lParam);
+			UINT height = HIWORD(lParam);
+
+			// グラフィックスエンジンにキャンバスの再生成を命令
+			Graphics::Instance().Resize(width, height);
+
+			// マウスの座標系も新しい解像度に合わせて更新
+			Input::Instance().GetMouse().SetScreenWidth(width);
+			Input::Instance().GetMouse().SetScreenHeight(height);
+		}
+		break;
 	default:
 		return DefWindowProc(hWnd, msg, wParam, lParam);
 	}

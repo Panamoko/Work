@@ -134,11 +134,15 @@
     <ClInclude Include="Source\Core\Misc.h" />
     <ClInclude Include="Source\Core\Mouse.h" />
     <ClInclude Include="Source\Core\RenderContext.h" />
+    <ClInclude Include="Source\Core\ResourceManager.h" />
     <ClInclude Include="Source\GameObject\Actor.h" />
     <ClInclude Include="Source\GameObject\Component.h" />
     <ClInclude Include="Source\GameObject\Components\AnimatorComponent.h" />
+    <ClInclude Include="Source\GameObject\Components\CrosshairComponent.h" />
     <ClInclude Include="Source\GameObject\Components\ModelComponent.h" />
     <ClInclude Include="Source\GameObject\Components\PlayerControllerComponent.h" />
+    <ClInclude Include="Source\GameObject\Components\ViewModelComponent.h" />
+    <ClInclude Include="Source\GameObject\Components\WeaponComponent.h" />
     <ClInclude Include="Source\Graphics\GpuResourceUtils.h" />
     <ClInclude Include="Source\Graphics\Graphics.h" />
     <ClInclude Include="Source\Graphics\Light.h" />
@@ -180,8 +184,11 @@
     <ClCompile Include="Source\Core\Mouse.cpp" />
     <ClCompile Include="Source\GameObject\Actor.cpp" />
     <ClCompile Include="Source\GameObject\Components\AnimatorComponent.cpp" />
+    <ClCompile Include="Source\GameObject\Components\CrosshairComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\ModelComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\PlayerControllerComponent.cpp" />
+    <ClCompile Include="Source\GameObject\Components\ViewModelComponent.cpp" />
+    <ClCompile Include="Source\GameObject\Components\WeaponComponent.cpp" />
     <ClCompile Include="Source\Graphics\GpuResourceUtils.cpp" />
     <ClCompile Include="Source\Graphics\Graphics.cpp" />
     <ClCompile Include="Source\Graphics\Model\GLTFImporter.cpp" />

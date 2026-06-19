@@ -146,3 +146,55 @@ void Graphics::Present(UINT syncInterval)
 {
 	swapchain->Present(syncInterval, 0);
 }
+
+void Graphics::Resize(UINT width, UINT height)
+{
+	if (!swapchain || width == 0 || height == 0) return;
+
+	// 1. 既存のバックバッファ参照を完全に解除する（これを忘れるとResizeBuffersが失敗してクラッシュします）
+	immediateContext->OMSetRenderTargets(0, nullptr, nullptr);
+	renderTargetView.Reset();
+	depthStencilView.Reset();
+
+	// 2. スワップチェーンのリサイズ
+	HRESULT hr = swapchain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	screenWidth = static_cast<float>(width);
+	screenHeight = static_cast<float>(height);
+
+	// 3. レンダーターゲットビューの再作成
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+	hr = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(backBuffer.GetAddressOf()));
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	hr = device->CreateRenderTargetView(backBuffer.Get(), nullptr, renderTargetView.GetAddressOf());
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	// 4. 深度ステンシルビューの再作成
+	D3D11_TEXTURE2D_DESC depthDesc = {};
+	depthDesc.Width = width;
+	depthDesc.Height = height;
+	depthDesc.MipLevels = 1;
+	depthDesc.ArraySize = 1;
+	depthDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthDesc.SampleDesc.Count = 1;
+	depthDesc.SampleDesc.Quality = 0;
+	depthDesc.Usage = D3D11_USAGE_DEFAULT;
+	depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+
+	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthBuffer;
+	hr = device->CreateTexture2D(&depthDesc, nullptr, depthBuffer.GetAddressOf());
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	hr = device->CreateDepthStencilView(depthBuffer.Get(), nullptr, depthStencilView.GetAddressOf());
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	// 5. ビューポートの更新
+	viewport.Width = static_cast<float>(width);
+	viewport.Height = static_cast<float>(height);
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
+	viewport.TopLeftX = 0.0f;
+	viewport.TopLeftY = 0.0f;
+}

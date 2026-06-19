@@ -1,10 +1,10 @@
-#include <algorithm>
+ï»¿#include <algorithm>
+#include <cmath>
 #include <imgui.h>
 #include "GameObject/Components/AnimatorComponent.h"
 
 void AnimatorComponent::Start()
 {
-
 	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
 
 	if (cachedModelComponent && cachedModelComponent->GetModel())
@@ -24,7 +24,7 @@ void AnimatorComponent::PlayBlend(int indexA, int indexB, float blendRatio, floa
 {
 	if (!cachedModelComponent || !cachedModelComponent->GetModel()) return;
 
-	// šƒvƒ‚Ì‹ZpFƒtƒF[ƒh‚Ì€”õiŒ»İ‚Ìƒ|[ƒY‚ğ‰ß‹‚Æ‚µ‚Ä‹L‰¯‚µAƒ^ƒCƒ}[‚ğƒŠƒZƒbƒgj
+	// â˜…ãƒ—ãƒ­ã®æŠ€è¡“ï¼šãƒ•ã‚§ãƒ¼ãƒ‰ã®æº–å‚™ï¼ˆç¾åœ¨ã®ãƒãƒ¼ã‚ºã‚’éå»ã¨ã—ã¦è¨˜æ†¶ã—ã€ã‚¿ã‚¤ãƒãƒ¼ã‚’ãƒªã‚»ãƒƒãƒˆï¼‰
 	if (fadeLength > 0.0f && currentPoses.size() > 0)
 	{
 		previousPoses = currentPoses;
@@ -43,7 +43,7 @@ void AnimatorComponent::PlayBlend(int indexA, int indexB, float blendRatio, floa
 	this->isLoop = loop;
 	animationSeconds = 0.0f;
 
-	// ƒAƒjƒ[ƒVƒ‡ƒ“‚Ì’·‚³‚ğæ“¾‚µA¡~‚ßİ’è‚ª‚ ‚ê‚Î“K—p‚·‚é
+	// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®é•·ã•ã‚’å–å¾—ã—ã€å¯¸æ­¢ã‚è¨­å®šãŒã‚ã‚Œã°é©ç”¨ã™ã‚‹
 	Model* model = cachedModelComponent->GetModel().get();
 	if (indexA >= 0)
 	{
@@ -68,7 +68,7 @@ void AnimatorComponent::Update(float elapsedTime)
 
 	animationSeconds += elapsedTime * animSpeed;
 
-	// ƒ‹[ƒv‚ÆƒNƒ‰ƒ“ƒvi¡~‚ßj‚Ìˆ—
+	// ãƒ«ãƒ¼ãƒ—ã¨ã‚¯ãƒ©ãƒ³ãƒ—ï¼ˆå¯¸æ­¢ã‚ï¼‰ã®å‡¦ç†
 	if (!isLoop)
 	{
 		if (animationSeconds >= currentAnimLength)
@@ -76,17 +76,41 @@ void AnimatorComponent::Update(float elapsedTime)
 	}
 	else
 	{
-		if (animationSeconds > currentAnimLength)
-			animationSeconds -= currentAnimLength;
+		// â˜…ãƒ—ãƒ­ã®ä¿®æ­£ï¼šå‡¦ç†è½ã¡ã§ä¸€æ°—ã«æ™‚é–“ãŒé€²ã‚“ã å ´åˆã§ã‚‚å®‰å…¨ã«ãƒ«ãƒ¼ãƒ—ã‚’å·»ãæˆ»ã™
+		if (currentAnimLength > 0.0001f) {
+			while (animationSeconds > currentAnimLength) {
+				animationSeconds -= currentAnimLength;
+			}
+		}
 	}
 
-	// 1. w’è‚³‚ê‚½ƒAƒjƒ[ƒVƒ‡ƒ“‚Ìƒ|[ƒY‚ğŒvZ
+	// 1. æŒ‡å®šã•ã‚ŒãŸã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®ãƒãƒ¼ã‚ºã‚’è¨ˆç®—
 	if (currentAnimIndexA >= 0 && currentAnimIndexB >= 0)
 	{
 		std::vector<Model::NodePose> posesA = currentPoses;
 		std::vector<Model::NodePose> posesB = currentPoses;
+
+		// =======================================================
+		// â˜…ãƒ—ãƒ­ã®ä¿®æ­£ï¼šãƒ•ã‚§ãƒ¼ã‚ºã‚·ãƒ³ã‚¯ï¼ˆä½ç›¸åŒæœŸã‚¢ãƒ«ã‚´ãƒªã‚ºãƒ ï¼‰
+		// =======================================================
+		float progressA = 0.0f;
+		// ã‚¼ãƒ­é™¤ç®—ã«ã‚ˆã‚‹ã‚¯ãƒ©ãƒƒã‚·ãƒ¥ã‚’é˜²æ­¢
+		if (currentAnimLength > 0.0001f) {
+			// Aï¼ˆãƒ¡ã‚¤ãƒ³ï¼‰ã®ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ãŒã€Œç¾åœ¨ä½•ãƒ‘ãƒ¼ã‚»ãƒ³ãƒˆ(0.0ã€œ1.0)é€²ã‚“ã§ã„ã‚‹ã‹ã€ã‚’è¨ˆç®—
+			progressA = animationSeconds / currentAnimLength;
+		}
+
+		// Bï¼ˆã‚µãƒ–ï¼‰ã®ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®å…¨ä½“ã®é•·ã•ã‚’å–å¾—
+		float animLengthB = model->GetAnimations().at(currentAnimIndexB).secondsLength;
+
+		// Bã®å†ç”Ÿæ™‚é–“ã‚’ã€Aã®é€²æ—ç‡ã«åˆã‚ã›ã¦ã€Œå¼·åˆ¶çš„ã«ã‚¿ã‚¤ãƒ ãƒ¯ãƒ¼ãƒ—ã€ã•ã›ã‚‹ï¼
+		float animationSecondsB = animLengthB * progressA;
+
 		model->ComputeAnimation(currentAnimIndexA, animationSeconds, posesA);
-		model->ComputeAnimation(currentAnimIndexB, animationSeconds, posesB);
+
+		// Bã«ã¯ã€é€šå¸¸ã®æ™‚é–“ã§ã¯ãªãå¼·åˆ¶åŒæœŸã•ã›ãŸæ™‚é–“ã‚’æ¸¡ã™
+		model->ComputeAnimation(currentAnimIndexB, animationSecondsB, posesB);
+
 		BlendNodePoses(currentPoses, posesA, posesB, currentBlendRatio);
 	}
 	else if (currentAnimIndexA >= 0)
@@ -94,7 +118,7 @@ void AnimatorComponent::Update(float elapsedTime)
 		model->ComputeAnimation(currentAnimIndexA, animationSeconds, currentPoses);
 	}
 
-	// 2. ƒNƒƒXƒtƒF[ƒh‚Ì“K—p
+	// 2. ã‚¯ãƒ­ã‚¹ãƒ•ã‚§ãƒ¼ãƒ‰ã®é©ç”¨
 	if (isFading)
 	{
 		fadeTimer += elapsedTime;
@@ -104,12 +128,12 @@ void AnimatorComponent::Update(float elapsedTime)
 			isFading = false;
 			fadeWeight = 1.0f;
 		}
-		// šƒoƒO‰ñ”ğF“¯‚¶”z—ñ‚Ì“¯“Ç‚İ‘‚«‚ğ–h‚®‚½‚ßAˆêƒoƒbƒtƒ@itempPosesj‚ğ—pˆÓ‚·‚é
+		// â˜…ãƒã‚°å›é¿ï¼šåŒã˜é…åˆ—ã®åŒæ™‚èª­ã¿æ›¸ãã‚’é˜²ããŸã‚ã€ä¸€æ™‚ãƒãƒƒãƒ•ã‚¡ï¼ˆtempPosesï¼‰ã‚’ç”¨æ„ã™ã‚‹
 		std::vector<Model::NodePose> tempPoses = currentPoses;
 		BlendNodePoses(currentPoses, previousPoses, tempPoses, fadeWeight);
 	}
 
-	// ÅIŒ‹‰Ê‚ğƒ‚ƒfƒ‹‚É”½‰f
+	// æœ€çµ‚çµæœã‚’ãƒ¢ãƒ‡ãƒ«ã«åæ˜ 
 	model->SetNodePoses(currentPoses);
 }
 
@@ -136,6 +160,6 @@ void AnimatorComponent::BlendNodePoses(std::vector<Model::NodePose>& outPoses, c
 
 void AnimatorComponent::OnGUI()
 {
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"¥ Animator “à•”ó‘Ô");
-	ImGui::Text(u8"ƒNƒƒXƒtƒF[ƒh: %s (%.2f / %.2f)", isFading ? "TRUE" : "FALSE", fadeTimer, fadeLength);
+	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"â–¼ Animator å†…éƒ¨çŠ¶æ…‹");
+	ImGui::Text(u8"ã‚¯ãƒ­ã‚¹ãƒ•ã‚§ãƒ¼ãƒ‰: %s (%.2f / %.2f)", isFading ? "TRUE" : "FALSE", fadeTimer, fadeLength);
 }

@@ -29,6 +29,8 @@ public:
 	// クリア
 	void Clear(float r, float g, float b, float a);
 
+	void Resize(UINT width, UINT height);
+
 	// レンダーターゲット設定
 	void SetRenderTargets();
 

@@ -1,11 +1,12 @@
 #include <imgui.h>
 #include "Graphics/Graphics.h"
 #include "GameObject/Components/ModelComponent.h"
+#include "Core/ResourceManager.h" // ★プロの追加：リソースマネージャーをインクルード
 
 ModelComponent::ModelComponent(const char* filename)
 {
-	ID3D11Device* device = Graphics::Instance().GetDevice();
-	model = std::make_shared<Model>(device, filename);
+	// ★プロの修正：毎回 new するのではなく、ResourceManager 経由で共有ポインタを取得する（Flyweightパターン）
+	model = ResourceManager::Instance().LoadModel(filename);
 
 	if (model != nullptr)
 	{

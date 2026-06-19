@@ -1,9 +1,11 @@
 #include "Graphics/Graphics.h"
 #include "Scene/SceneGame.h"
+#include "GameObject/Actor.h"
 #include "GameObject/Components/ModelComponent.h"
-#include "GameObject/Components/PlayerControllerComponent.h" // コンポーネントをインクルード
-#include "GameObject/Components/AnimatorComponent.h" // ★追加：アニメーターをインクルード
-
+#include "GameObject/Components/PlayerControllerComponent.h" 
+#include "GameObject/Components/AnimatorComponent.h" 
+#include "GameObject/Components/ViewModelComponent.h" 
+#include "GameObject/Components/CrosshairComponent.h"
 SceneGame::SceneGame()
 {
 	ID3D11Device* device = Graphics::Instance().GetDevice();
@@ -18,7 +20,7 @@ SceneGame::SceneGame()
 	cameraController.SyncCameraToController(camera);
 
 	// =======================================================
-	// ステージアクターの生成と衝突メッシュ(CollisionMesh)の構築
+	// ステージアクターの生成
 	// =======================================================
 	stageActor = ActorManager::Instance().Create();
 	stageActor->SetName("Stage");
@@ -27,7 +29,6 @@ SceneGame::SceneGame()
 	CollisionMesh collisionMesh;
 	Model* stageModel = stageModelComp->GetModel().get();
 
-	// ステージモデルの全メッシュから三角形ポリゴンを抽出して物理判定用のリストを作る
 	for (const Model::Mesh& mesh : stageModel->GetMeshes())
 	{
 		DirectX::XMMATRIX WorldTransform = DirectX::XMLoadFloat4x4(&mesh.node->worldTransform);
@@ -56,39 +57,47 @@ SceneGame::SceneGame()
 			DirectX::XMStoreFloat3(&triangle.normal, N);
 		}
 	}
+	collisionMesh.BuildSpatialGrid(); // 空間ハッシュグリッドの構築（Broad Phase）
 
+	// =======================================================
+	// プレイヤーアクターの生成（当たり判定・カメラ操作用）
+	// =======================================================
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
-	playerActor->AddComponent<ModelComponent>("Data/Model/Mr.Incredible/Player.glb");
 
-	// ★追加忘れ注意！：アニメーターコンポーネント
-	playerActor->AddComponent<AnimatorComponent>();
+	// ★プロの修正：WeaponActorへの依存を完全に切り離す（nullptrを渡すか、引数自体を削除）
+	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
 
 	// =======================================================
-	// ★ここを追加：武器アクターを作り、PlayerControllerに渡す！
+	// ★新規：FPS視点専用の「腕＋銃」アクター（ViewModel）
 	// =======================================================
-	std::shared_ptr<Actor> weaponActor = ActorManager::Instance().Create();
-	weaponActor->SetName("Weapon");
-	// ※ライフルのファイルパスはあなたの環境に合わせてください
-	weaponActor->AddComponent<ModelComponent>("Data/Model/Weapon/Rifle.glb");
+	// 【重要】必ず playerActor より後に Create すること。
+	// これにより Update() の順番が Player -> ViewModel となり、カメラ遅延（1フレームのズレ）が消滅します。
+	viewModelActor = ActorManager::Instance().Create();
+	viewModelActor->SetName("ViewModel");
 
-	// ★ここを修正：第4引数として `weaponActor.get()` を渡す！
-	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh, weaponActor.get());
+	// Sketchfab等で用意した「腕と銃」のモデルパスを指定してください
+	viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/Pistol.glb");
+	viewModelActor->AddComponent<AnimatorComponent>();
+
+	// 強制補正コンポーネントをアタッチし、追従すべきカメラを渡す
+	auto playerCtrl = playerActor->GetComponent<PlayerControllerComponent>();
+	viewModelActor->AddComponent<ViewModelComponent>(&camera, playerCtrl.get());
+
+	// ★修正：銃と連携しやすくするため、ViewModelのアクターにクロスヘアを持たせる
+	viewModelActor->AddComponent<CrosshairComponent>();
 }
 
 SceneGame::~SceneGame()
 {
-	// シーン終了時、確実にアクターを削除してメモリを解放する
-	ActorManager::Instance().Remove(playerActor);
 	ActorManager::Instance().Remove(stageActor);
+	ActorManager::Instance().Remove(playerActor);
+	ActorManager::Instance().Remove(viewModelActor); // ★追加：メモリリーク防止
 }
 
 void SceneGame::Update(float elapsedTime)
 {
-	// 全てのアクターとコンポーネントのロジックを一括更新
 	ActorManager::Instance().Update(elapsedTime);
-
-	// 全てのアクターのワールド行列を一括更新
 	ActorManager::Instance().UpdateTransform();
 }
 
@@ -99,11 +108,31 @@ void SceneGame::Render(float elapsedTime)
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	// 全てのアクターの描画を一括処理
 	ActorManager::Instance().Render(rc);
+
+	// =======================================================
+	// ★追加：蓄積された3Dエフェクト（弾道・火花・弾痕）を描画する
+	// =======================================================
+	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera.GetRight());
+	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera.GetUp());
+	DirectX::XMVECTOR F = DirectX::XMLoadFloat3(&camera.GetFront());
+	DirectX::XMVECTOR E = DirectX::XMLoadFloat3(&camera.GetEye());
+	DirectX::XMMATRIX mCamWorld;
+	mCamWorld.r[0] = DirectX::XMVectorSetW(R, 0.0f); mCamWorld.r[1] = DirectX::XMVectorSetW(U, 0.0f);
+	mCamWorld.r[2] = DirectX::XMVectorSetW(F, 0.0f); mCamWorld.r[3] = DirectX::XMVectorSetW(E, 1.0f);
+	DirectX::XMMATRIX mView = DirectX::XMMatrixInverse(nullptr, mCamWorld);
+
+	float aspect = Graphics::Instance().GetScreenWidth() / Graphics::Instance().GetScreenHeight();
+	DirectX::XMMATRIX mProj = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(60), aspect, 0.35f, 1000.0f);
+
+	DirectX::XMFLOAT4X4 view, proj;
+	DirectX::XMStoreFloat4x4(&view, mView);
+	DirectX::XMStoreFloat4x4(&proj, mProj);
+
+	// ShapeRendererを呼び出して、キューに溜まったエフェクトを一気に描画
+	Graphics::Instance().GetShapeRenderer()->Render(rc.deviceContext, view, proj);
 }
 
 void SceneGame::DrawGUI()
 {
-	// UIの描画も各コンポーネントの OnGUI() が自動で呼ばれるため、シーン側では何もしない
 }
