@@ -22,6 +22,9 @@ private:
 	std::shared_ptr<class Actor> stageActor;
 	std::shared_ptr<class Actor> playerActor;
 
-	// ★プロの修正：WeaponActorを廃止し、FPS専用のViewModelActorに変更
+	// 都築の修正：WeaponActorを廃止し、FPS専用のViewModelActorに変更
 	std::shared_ptr<class Actor> viewModelActor;
+
+	// PBR確認用：DamagedHelmet
+	std::shared_ptr<class Actor> helmetActor;
 };

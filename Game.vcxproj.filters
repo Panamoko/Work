@@ -210,6 +210,9 @@
     <ClInclude Include="Source\GameObject\Components\CrosshairComponent.h">
       <Filter>Source\GameObject\Components</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Graphics\ShaderClass\PbrShader.h">
+      <Filter>Source\Graphics\ShaderClass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -338,6 +341,9 @@
     <ClCompile Include="Source\GameObject\Components\CrosshairComponent.cpp">
       <Filter>Source\GameObject\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Graphics\ShaderClass\PbrShader.cpp">
+      <Filter>Source\Graphics\ShaderClass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shader\Sprite.hlsli">
@@ -359,6 +365,9 @@
       <Filter>Shader</Filter>
     </None>
     <None Include="Shader\Scene.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Pbr.hlsli">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>
@@ -391,6 +400,12 @@
       <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="Shader\LambertVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\PbrVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\PbrPS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>

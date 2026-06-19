@@ -65,14 +65,14 @@ SceneGame::SceneGame()
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
 
-	// ★プロの修正：WeaponActorへの依存を完全に切り離す（nullptrを渡すか、引数自体を削除）
+	// 都築の修正：WeaponActorへの依存を完全に切り離し（nullptrを渡さず、メンバそのものを削除）
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
 
 	// =======================================================
 	// ★新規：FPS視点専用の「腕＋銃」アクター（ViewModel）
 	// =======================================================
-	// 【重要】必ず playerActor より後に Create すること。
-	// これにより Update() の順番が Player -> ViewModel となり、カメラ遅延（1フレームのズレ）が消滅します。
+	// 【重要】必ず playerActor の後で Create すること。
+	// これにより Update() の順番が Player -> ViewModel となり、カメラ遅延（1フレームのズレ）を防げます。
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
 
@@ -80,12 +80,22 @@ SceneGame::SceneGame()
 	viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/Pistol.glb");
 	viewModelActor->AddComponent<AnimatorComponent>();
 
-	// 強制補正コンポーネントをアタッチし、追従すべきカメラを渡す
+	// 自動補正コンポーネントをアタッチし、追従すべきカメラを渡す
 	auto playerCtrl = playerActor->GetComponent<PlayerControllerComponent>();
 	viewModelActor->AddComponent<ViewModelComponent>(&camera, playerCtrl.get());
 
-	// ★修正：銃と連携しやすくするため、ViewModelのアクターにクロスヘアを持たせる
+	// 修正：弾と連携しやすくするため、ViewModelのアクターにクロスヘアを持たせる
 	viewModelActor->AddComponent<CrosshairComponent>();
+
+	// =======================================================
+	// ★PBR確認用：DamagedHelmet を配置
+	// =======================================================
+	helmetActor = ActorManager::Instance().Create();
+	helmetActor->SetName("DamagedHelmet");
+	auto helmetModelComp = helmetActor->AddComponent<ModelComponent>("Data/Model/Stage/DamagedHelmet.glb");
+	helmetModelComp->SetShaderId(ShaderId::Pbr);             // PBRシェーダーで描画
+	helmetActor->SetPosition({ 10.0f, 2.1f, 7.0f });        // 開始時のカメラ前方
+	helmetActor->SetScale({ 1.0f, 1.0f, 1.0f });
 }
 
 SceneGame::~SceneGame()
@@ -93,6 +103,7 @@ SceneGame::~SceneGame()
 	ActorManager::Instance().Remove(stageActor);
 	ActorManager::Instance().Remove(playerActor);
 	ActorManager::Instance().Remove(viewModelActor); // ★追加：メモリリーク防止
+	ActorManager::Instance().Remove(helmetActor);    // ★追加
 }
 
 void SceneGame::Update(float elapsedTime)

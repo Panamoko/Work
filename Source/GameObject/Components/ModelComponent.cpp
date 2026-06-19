@@ -71,7 +71,7 @@ void ModelComponent::OnGUI()
 		ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"ƒ‚ƒfƒ‹“ÇŠ®—¹");
 
 		int currentShader = static_cast<int>(shaderId);
-		const char* shaderNames[] = { "Basic", "Lambert" };
+		const char* shaderNames[] = { "Basic", "Lambert","PBR"};
 		if (ImGui::Combo("Shader", &currentShader, shaderNames, IM_ARRAYSIZE(shaderNames)))
 		{
 			shaderId = static_cast<ShaderId>(currentShader);

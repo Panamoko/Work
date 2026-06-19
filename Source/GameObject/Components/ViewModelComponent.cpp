@@ -33,6 +33,12 @@ void ViewModelComponent::SaveSettings()
 		ofs << offsetPos.x << " " << offsetPos.y << " " << offsetPos.z << "\n";
 		ofs << offsetRot.x << " " << offsetRot.y << " " << offsetRot.z << "\n";
 		ofs << offsetScale.x << " " << offsetScale.y << " " << offsetScale.z << "\n";
+
+		// =======================================================
+		// ★追加：銃口オフセットと、デバッグ表示のON/OFF状態も保存する
+		// =======================================================
+		ofs << muzzleOffset.x << " " << muzzleOffset.y << " " << muzzleOffset.z << "\n";
+		ofs << showDebugMuzzle << "\n";
 	}
 }
 
@@ -43,6 +49,12 @@ void ViewModelComponent::LoadSettings()
 		ifs >> offsetPos.x >> offsetPos.y >> offsetPos.z;
 		ifs >> offsetRot.x >> offsetRot.y >> offsetRot.z;
 		ifs >> offsetScale.x >> offsetScale.y >> offsetScale.z;
+
+		// =======================================================
+		// ★追加：保存した順番と「全く同じ順番」で読み込む
+		// =======================================================
+		ifs >> muzzleOffset.x >> muzzleOffset.y >> muzzleOffset.z;
+		ifs >> showDebugMuzzle;
 	}
 }
 

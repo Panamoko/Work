@@ -155,6 +155,7 @@
     <ClInclude Include="Source\Graphics\RenderState.h" />
     <ClInclude Include="Source\Graphics\ShaderClass\BasicShader.h" />
     <ClInclude Include="Source\Graphics\ShaderClass\LambertShader.h" />
+    <ClInclude Include="Source\Graphics\ShaderClass\PbrShader.h" />
     <ClInclude Include="Source\Graphics\ShaderClass\Shader.h" />
     <ClInclude Include="Source\Physics\SphereCast.h" />
     <ClInclude Include="Source\Physics\TransformUtils.h" />
@@ -200,6 +201,7 @@
     <ClCompile Include="Source\Graphics\RenderState.cpp" />
     <ClCompile Include="Source\Graphics\ShaderClass\BasicShader.cpp" />
     <ClCompile Include="Source\Graphics\ShaderClass\LambertShader.cpp" />
+    <ClCompile Include="Source\Graphics\ShaderClass\PbrShader.cpp" />
     <ClCompile Include="Source\Physics\SphereCast.cpp" />
     <ClCompile Include="Source\Physics\TransformUtils.cpp" />
     <ClCompile Include="Source\Scene\Scene.cpp" />
@@ -210,6 +212,7 @@
   <ItemGroup>
     <None Include="Shader\Basic.hlsli" />
     <None Include="Shader\Lambert.hlsli" />
+    <None Include="Shader\Pbr.hlsli" />
     <None Include="Shader\Scene.hlsli" />
     <None Include="Shader\ShapeRenderer.hlsli" />
     <None Include="Shader\PrimitiveRenderer.hlsli" />
@@ -232,6 +235,18 @@
     <FxCompile Include="Shader\LambertVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shader\PbrPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Data\CompiledShader\%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Data\CompiledShader\%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="Shader\PbrVS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Data\CompiledShader\%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Data\CompiledShader\%(Filename).cso</ObjectFileOutput>
     </FxCompile>
     <FxCompile Include="Shader\ShapeRendererPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

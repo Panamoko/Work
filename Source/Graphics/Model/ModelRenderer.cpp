@@ -4,7 +4,7 @@
 #include "Graphics/Model/ModelRenderer.h"
 #include "Graphics/ShaderClass/BasicShader.h"
 #include "Graphics/ShaderClass/LambertShader.h"
-
+#include "Graphics/ShaderClass/PbrShader.h"  
 // コンストラクタ
 ModelRenderer::ModelRenderer(ID3D11Device* device)
 {
@@ -23,6 +23,7 @@ ModelRenderer::ModelRenderer(ID3D11Device* device)
 	// シェーダー生成
 	shaders[static_cast<int>(ShaderId::Basic)] = std::make_unique<BasicShader>(device);
 	shaders[static_cast<int>(ShaderId::Lambert)] = std::make_unique<LambertShader>(device);
+	shaders[static_cast<int>(ShaderId::Pbr)] = std::make_unique<PbrShader>(device);  
 }
 
 // 箱描画
