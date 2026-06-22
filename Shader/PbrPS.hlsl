@@ -149,5 +149,5 @@ float4 main(VS_OUT pin) : SV_TARGET
     color = color / (color + 1.0f);
     color = pow(max(color, 0.0f), 1.0f / 2.2f);
 
-    return float4(color, baseColor.a);
+    return float4(PrefilteredMap.SampleLevel(LinearClampSampler, reflect(-V, N), 0).rgb, 1.0f);
 }
