@@ -1,7 +1,7 @@
 [Project Structure] 
  
 Folder PATH listing for volume Windows
-Volume serial number is 00000078 0255:C8DA
+Volume serial number is 0000009D 0255:C8DA
 C:.
 Да   .gitignore
 Да   Game.sln
@@ -28,9 +28,6 @@ C:.
 Да   Да   FBX2glTF-windows-x64.exe
 Да   Да   FBX2glTF.bat
 Да   Да   
-Да   ДеДЯДЯДЯ CompiledShader
-Да   Да       PbrPS.cso
-Да   Да       
 Да   ДеДЯДЯДЯCompiledShader
 Да   Да       BasicPS.cso
 Да   Да       BasicVS.cso
@@ -451,6 +448,7 @@ C:.
 Да   Да   Да               Да   BC4BC5.obj
 Да   Да   Да               Да   BC6HBC7.obj
 Да   Да   Да               Да   BCDirectCompute.obj
+Да   Да   Да               Да   DirectXTex.Build.CppClean.log
 Да   Да   Да               Да   DirectXTex.lib
 Да   Да   Да               Да   DirectXTex.lib.recipe
 Да   Да   Да               Да   DirectXTex.pch
@@ -635,16 +633,17 @@ C:.
 Да           Да   AnimatorComponent.obj
 Да           Да   BasicShader.obj
 Да           Да   Camera.obj
-Да           Да   ConfirmCommandScene.obj
 Да           Да   CrosshairComponent.obj
 Да           Да   Dialog.obj
 Да           Да   FpsCameraController.obj
 Да           Да   Framework.obj
 Да           Да   FreeCameraController.obj
+Да           Да   Game.Build.CppClean.log
 Да           Да   Game.exe.recipe
 Да           Да   Game.iobj
 Да           Да   Game.ipdb
 Да           Да   Game.log
+Да           Да   Game.vcxproj.FileListAbsolute.txt
 Да           Да   GamePad.obj
 Да           Да   GLTFImporter.obj
 Да           Да   GpuResourceUtils.obj
@@ -662,36 +661,24 @@ C:.
 Да           Да   ImSequencer.obj
 Да           Да   Input.obj
 Да           Да   LambertShader.obj
-Да           Да   LookAtScene.obj
 Да           Да   Main.obj
 Да           Да   Model.obj
 Да           Да   ModelComponent.obj
 Да           Да   ModelRenderer.obj
-Да           Да   ModelViewerScene.obj
 Да           Да   Mouse.obj
 Да           Да   PbrShader.obj
 Да           Да   PlayerControllerComponent.obj
 Да           Да   PrimitiveRenderer.obj
-Да           Да   RaceRankingScene.obj
 Да           Да   RenderState.obj
-Да           Да   RootMotionExScene.obj
-Да           Да   RootMotionScene.obj
 Да           Да   Scene.obj
 Да           Да   SceneGame.obj
 Да           Да   ShapeRenderer.obj
-Да           Да   SortingAndFilteringScene.obj
-Да           Да   SpaceDivisionRaycastScene.obj
 Да           Да   SphereCast.obj
-Да           Да   SphereCastMoveScene.obj
-Да           Да   SphereVsTriangleCollisionScene.obj
 Да           Да   Sprite.obj
-Да           Да   SwordTrailScene.obj
 Да           Да   TransformUtils.obj
-Да           Да   TwoBoneIKScene.obj
 Да           Да   vc143.pdb
 Да           Да   ViewModelComponent.obj
 Да           Да   WeaponComponent.obj
-Да           Да   WeightedCollisionScene.obj
 Да           Да   
 Да           ДдДЯДЯДЯGame.tlog
 Да                   CL.command.1.tlog
