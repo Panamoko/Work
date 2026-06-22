@@ -1,11 +1,11 @@
 #include <imgui.h>
 #include "Graphics/Graphics.h"
 #include "GameObject/Components/ModelComponent.h"
-#include "Core/ResourceManager.h" // ★プロの追加：リソースマネージャーをインクルード
+#include "Core/ResourceManager.h" // リソースマネージャー
 
 ModelComponent::ModelComponent(const char* filename)
 {
-	// ★プロの修正：毎回 new するのではなく、ResourceManager 経由で共有ポインタを取得する（Flyweightパターン）
+	// 毎回 new するのではなく、ResourceManager 経由で共有ポインタを取得する
 	model = ResourceManager::Instance().LoadModel(filename);
 
 	if (model != nullptr)
@@ -71,31 +71,37 @@ void ModelComponent::OnGUI()
 		ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"モデル読込完了");
 
 		int currentShader = static_cast<int>(shaderId);
-		const char* shaderNames[] = { "Basic", "Lambert","PBR"};
+
+		// =======================================================
+		// ★修正：インスペクターのプルダウン配列に "Toon" を追加！
+		// =======================================================
+		const char* shaderNames[] = { "Basic", "Lambert", "PBR", "Toon" };
 		if (ImGui::Combo("Shader", &currentShader, shaderNames, IM_ARRAYSIZE(shaderNames)))
 		{
 			shaderId = static_cast<ShaderId>(currentShader);
 		}
 
 		ImGui::Separator();
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"アニメーション設定");
+		ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ マテリアル設定");
+		auto& materials = model->GetMaterials();
+		for (size_t i = 0; i < materials.size(); ++i) {
+			ImGui::PushID(static_cast<int>(i));
+			ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"マテリアル [%d]: %s", i, materials[i].name.c_str());
 
-		// ★プロのハック: バー付きのスライダー (SliderFloat) を使用。
-		// アニメーション速度のように「下限(0.0)と上限(5.0)が明確な値」にはこちらが最適です。
-		ImGui::SliderFloat("Speed", &animSpeed, 0.0f, 5.0f);
+			if (ImGui::Button(u8"【 テクスチャの呪縛を解除 】")) {
+				materials[i].baseMap.Reset();
+				materials[i].metalnessRoughnessMap.Reset();
+				materials[i].normalMap.Reset();
+				materials[i].emissiveMap.Reset();
+				materials[i].occlusionMap.Reset();
+			}
 
-		if (animationIndex >= 0)
-		{
-			ImGui::Text("Current Anim Index: %d", animationIndex);
-			ImGui::Text("Time: %.2f", animationSeconds);
+			ImGui::SliderFloat(u8"粗さ (Roughness)", &materials[i].roughness, 0.0f, 1.0f);
+			ImGui::SliderFloat(u8"金属度 (Metalness)", &materials[i].metalness, 0.0f, 1.0f);
+			ImGui::ColorEdit3(u8"ベースカラー (色)", &materials[i].baseColor.x);
+
+			ImGui::PopID();
+			ImGui::Separator();
 		}
-		else
-		{
-			ImGui::Text("No Animation Playing");
-		}
-	}
-	else
-	{
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), u8"モデルがありません");
 	}
 }

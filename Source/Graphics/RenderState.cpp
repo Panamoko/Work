@@ -246,6 +246,25 @@ RenderState::RenderState(ID3D11Device* device)
 			rasterizerStates[static_cast<int>(RasterizerState::SolidCullBack)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
+	// =======================================================
+	// ★追加：ベタ塗り＆表面カリング（トゥーンのアウトライン描画用）
+	// =======================================================
+	{
+		D3D11_RASTERIZER_DESC desc{};
+		desc.FrontCounterClockwise = false;
+		desc.DepthBias = 0;
+		desc.DepthBiasClamp = 0;
+		desc.SlopeScaledDepthBias = 0;
+		desc.DepthClipEnable = true;
+		desc.ScissorEnable = false;
+		desc.MultisampleEnable = true;
+		desc.FillMode = D3D11_FILL_SOLID;
+		desc.CullMode = D3D11_CULL_FRONT; // ココがミソ：表面を消して裏面だけ描画する
+		desc.AntialiasedLineEnable = false;
+		HRESULT hr = device->CreateRasterizerState(&desc,
+			rasterizerStates[static_cast<int>(RasterizerState::SolidCullFront)].GetAddressOf());
+		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	}
 	// ワイヤーフレーム＆カリングなし
 	{
 		D3D11_RASTERIZER_DESC desc{};

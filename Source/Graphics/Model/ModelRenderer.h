@@ -13,6 +13,7 @@ enum class ShaderId
 	Basic,
 	Lambert,
 	Pbr,
+	Toon, // ★追加：アニメ調（NPR-PBR）用シェーダー
 
 	EnumCount
 };
@@ -64,6 +65,8 @@ private:
 	};
 
 	std::unique_ptr<Shader>           shaders[static_cast<int>(ShaderId::EnumCount)];
+	std::unique_ptr<Shader>           toonOutlineShader; // ★追加：アウトライン描画専用シェーダー
+
 	std::vector<DrawInfo>             drawInfos;
 	std::vector<TransparencyDrawInfo> transparencyDrawInfos;
 

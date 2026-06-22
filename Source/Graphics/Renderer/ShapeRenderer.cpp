@@ -14,7 +14,7 @@ ShapeRenderer::ShapeRenderer(ID3D11Device* device)
 	// 頂点シェーダー
 	GpuResourceUtils::LoadVertexShader(
 		device,
-		"Data/Shader/ShapeRendererVS.cso",
+		"Data/CompiledShader/ShapeRendererVS.cso",
 		inputElementDesc,
 		_countof(inputElementDesc),
 		inputLayout.GetAddressOf(),
@@ -23,7 +23,7 @@ ShapeRenderer::ShapeRenderer(ID3D11Device* device)
 	// ピクセルシェーダー
 	GpuResourceUtils::LoadPixelShader(
 		device,
-		"Data/Shader/ShapeRendererPS.cso",
+		"Data/CompiledShader/ShapeRendererPS.cso",
 		pixelShader.GetAddressOf());
 
 	// 定数バッファ

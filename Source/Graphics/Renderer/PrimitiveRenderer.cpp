@@ -13,7 +13,7 @@ PrimitiveRenderer::PrimitiveRenderer(ID3D11Device* device)
 	// 頂点シェーダー
 	GpuResourceUtils::LoadVertexShader(
 		device,
-		"Data/Shader/PrimitiveRendererVS.cso",
+		"Data/CompiledShader/PrimitiveRendererVS.cso",
 		inputElementDesc,
 		_countof(inputElementDesc),
 		inputLayout.GetAddressOf(),
@@ -22,7 +22,7 @@ PrimitiveRenderer::PrimitiveRenderer(ID3D11Device* device)
 	// ピクセルシェーダー
 	GpuResourceUtils::LoadPixelShader(
 		device,
-		"Data/Shader/PrimitiveRendererPS.cso",
+		"Data/CompiledShader/PrimitiveRendererPS.cso",
 		pixelShader.GetAddressOf());
 
 	// 定数バッファ

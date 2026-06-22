@@ -5,6 +5,7 @@
 #include "Graphics/ShaderClass/BasicShader.h"
 #include "Graphics/ShaderClass/LambertShader.h"
 #include "Graphics/ShaderClass/PbrShader.h"
+#include "Graphics/ShaderClass/ToonShader.h"
 
 ModelRenderer::ModelRenderer(ID3D11Device* device)
 {
@@ -14,6 +15,9 @@ ModelRenderer::ModelRenderer(ID3D11Device* device)
 	shaders[static_cast<int>(ShaderId::Basic)] = std::make_unique<BasicShader>(device);
 	shaders[static_cast<int>(ShaderId::Lambert)] = std::make_unique<LambertShader>(device);
 	shaders[static_cast<int>(ShaderId::Pbr)] = std::make_unique<PbrShader>(device);
+
+	shaders[static_cast<int>(ShaderId::Toon)] = std::make_unique<ToonShader>(device);
+	toonOutlineShader = std::make_unique<ToonOutlineShader>(device);
 }
 
 void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model)
@@ -54,7 +58,6 @@ void ModelRenderer::Render(const RenderContext& rc)
 	dc->VSSetConstantBuffers(6, _countof(vsConstantBuffers), vsConstantBuffers);
 	dc->PSSetConstantBuffers(7, _countof(psConstantBuffers), psConstantBuffers);
 
-	// s0 = LinearWrap（マテリアルテクスチャ）, s1 = LinearClamp（IBL）
 	ID3D11SamplerState* samplers[] =
 	{
 		rc.renderState->GetSamplerState(SamplerState::LinearWrap),
@@ -62,7 +65,6 @@ void ModelRenderer::Render(const RenderContext& rc)
 	};
 	dc->PSSetSamplers(0, _countof(samplers), samplers);
 
-	// IBLテクスチャを t5/t6/t7 にバインド
 	if (enableIBL)
 	{
 		ID3D11ShaderResourceView* iblSRVs[] = { iblIrradiance, iblPrefiltered, iblBrdfLut };
@@ -73,6 +75,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 		ID3D11ShaderResourceView* nullIBL[] = { nullptr, nullptr, nullptr };
 		dc->PSSetShaderResources(5, _countof(nullIBL), nullIBL);
 	}
+
 	auto drawMesh = [&](const Model::Mesh& mesh, Shader* shader)
 		{
 			UINT stride = sizeof(Model::Vertex);
@@ -106,14 +109,42 @@ void ModelRenderer::Render(const RenderContext& rc)
 	DirectX::XMVECTOR CameraFront = DirectX::XMLoadFloat3(&rc.camera->GetFront());
 
 	dc->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
+	dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullBack));
 
 	for (DrawInfo& drawInfo : drawInfos)
 	{
+		if (drawInfo.shaderId == ShaderId::Toon)
+		{
+			dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullFront));
+			toonOutlineShader->Begin(rc);
+
+			for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
+			{
+				// ★安全装置：マテリアルが空ならスキップ
+				if (mesh.material == nullptr) continue;
+
+				if (mesh.material->alphaMode == Model::AlphaMode::Blend ||
+					(mesh.material->baseColor.w > 0.01f && mesh.material->baseColor.w < 0.99f)) continue;
+
+				drawMesh(mesh, toonOutlineShader.get());
+			}
+			toonOutlineShader->End(rc);
+
+			dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullBack));
+		}
+
 		Shader* shader = shaders[static_cast<int>(drawInfo.shaderId)].get();
 		shader->Begin(rc);
 
 		for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
 		{
+			// ★安全装置：マテリアルが空の場合は透明度チェックを飛ばしてそのまま描画する
+			if (mesh.material == nullptr)
+			{
+				drawMesh(mesh, shader);
+				continue;
+			}
+
 			if (mesh.material->alphaMode == Model::AlphaMode::Blend ||
 				(mesh.material->baseColor.w > 0.01f && mesh.material->baseColor.w < 0.99f))
 			{
@@ -149,7 +180,6 @@ void ModelRenderer::Render(const RenderContext& rc)
 	}
 	transparencyDrawInfos.clear();
 
-	// バインド解除
 	for (auto& cb : vsConstantBuffers) cb = nullptr;
 	for (auto& cb : psConstantBuffers) cb = nullptr;
 	dc->VSSetConstantBuffers(6, _countof(vsConstantBuffers), vsConstantBuffers);

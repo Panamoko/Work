@@ -1,10 +1,34 @@
-#include "sprite.hlsli"
+// =======================================================
+// 頂点シェーダーからの入力構造体
+// （SpriteVS.hlsl の出力と完全一致させる必要があります）
+// =======================================================
+struct VS_OUT
+{
+    float4 position : SV_POSITION; // 画面上のピクセル座標
+    float4 color : COLOR; // C++側から指定されたスプライトの色/透明度
+    float2 texcoord : TEXCOORD; // テクスチャのUV座標
+};
 
-Texture2D spriteTexture : register(t0);
-SamplerState spriteSampler : register(s0);
+// =======================================================
+// リソース（C++側から送られてくるデータ）
+// =======================================================
+Texture2D colorMap : register(t0); // 描画する2D画像本体
+SamplerState colorSampler : register(s0); // 画像のサンプリング方法（PointやLinearなど）
 
-// ピクセルシェーダーエントリポイント
+// =======================================================
+// ピクセルシェーダー メイン関数
+// =======================================================
 float4 main(VS_OUT pin) : SV_TARGET
 {
-	return spriteTexture.Sample(spriteSampler, pin.texcoord) * pin.color;
+    // テクスチャから現在のピクセルの色を取り出し、頂点カラーを掛け合わせる
+    // （これにより、C++側でスプライト全体を赤く染めたり、アルファ値を下げてフェードアウトさせたりできる）
+    float4 finalColor = colorMap.Sample(colorSampler, pin.texcoord) * pin.color;
+
+    // ★プロの安全装置：完全に透明なピクセルは描画処理を破棄（Discard）する
+    if (finalColor.a <= 0.0f)
+    {
+        discard;
+    }
+
+    return finalColor;
 }

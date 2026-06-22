@@ -40,7 +40,7 @@ Sprite::Sprite(ID3D11Device* device, const char* filename)
 		};
 		hr = GpuResourceUtils::LoadVertexShader(
 			device,
-			"Data/Shader/SpriteVS.cso",
+			"Data/CompiledShader/SpriteVS.cso",
 			inputElementDesc,
 			ARRAYSIZE(inputElementDesc),
 			inputLayout.GetAddressOf(),
@@ -53,7 +53,7 @@ Sprite::Sprite(ID3D11Device* device, const char* filename)
 	{
 		hr = GpuResourceUtils::LoadPixelShader(
 			device,
-			"Data/Shader/SpritePS.cso",
+			"Data/CompiledShader/SpritePS.cso",
 			pixelShader.GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}

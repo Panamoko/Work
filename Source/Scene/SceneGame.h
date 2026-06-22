@@ -1,8 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <wrl.h>         // ★追加: ComPtr用
-#include <d3d11.h>       // ★追加: ID3D11ShaderResourceView用
+#include <wrl.h>         
+#include <d3d11.h>       
 #include "Scene.h"
 #include "Camera/Camera.h"
 #include "Camera/FpsCameraController.h"
@@ -23,17 +23,15 @@ private:
 
 	std::shared_ptr<class Actor> stageActor;
 	std::shared_ptr<class Actor> playerActor;
-
-	// 都築の修正：WeaponActorを廃止し、FPS専用のViewModelActorに変更
 	std::shared_ptr<class Actor> viewModelActor;
-
-	// PBR確認用：DamagedHelmet
 	std::shared_ptr<class Actor> helmetActor;
 	std::shared_ptr<class Actor> pbrSphereActor;
 
 	// =======================================================
-	// ★追加：IBL（Image-Based Lighting）用のテクスチャ保持
+	// ★追加：エディタGUI用の「現在選択中のアクター」保持ポインタ
 	// =======================================================
+	std::shared_ptr<class Actor> selectedActor = nullptr;
+
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblIrradiance;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblPrefiltered;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblBrdfLut;

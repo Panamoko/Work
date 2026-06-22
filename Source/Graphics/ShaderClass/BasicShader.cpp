@@ -7,7 +7,7 @@ BasicShader::BasicShader(ID3D11Device* device)
 	// 頂点シェーダー
 	GpuResourceUtils::LoadVertexShader(
 		device,
-		"Data/Shader/BasicVS.cso",
+		"Data/CompiledShader/BasicVS.cso",
 		Model::InputElementDescs.data(),
 		static_cast<UINT>(Model::InputElementDescs.size()),
 		inputLayout.GetAddressOf(),
@@ -16,7 +16,7 @@ BasicShader::BasicShader(ID3D11Device* device)
 	// ピクセルシェーダー
 	GpuResourceUtils::LoadPixelShader(
 		device,
-		"Data/Shader/BasicPS.cso",
+		"Data/CompiledShader/BasicPS.cso",
 		pixelShader.GetAddressOf());
 
 	// メッシュ用定数バッファ

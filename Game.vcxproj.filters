@@ -213,6 +213,9 @@
     <ClInclude Include="Source\Graphics\ShaderClass\PbrShader.h">
       <Filter>Source\Graphics\ShaderClass</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Graphics\ShaderClass\ToonShader.h">
+      <Filter>Source\Graphics\ShaderClass</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -344,6 +347,9 @@
     <ClCompile Include="Source\Graphics\ShaderClass\PbrShader.cpp">
       <Filter>Source\Graphics\ShaderClass</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Graphics\ShaderClass\ToonShader.cpp">
+      <Filter>Source\Graphics\ShaderClass</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Shader\Sprite.hlsli">
@@ -375,9 +381,6 @@
     <FxCompile Include="Shader\SpriteVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
-    <FxCompile Include="Shader\SpritePS.hlsl">
-      <Filter>Shader</Filter>
-    </FxCompile>
     <FxCompile Include="Shader\ShapeRendererVS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
@@ -406,6 +409,21 @@
       <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="Shader\PbrPS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ToonVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ToonOutlineVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ToonOutlinePS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\SpritePS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ToonPS.hlsl">
       <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>

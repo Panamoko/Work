@@ -42,6 +42,7 @@ enum class RasterizerState
 {
 	SolidCullNone,
 	SolidCullBack,
+	SolidCullFront, // ★追加：トゥーンのアウトライン（表面カリング・裏面描画）用
 	WireCullNone,
 	WireCullBack,
 
