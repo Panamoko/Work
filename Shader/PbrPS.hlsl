@@ -24,8 +24,12 @@ Texture2D NormalMap : register(t1);
 Texture2D MetalnessRoughnessMap : register(t2);
 Texture2D EmissiveMap : register(t3);
 Texture2D OcclusionMap : register(t4);
+TextureCube IrradianceMap : register(t5);
+TextureCube PrefilteredMap : register(t6);
+Texture2D BrdfLut : register(t7);
 
 SamplerState LinearSampler : register(s0);
+SamplerState LinearClampSampler : register(s1);
 
 static const float PI = 3.14159265358979f;
 
@@ -46,13 +50,18 @@ float GeometrySchlickGGX(float NdotX, float roughness)
 
 float GeometrySmith(float NdotV, float NdotL, float roughness)
 {
-    return GeometrySchlickGGX(NdotV, roughness)
-         * GeometrySchlickGGX(NdotL, roughness);
+    return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
 }
 
 float3 FresnelSchlick(float cosTheta, float3 F0)
 {
     return F0 + (1.0f - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
+}
+
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+    float3 r = max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), F0);
+    return F0 + (r - F0) * pow(saturate(1.0f - cosTheta), 5.0f);
 }
 
 float3 SRGBToLinear(float3 c)
@@ -69,14 +78,13 @@ float4 main(VS_OUT pin) : SV_TARGET
         baseColor.rgb *= SRGBToLinear(t.rgb);
         baseColor.a *= t.a;
     }
-
     if (alphaMode == 1 && baseColor.a < alphaCutoff)
         discard;
 
     float3 albedo = baseColor.rgb;
-
     float metalness = metalnessFactor;
     float roughness = roughnessFactor;
+
     if (hasMetalnessRoughnessMap)
     {
         float4 mr = MetalnessRoughnessMap.Sample(LinearSampler, pin.texcoord);
@@ -98,7 +106,6 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 V = normalize(cameraPosition.xyz - pin.worldPosition);
     float3 L = normalize(-lightDirection.xyz);
     float3 H = normalize(V + L);
-
     float NdotV = max(dot(N, V), 1e-4f);
     float NdotL = max(dot(N, L), 0.0f);
     float NdotH = max(dot(N, H), 0.0f);
@@ -110,13 +117,8 @@ float4 main(VS_OUT pin) : SV_TARGET
     float G = GeometrySmith(NdotV, NdotL, roughness);
     float3 F = FresnelSchlick(VdotH, F0);
     float3 specular = (D * G * F) / max(4.0f * NdotV * NdotL, 1e-4f);
-
-    float3 kS = F;
-    float3 kD = (1.0f - kS) * (1.0f - metalness);
-    float3 diffuse = kD * albedo / PI;
-
-    float3 radiance = lightColor.rgb;
-    float3 Lo = (diffuse + specular) * radiance * NdotL;
+    float3 kD = (1.0f - F) * (1.0f - metalness);
+    float3 Lo = (kD * albedo / PI + specular) * lightColor.rgb * NdotL;
 
     float ao = 1.0f;
     if (hasOcclusionMap)
@@ -124,7 +126,20 @@ float4 main(VS_OUT pin) : SV_TARGET
         float occ = OcclusionMap.Sample(LinearSampler, pin.texcoord).r;
         ao = lerp(1.0f, occ, occlusionStrength);
     }
-    float3 ambient = float3(0.03f, 0.03f, 0.03f) * albedo * ao;
+
+    // IBL 環境光
+    float3 kS_ibl = FresnelSchlickRoughness(NdotV, F0, roughness);
+    float3 kD_ibl = (1.0f - kS_ibl) * (1.0f - metalness);
+    float3 irradiance = IrradianceMap.Sample(LinearClampSampler, N).rgb;
+    float3 diffuseIBL = kD_ibl * irradiance * albedo;
+
+    float3 R = reflect(-V, N);
+    // specular_pmrem.dds は mip 0〜10 の 11段（roughness * 10 でマッピング）
+    float3 prefiltered = PrefilteredMap.SampleLevel(LinearClampSampler, R, roughness * 10.0f).rgb;
+    float2 envBrdf = BrdfLut.Sample(LinearClampSampler, float2(NdotV, roughness)).rg;
+    float3 specularIBL = prefiltered * (F0 * envBrdf.x + envBrdf.y);
+
+    float3 ambient = (diffuseIBL + specularIBL) * ao;
 
     float3 emissive = emissiveFactor;
     if (hasEmissiveMap)

@@ -1,4 +1,5 @@
 #include "Graphics/Graphics.h"
+#include "Graphics/GpuResourceUtils.h" // ★追加：テクスチャ読み込み用
 #include "Scene/SceneGame.h"
 #include "GameObject/Actor.h"
 #include "GameObject/Components/ModelComponent.h"
@@ -6,11 +7,30 @@
 #include "GameObject/Components/AnimatorComponent.h" 
 #include "GameObject/Components/ViewModelComponent.h" 
 #include "GameObject/Components/CrosshairComponent.h"
+#include <imgui.h>
+
 SceneGame::SceneGame()
 {
 	ID3D11Device* device = Graphics::Instance().GetDevice();
 	float screenWidth = Graphics::Instance().GetScreenWidth();
 	float screenHeight = Graphics::Instance().GetScreenHeight();
+
+	// =======================================================
+	// ★追加：IBLテクスチャのロードと、ModelRendererへのセット
+	// =======================================================
+	// 1. 拡散環境光（Irradiance）
+	GpuResourceUtils::LoadTexture(device, "Data/Sprite/IBL/diffuse_iem.dds", iblIrradiance.GetAddressOf());
+
+	// 2. 鏡面環境光（Prefiltered）
+	GpuResourceUtils::LoadTexture(device, "Data/Sprite/IBL/specular_pmrem.dds", iblPrefiltered.GetAddressOf());
+
+	// 3. BRDFルックアップテーブル
+	GpuResourceUtils::LoadTexture(device, "Data/Sprite/IBL/lut_ggx.dds", iblBrdfLut.GetAddressOf());
+
+	// ロードしたテクスチャを、完璧に準備されていた ModelRenderer に渡す！
+	Graphics::Instance().GetModelRenderer()->SetIBL(iblIrradiance.Get(), iblPrefiltered.Get(), iblBrdfLut.Get());
+	// =======================================================
+
 
 	// =======================================================
 	// カメラの初期セットアップ
@@ -96,14 +116,31 @@ SceneGame::SceneGame()
 	helmetModelComp->SetShaderId(ShaderId::Pbr);             // PBRシェーダーで描画
 	helmetActor->SetPosition({ 10.0f, 2.1f, 7.0f });        // 開始時のカメラ前方
 	helmetActor->SetScale({ 1.0f, 1.0f, 1.0f });
+	pbrSphereActor = ActorManager::Instance().Create();
+	pbrSphereActor->SetName("PBR_Sphere");
+	auto sphereModelComp = pbrSphereActor->AddComponent<ModelComponent>("Data/Model/Shape/Sphere.glb");
+	sphereModelComp->SetShaderId(ShaderId::Pbr);
+	pbrSphereActor->SetPosition({ 8.0f, 2.1f, 7.0f }); // ヘルメットの少し左に配置
+	pbrSphereActor->SetScale({ 1.0f, 1.0f, 1.0f });
+
+	// 球体の初期マテリアルを分かりやすく「金ピカの鏡」にしておく
+	if (sphereModelComp->GetModel()) {
+		auto& materials = sphereModelComp->GetModel()->GetMaterials();
+		if (!materials.empty()) {
+			materials[0].baseColor = { 1.0f, 0.8f, 0.2f, 1.0f }; // ゴールド
+			materials[0].metalness = 1.0f;                       // 1.0=完全な金属
+			materials[0].roughness = 0.1f;                       // 0.0=完全にツルツル
+		}
+	}
 }
 
 SceneGame::~SceneGame()
 {
 	ActorManager::Instance().Remove(stageActor);
 	ActorManager::Instance().Remove(playerActor);
-	ActorManager::Instance().Remove(viewModelActor); // ★追加：メモリリーク防止
-	ActorManager::Instance().Remove(helmetActor);    // ★追加
+	ActorManager::Instance().Remove(viewModelActor);
+	ActorManager::Instance().Remove(helmetActor);
+	ActorManager::Instance().Remove(pbrSphereActor);
 }
 
 void SceneGame::Update(float elapsedTime)
@@ -122,7 +159,7 @@ void SceneGame::Render(float elapsedTime)
 	ActorManager::Instance().Render(rc);
 
 	// =======================================================
-	// ★追加：蓄積された3Dエフェクト（弾道・火花・弾痕）を描画する
+	// 蓄積された3Dエフェクト（弾道・火花・弾痕）を描画する
 	// =======================================================
 	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera.GetRight());
 	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera.GetUp());
@@ -146,4 +183,35 @@ void SceneGame::Render(float elapsedTime)
 
 void SceneGame::DrawGUI()
 {
+	// =======================================================
+	// ★追加：IBLとPBRマテリアルのリアルタイムデバッグパネル
+	// =======================================================
+	ImGui::Begin(u8"環境光 & PBR デバッグ (IBL Debug)");
+
+	// 1. IBLのON/OFF切り替え
+	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
+	ImGui::Checkbox(u8"IBL(環境光反射) を有効にする", &renderer->enableIBL);
+	ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1), u8"※チェックを外すと環境光が消え、反射が真っ黒になります");
+
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ テスト球体の質感(PBR)設定");
+
+	if (pbrSphereActor) {
+		auto modelComp = pbrSphereActor->GetComponent<ModelComponent>();
+		if (modelComp && modelComp->GetModel()) {
+			std::vector<Model::Material>& materials = modelComp->GetModel()->GetMaterials();
+			if (!materials.empty()) {
+				// 2. PBRの最重要パラメータ2つをスライダーで直接操作
+				ImGui::SliderFloat(u8"粗さ (Roughness)", &materials[0].roughness, 0.0f, 1.0f);
+				ImGui::Text(u8"  └ 0.0=ツルツルの鏡 / 1.0=ザラザラのマット");
+
+				ImGui::SliderFloat(u8"金属度 (Metalness)", &materials[0].metalness, 0.0f, 1.0f);
+				ImGui::Text(u8"  └ 0.0=プラスチック / 1.0=金属(周りを反射)");
+
+				ImGui::ColorEdit3(u8"ベースカラー (色)", &materials[0].baseColor.x);
+			}
+		}
+	}
+
+	ImGui::End();
 }

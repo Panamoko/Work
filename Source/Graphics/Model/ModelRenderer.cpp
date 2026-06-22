@@ -4,29 +4,18 @@
 #include "Graphics/Model/ModelRenderer.h"
 #include "Graphics/ShaderClass/BasicShader.h"
 #include "Graphics/ShaderClass/LambertShader.h"
-#include "Graphics/ShaderClass/PbrShader.h"  
-// コンストラクタ
+#include "Graphics/ShaderClass/PbrShader.h"
+
 ModelRenderer::ModelRenderer(ID3D11Device* device)
 {
-	// シーン用定数バッファ
-	GpuResourceUtils::CreateConstantBuffer(
-		device,
-		sizeof(CbScene),
-		sceneConstantBuffer.GetAddressOf());
+	GpuResourceUtils::CreateConstantBuffer(device, sizeof(CbScene), sceneConstantBuffer.GetAddressOf());
+	GpuResourceUtils::CreateConstantBuffer(device, sizeof(CbSkeleton), skeletonConstantBuffer.GetAddressOf());
 
-	// スケルトン用定数バッファ
-	GpuResourceUtils::CreateConstantBuffer(
-		device,
-		sizeof(CbSkeleton),
-		skeletonConstantBuffer.GetAddressOf());
-
-	// シェーダー生成
 	shaders[static_cast<int>(ShaderId::Basic)] = std::make_unique<BasicShader>(device);
 	shaders[static_cast<int>(ShaderId::Lambert)] = std::make_unique<LambertShader>(device);
-	shaders[static_cast<int>(ShaderId::Pbr)] = std::make_unique<PbrShader>(device);  
+	shaders[static_cast<int>(ShaderId::Pbr)] = std::make_unique<PbrShader>(device);
 }
 
-// 箱描画
 void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model)
 {
 	DrawInfo& drawInfo = drawInfos.emplace_back();
@@ -34,12 +23,10 @@ void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model)
 	drawInfo.model = model;
 }
 
-// 描画実行
 void ModelRenderer::Render(const RenderContext& rc)
 {
 	ID3D11DeviceContext* dc = rc.deviceContext;
 
-	// シーン用定数バッファ更新
 	{
 		static LightManager defaultLightManager;
 		const LightManager* lightManager = rc.lightManager ? rc.lightManager : &defaultLightManager;
@@ -48,13 +35,13 @@ void ModelRenderer::Render(const RenderContext& rc)
 		DirectX::XMMATRIX V = DirectX::XMLoadFloat4x4(&rc.camera->GetView());
 		DirectX::XMMATRIX P = DirectX::XMLoadFloat4x4(&rc.camera->GetProjection());
 		DirectX::XMStoreFloat4x4(&cbScene.viewProjection, V * P);
-		const DirectionalLight& directionalLight = lightManager->GetDirectionalLight();
-		cbScene.lightDirection.x = directionalLight.direction.x;
-		cbScene.lightDirection.y = directionalLight.direction.y;
-		cbScene.lightDirection.z = directionalLight.direction.z;
-		cbScene.lightColor.x = directionalLight.color.x;
-		cbScene.lightColor.y = directionalLight.color.y;
-		cbScene.lightColor.z = directionalLight.color.z;
+		const DirectionalLight& dl = lightManager->GetDirectionalLight();
+		cbScene.lightDirection.x = dl.direction.x;
+		cbScene.lightDirection.y = dl.direction.y;
+		cbScene.lightDirection.z = dl.direction.z;
+		cbScene.lightColor.x = dl.color.x;
+		cbScene.lightColor.y = dl.color.y;
+		cbScene.lightColor.z = dl.color.z;
 		const DirectX::XMFLOAT3& eye = rc.camera->GetEye();
 		cbScene.cameraPosition.x = eye.x;
 		cbScene.cameraPosition.y = eye.y;
@@ -62,73 +49,64 @@ void ModelRenderer::Render(const RenderContext& rc)
 		dc->UpdateSubresource(sceneConstantBuffer.Get(), 0, 0, &cbScene, 0, 0);
 	}
 
-	// 定数バッファ設定
-	ID3D11Buffer* vsConstantBuffers[] =
-	{
-		skeletonConstantBuffer.Get(),
-		sceneConstantBuffer.Get(),
-	};
-	ID3D11Buffer* psConstantBuffers[] =
-	{
-		sceneConstantBuffer.Get(),
-	};
+	ID3D11Buffer* vsConstantBuffers[] = { skeletonConstantBuffer.Get(), sceneConstantBuffer.Get() };
+	ID3D11Buffer* psConstantBuffers[] = { sceneConstantBuffer.Get() };
 	dc->VSSetConstantBuffers(6, _countof(vsConstantBuffers), vsConstantBuffers);
 	dc->PSSetConstantBuffers(7, _countof(psConstantBuffers), psConstantBuffers);
 
-	// サンプラステート設定
-	ID3D11SamplerState* samplerStates[] =
+	// s0 = LinearWrap（マテリアルテクスチャ）, s1 = LinearClamp（IBL）
+	ID3D11SamplerState* samplers[] =
 	{
-		rc.renderState->GetSamplerState(SamplerState::LinearWrap)
+		rc.renderState->GetSamplerState(SamplerState::LinearWrap),
+		rc.renderState->GetSamplerState(SamplerState::LinearClamp),
 	};
-	dc->PSSetSamplers(0, _countof(samplerStates), samplerStates);
+	dc->PSSetSamplers(0, _countof(samplers), samplers);
 
-	// レンダーステート設定
-	dc->OMSetDepthStencilState(rc.renderState->GetDepthStencilState(DepthState::TestAndWrite), 0);
-	dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullBack));
-
-	// メッシュ描画関数
+	// IBLテクスチャを t5/t6/t7 にバインド
+	if (enableIBL)
+	{
+		ID3D11ShaderResourceView* iblSRVs[] = { iblIrradiance, iblPrefiltered, iblBrdfLut };
+		dc->PSSetShaderResources(5, _countof(iblSRVs), iblSRVs);
+	}
+	else
+	{
+		ID3D11ShaderResourceView* nullIBL[] = { nullptr, nullptr, nullptr };
+		dc->PSSetShaderResources(5, _countof(nullIBL), nullIBL);
+	}
 	auto drawMesh = [&](const Model::Mesh& mesh, Shader* shader)
-	{
-		// 頂点バッファ設定
-		UINT stride = sizeof(Model::Vertex);
-		UINT offset = 0;
-		dc->IASetVertexBuffers(0, 1, mesh.vertexBuffer.GetAddressOf(), &stride, &offset);
-		dc->IASetIndexBuffer(mesh.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
-		dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		// スケルトン用定数バッファ更新
-		CbSkeleton cbSkeleton{};
-		if (mesh.bones.size() > 0)
 		{
-			for (size_t i = 0; i < mesh.bones.size(); ++i)
+			UINT stride = sizeof(Model::Vertex);
+			UINT offset = 0;
+			dc->IASetVertexBuffers(0, 1, mesh.vertexBuffer.GetAddressOf(), &stride, &offset);
+			dc->IASetIndexBuffer(mesh.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+			dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			CbSkeleton cbSkeleton{};
+			if (mesh.bones.size() > 0)
 			{
-				const Model::Bone& bone = mesh.bones.at(i);
-				DirectX::XMMATRIX WorldTransform = DirectX::XMLoadFloat4x4(&bone.node->worldTransform);
-				DirectX::XMMATRIX OffsetTransform = DirectX::XMLoadFloat4x4(&bone.offsetTransform);
-				DirectX::XMMATRIX BoneTransform = OffsetTransform * WorldTransform;
-				DirectX::XMStoreFloat4x4(&cbSkeleton.boneTransforms[i], BoneTransform);
+				for (size_t i = 0; i < mesh.bones.size(); ++i)
+				{
+					const Model::Bone& bone = mesh.bones.at(i);
+					DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&bone.node->worldTransform);
+					DirectX::XMMATRIX O = DirectX::XMLoadFloat4x4(&bone.offsetTransform);
+					DirectX::XMStoreFloat4x4(&cbSkeleton.boneTransforms[i], O * W);
+				}
 			}
-		}
-		else
-		{
-			cbSkeleton.boneTransforms[0] = mesh.node->worldTransform;
-		}
-		dc->UpdateSubresource(skeletonConstantBuffer.Get(), 0, 0, &cbSkeleton, 0, 0);
+			else
+			{
+				cbSkeleton.boneTransforms[0] = mesh.node->worldTransform;
+			}
+			dc->UpdateSubresource(skeletonConstantBuffer.Get(), 0, 0, &cbSkeleton, 0, 0);
 
-		// 更新
-		shader->Update(rc, mesh);
-
-		// 描画
-		dc->DrawIndexed(static_cast<UINT>(mesh.indices.size()), 0, 0);
-	};
+			shader->Update(rc, mesh);
+			dc->DrawIndexed(static_cast<UINT>(mesh.indices.size()), 0, 0);
+		};
 
 	DirectX::XMVECTOR CameraPosition = DirectX::XMLoadFloat3(&rc.camera->GetEye());
 	DirectX::XMVECTOR CameraFront = DirectX::XMLoadFloat3(&rc.camera->GetFront());
 
-	// ブレンドステート設定
 	dc->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
-	// 不透明描画処理
 	for (DrawInfo& drawInfo : drawInfos)
 	{
 		Shader* shader = shaders[static_cast<int>(drawInfo.shaderId)].get();
@@ -136,62 +114,50 @@ void ModelRenderer::Render(const RenderContext& rc)
 
 		for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
 		{
-			// 半透明メッシュ登録
 			if (mesh.material->alphaMode == Model::AlphaMode::Blend ||
 				(mesh.material->baseColor.w > 0.01f && mesh.material->baseColor.w < 0.99f))
 			{
-				TransparencyDrawInfo& transparencyDrawInfo = transparencyDrawInfos.emplace_back();
-				transparencyDrawInfo.mesh = &mesh;
-				// カメラとの距離を算出
-				DirectX::XMVECTOR Position = DirectX::XMVectorSet(
+				TransparencyDrawInfo& tdi = transparencyDrawInfos.emplace_back();
+				tdi.mesh = &mesh;
+				tdi.shaderId = drawInfo.shaderId;
+				DirectX::XMVECTOR pos = DirectX::XMVectorSet(
 					mesh.node->worldTransform._41,
 					mesh.node->worldTransform._42,
-					mesh.node->worldTransform._43,
-					0.0f);
-				DirectX::XMVECTOR Vec = DirectX::XMVectorSubtract(Position, CameraPosition);
-				transparencyDrawInfo.distance = DirectX::XMVectorGetX(DirectX::XMVector3Dot(CameraFront, Vec));
-
+					mesh.node->worldTransform._43, 0);
+				tdi.distance = DirectX::XMVectorGetX(
+					DirectX::XMVector3Dot(CameraFront, DirectX::XMVectorSubtract(pos, CameraPosition)));
 				continue;
 			}
-
-			// 描画
 			drawMesh(mesh, shader);
 		}
-
 		shader->End(rc);
 	}
 	drawInfos.clear();
 
-	// ブレンドステート設定
 	dc->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Transparency), nullptr, 0xFFFFFFFF);
 
-	// カメラから遠い順にソート
 	std::sort(transparencyDrawInfos.begin(), transparencyDrawInfos.end(),
-		[](const TransparencyDrawInfo& lhs, const TransparencyDrawInfo& rhs)
-		{
-			return lhs.distance > rhs.distance;
-		});
+		[](const TransparencyDrawInfo& a, const TransparencyDrawInfo& b)
+		{ return a.distance > b.distance; });
 
-	// 半透明描画処理
-	for (const TransparencyDrawInfo& transparencyDrawInfo : transparencyDrawInfos)
+	for (const TransparencyDrawInfo& tdi : transparencyDrawInfos)
 	{
-		Shader* shader = shaders[static_cast<int>(transparencyDrawInfo.shaderId)].get();
-
+		Shader* shader = shaders[static_cast<int>(tdi.shaderId)].get();
 		shader->Begin(rc);
-
-		drawMesh(*transparencyDrawInfo.mesh, shader);
-
+		drawMesh(*tdi.mesh, shader);
 		shader->End(rc);
 	}
 	transparencyDrawInfos.clear();
 
-	// 定数バッファ設定解除
-	for (ID3D11Buffer*& vsConstantBuffer : vsConstantBuffers) { vsConstantBuffer = nullptr; }
-	for (ID3D11Buffer*& psConstantBuffer : psConstantBuffers) { psConstantBuffer = nullptr; }
+	// バインド解除
+	for (auto& cb : vsConstantBuffers) cb = nullptr;
+	for (auto& cb : psConstantBuffers) cb = nullptr;
 	dc->VSSetConstantBuffers(6, _countof(vsConstantBuffers), vsConstantBuffers);
 	dc->PSSetConstantBuffers(7, _countof(psConstantBuffers), psConstantBuffers);
 
-	// サンプラステート設定解除
-	for (ID3D11SamplerState*& samplerState : samplerStates) { samplerState = nullptr; }
-	dc->PSSetSamplers(0, _countof(samplerStates), samplerStates);
+	for (auto& s : samplers) s = nullptr;
+	dc->PSSetSamplers(0, _countof(samplers), samplers);
+
+	ID3D11ShaderResourceView* nullIBL[] = { nullptr, nullptr, nullptr };
+	dc->PSSetShaderResources(5, _countof(nullIBL), nullIBL);
 }
