@@ -184,14 +184,12 @@ void SceneGame::Render(float elapsedTime)
 void SceneGame::DrawGUI()
 {
 	// =======================================================
-	// ★追加：IBLとPBRマテリアルのリアルタイムデバッグパネル
+	// ★プロのハック：テクスチャパージ機能付きの最強PBRデバッグパネル
 	// =======================================================
 	ImGui::Begin(u8"環境光 & PBR デバッグ (IBL Debug)");
 
-	// 1. IBLのON/OFF切り替え
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
 	ImGui::Checkbox(u8"IBL(環境光反射) を有効にする", &renderer->enableIBL);
-	ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1), u8"※チェックを外すと環境光が消え、反射が真っ黒になります");
 
 	ImGui::Separator();
 	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ テスト球体の質感(PBR)設定");
@@ -200,18 +198,30 @@ void SceneGame::DrawGUI()
 		auto modelComp = pbrSphereActor->GetComponent<ModelComponent>();
 		if (modelComp && modelComp->GetModel()) {
 			std::vector<Model::Material>& materials = modelComp->GetModel()->GetMaterials();
-			if (!materials.empty()) {
-				// 2. PBRの最重要パラメータ2つをスライダーで直接操作
-				ImGui::SliderFloat(u8"粗さ (Roughness)", &materials[0].roughness, 0.0f, 1.0f);
-				ImGui::Text(u8"  └ 0.0=ツルツルの鏡 / 1.0=ザラザラのマット");
 
-				ImGui::SliderFloat(u8"金属度 (Metalness)", &materials[0].metalness, 0.0f, 1.0f);
-				ImGui::Text(u8"  └ 0.0=プラスチック / 1.0=金属(周りを反射)");
+			// ★修正：マテリアルが複数ある場合に対応するためループで全て表示する
+			for (size_t i = 0; i < materials.size(); ++i) {
+				ImGui::PushID(static_cast<int>(i));
+				ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"マテリアル [%d]: %s", i, materials[i].name.c_str());
 
-				ImGui::ColorEdit3(u8"ベースカラー (色)", &materials[0].baseColor.x);
+				// ★最強の解決策：邪魔なテクスチャを強制的に引き剥がすボタン
+				if (ImGui::Button(u8"【 テクスチャの呪縛を解除 (スライダーを強制優先) 】")) {
+					materials[i].baseMap.Reset();
+					materials[i].metalnessRoughnessMap.Reset();
+					materials[i].normalMap.Reset();
+					materials[i].emissiveMap.Reset();
+					materials[i].occlusionMap.Reset();
+				}
+				ImGui::Text(u8"※スライダーが効かない時は上のボタンを押してください");
+
+				ImGui::SliderFloat(u8"粗さ (Roughness)", &materials[i].roughness, 0.0f, 1.0f);
+				ImGui::SliderFloat(u8"金属度 (Metalness)", &materials[i].metalness, 0.0f, 1.0f);
+				ImGui::ColorEdit3(u8"ベースカラー (色)", &materials[i].baseColor.x);
+
+				ImGui::PopID();
+				ImGui::Separator();
 			}
 		}
 	}
-
 	ImGui::End();
 }
