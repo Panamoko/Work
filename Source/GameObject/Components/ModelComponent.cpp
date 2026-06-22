@@ -1,11 +1,11 @@
 #include <imgui.h>
 #include "Graphics/Graphics.h"
 #include "GameObject/Components/ModelComponent.h"
-#include "Core/ResourceManager.h" // šƒvƒ‚Ì’Ç‰ÁFƒŠƒ\[ƒXƒ}ƒl[ƒWƒƒ[‚ğƒCƒ“ƒNƒ‹[ƒh
+#include "Core/ResourceManager.h" // ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½Ì’Ç‰ï¿½ï¿½Fï¿½ï¿½ï¿½\ï¿½[ï¿½Xï¿½}ï¿½lï¿½[ï¿½Wï¿½ï¿½ï¿½[ï¿½ï¿½ï¿½Cï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½[ï¿½h
 
 ModelComponent::ModelComponent(const char* filename)
 {
-	// šƒvƒ‚ÌC³F–ˆ‰ñ new ‚·‚é‚Ì‚Å‚Í‚È‚­AResourceManager Œo—R‚Å‹¤—Lƒ|ƒCƒ“ƒ^‚ğæ“¾‚·‚éiFlyweightƒpƒ^[ƒ“j
+	// ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½ÌCï¿½ï¿½ï¿½Fï¿½ï¿½ï¿½ï¿½ new ï¿½ï¿½ï¿½ï¿½Ì‚Å‚Í‚È‚ï¿½ï¿½AResourceManager ï¿½oï¿½Rï¿½Å‹ï¿½ï¿½Lï¿½|ï¿½Cï¿½ï¿½ï¿½^ï¿½ï¿½ï¿½æ“¾ï¿½ï¿½ï¿½ï¿½iFlyweightï¿½pï¿½^ï¿½[ï¿½ï¿½ï¿½j
 	model = ResourceManager::Instance().LoadModel(filename);
 
 	if (model != nullptr)
@@ -68,7 +68,7 @@ void ModelComponent::OnGUI()
 {
 	if (model != nullptr)
 	{
-		ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"ƒ‚ƒfƒ‹“ÇŠ®—¹");
+		ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"ï¿½ï¿½ï¿½fï¿½ï¿½ï¿½Çï¿½ï¿½ï¿½ï¿½ï¿½");
 
 		int currentShader = static_cast<int>(shaderId);
 		const char* shaderNames[] = { "Basic", "Lambert","PBR"};
@@ -78,10 +78,10 @@ void ModelComponent::OnGUI()
 		}
 
 		ImGui::Separator();
-		ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"ƒAƒjƒ[ƒVƒ‡ƒ“İ’è");
+		ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½İ’ï¿½");
 
-		// šƒvƒ‚ÌƒnƒbƒN: ƒo[•t‚«‚ÌƒXƒ‰ƒCƒ_[ (SliderFloat) ‚ğg—pB
-		// ƒAƒjƒ[ƒVƒ‡ƒ“‘¬“x‚Ì‚æ‚¤‚Éu‰ºŒÀ(0.0)‚ÆãŒÀ(5.0)‚ª–¾Šm‚È’lv‚É‚Í‚±‚¿‚ç‚ªÅ“K‚Å‚·B
+		// ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½Ìƒnï¿½bï¿½N: ï¿½oï¿½[ï¿½tï¿½ï¿½ï¿½ÌƒXï¿½ï¿½ï¿½Cï¿½_ï¿½[ (SliderFloat) ï¿½ï¿½ï¿½gï¿½pï¿½B
+		// ï¿½Aï¿½jï¿½ï¿½ï¿½[ï¿½Vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½xï¿½Ì‚æ‚¤ï¿½Éuï¿½ï¿½ï¿½ï¿½(0.0)ï¿½Æï¿½ï¿½(5.0)ï¿½ï¿½ï¿½ï¿½ï¿½mï¿½È’lï¿½vï¿½É‚Í‚ï¿½ï¿½ï¿½ï¿½ç‚ªï¿½Å“Kï¿½Å‚ï¿½ï¿½B
 		ImGui::SliderFloat("Speed", &animSpeed, 0.0f, 5.0f);
 
 		if (animationIndex >= 0)
@@ -93,9 +93,31 @@ void ModelComponent::OnGUI()
 		{
 			ImGui::Text("No Animation Playing");
 		}
+
+		// ===== Material editor (PBR) =====
+		ImGui::Separator();
+		if (ImGui::CollapsingHeader(u8"Materials (PBR)"))
+		{
+			std::vector<Model::Material>& materials = model->GetMaterials();
+			for (size_t i = 0; i < materials.size(); ++i)
+			{
+				ImGui::PushID(static_cast<int>(i));
+				Model::Material& m = materials[i];
+				if (ImGui::TreeNodeEx(m.name.c_str(),
+					ImGuiTreeNodeFlags_DefaultOpen, u8"[%d] %s", (int)i, m.name.c_str()))
+				{
+					ImGui::ColorEdit4(u8"Base Color", &m.baseColor.x);
+					ImGui::SliderFloat(u8"Roughness", &m.roughness, 0.0f, 1.0f);
+					ImGui::SliderFloat(u8"Metalness", &m.metalness, 0.0f, 1.0f);
+					ImGui::ColorEdit3(u8"Emissive", &m.emissiveColor.x);
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+		}
 	}
 	else
 	{
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), u8"ƒ‚ƒfƒ‹‚ª‚ ‚è‚Ü‚¹‚ñ");
+		ImGui::TextColored(ImVec4(1, 0, 0, 1), u8"ï¿½ï¿½ï¿½fï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½");
 	}
 }

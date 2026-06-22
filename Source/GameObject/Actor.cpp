@@ -1,15 +1,56 @@
 #include <imgui.h>
-#include <functional> // std::function—piƒcƒŠ[•`‰æ‚ÌÄ‹A‚Ég—pj
+#include <functional> // std::functionï¿½pï¿½iï¿½cï¿½ï¿½ï¿½[ï¿½`ï¿½ï¿½ÌÄ‹Aï¿½Égï¿½pï¿½j
+#include <cmath>      // asinf / atan2f / copysignf
+#include <cstring>    // strncpy_s / strstr
+
+// ---------------------------------------------------------------------
+// Inspector helpers (local to this translation unit)
+// ---------------------------------------------------------------------
+namespace
+{
+	// Quaternion -> Euler(degrees). For display (inverse of RollPitchYaw).
+	DirectX::XMFLOAT3 QuatToEulerDeg(const DirectX::XMFLOAT4& q)
+	{
+		const float x = q.x, y = q.y, z = q.z, w = q.w;
+		float sinp = 2.0f * (w * x - y * z);
+		float pitch = (fabsf(sinp) >= 1.0f) ? copysignf(DirectX::XM_PIDIV2, sinp) : asinf(sinp);
+		float yaw   = atan2f(2.0f * (w * y + x * z), 1.0f - 2.0f * (x * x + y * y));
+		float roll  = atan2f(2.0f * (w * z + x * y), 1.0f - 2.0f * (x * x + z * z));
+		return { DirectX::XMConvertToDegrees(pitch),
+				 DirectX::XMConvertToDegrees(yaw),
+				 DirectX::XMConvertToDegrees(roll) };
+	}
+
+	// Euler(degrees) -> Quaternion.
+	DirectX::XMFLOAT4 EulerDegToQuat(const DirectX::XMFLOAT3& e)
+	{
+		DirectX::XMVECTOR q = DirectX::XMQuaternionRotationRollPitchYaw(
+			DirectX::XMConvertToRadians(e.x),
+			DirectX::XMConvertToRadians(e.y),
+			DirectX::XMConvertToRadians(e.z));
+		DirectX::XMFLOAT4 r; DirectX::XMStoreFloat4(&r, q); return r;
+	}
+
+	// Small "Reset" button on the right edge. Returns true when pressed.
+	bool ResetButton(const char* id)
+	{
+		ImGui::SameLine(ImGui::GetContentRegionAvail().x - 46.0f);
+		ImGui::PushID(id);
+		bool pressed = ImGui::SmallButton(u8"Reset");
+		ImGui::PopID();
+		return pressed;
+	}
+}
 #include "Graphics/Graphics.h"
 #include "GameObject/Component.h"
 #include "GameObject/Actor.h"
-#include "Graphics/Model/ModelRenderer.h" // ’x‰„•`‰æ—p‚ÉƒCƒ“ƒNƒ‹[ƒh’Ç‰Á
+#include "Graphics/Model/ModelRenderer.h" // ï¿½xï¿½ï¿½ï¿½`ï¿½ï¿½pï¿½ÉƒCï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½[ï¿½hï¿½Ç‰ï¿½
 
 // =====================================================================
-// Actor ƒNƒ‰ƒX‚ÌÀ‘•
+// Actor ï¿½Nï¿½ï¿½ï¿½Xï¿½Ìï¿½ï¿½ï¿½
 // =====================================================================
 
-// ŠJnˆ—
+// ï¿½Jï¿½nï¿½ï¿½ï¿½ï¿½
 void Actor::Start()
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -18,7 +59,7 @@ void Actor::Start()
 	}
 }
 
-// XVˆ—
+// ï¿½Xï¿½Vï¿½ï¿½ï¿½ï¿½
 void Actor::Update(float elapsedTime)
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -27,7 +68,7 @@ void Actor::Update(float elapsedTime)
 	}
 }
 
-// s—ñ‚ÌXViƒV[ƒ“ƒOƒ‰ƒt‘Î‰j
+// ï¿½sï¿½ï¿½ÌXï¿½Vï¿½iï¿½Vï¿½[ï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½tï¿½Î‰ï¿½ï¿½j
 void Actor::UpdateTransform()
 {
 	DirectX::XMVECTOR Q = DirectX::XMLoadFloat4(&rotation);
@@ -47,7 +88,7 @@ void Actor::UpdateTransform()
 	DirectX::XMStoreFloat4x4(&transform, W);
 }
 
-// •`‰æ“o˜^ˆ—
+// ï¿½`ï¿½ï¿½oï¿½^ï¿½ï¿½ï¿½ï¿½
 void Actor::Draw()
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -56,49 +97,64 @@ void Actor::Draw()
 	}
 }
 
-// GUI•\¦iƒCƒ“ƒXƒyƒNƒ^j
+// GUIï¿½\ï¿½ï¿½ï¿½iï¿½Cï¿½ï¿½ï¿½Xï¿½yï¿½Nï¿½^ï¿½j
 void Actor::OnGUI()
 {
-	// –¼‘O
+	// ï¿½ï¿½ï¿½O
 	{
-		char buffer[1024];
-		::strncpy_s(buffer, sizeof(buffer), GetName(), sizeof(buffer));
-		if (ImGui::InputText("Name", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+		char buffer[256];
+		::strncpy_s(buffer, sizeof(buffer), GetName(), _TRUNCATE);
+		ImGui::PushItemWidth(-1);
+		if (ImGui::InputText(u8"##Name", buffer, sizeof(buffer)))
 		{
 			SetName(buffer);
 		}
+		ImGui::PopItemWidth();
 	}
 
-	// ƒgƒ‰ƒ“ƒXƒtƒH[ƒ€
+	// ï¿½gï¿½ï¿½ï¿½ï¿½ï¿½Xï¿½tï¿½Hï¿½[ï¿½ï¿½
 	if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		// šƒvƒ‚ÌƒnƒbƒN: DragFloat ‚ğg—pB
-		// ”š‚Ì•”•ª‚ğ¶‰E‚Éƒhƒ‰ƒbƒO‚·‚é‚ÆƒXƒ‰ƒCƒ_[‚Ì‚æ‚¤‚ÉŠŠ‚ç‚©‚É“®‚«AãŒÀ/‰ºŒÀ‚Ì”›‚è‚ª‚ ‚è‚Ü‚¹‚ñB
-		// ‘æ3ˆø”(0.1f)‚ÍAƒhƒ‰ƒbƒO‚µ‚½‚Ì•Ï‰»‚Ì‘¬“x‚Å‚·B
-		ImGui::DragFloat3("Position", &position.x, 0.1f);
-		ImGui::DragFloat4("Rotation", &rotation.x, 0.01f);
-		ImGui::DragFloat3("Scale", &scale.x, 0.05f);
+		// ï¿½ï¿½ï¿½vï¿½ï¿½ï¿½Ìƒnï¿½bï¿½N: DragFloat ï¿½ï¿½ï¿½gï¿½pï¿½B
+		// ï¿½ï¿½ï¿½ï¿½ï¿½Ì•ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Eï¿½Éƒhï¿½ï¿½ï¿½bï¿½Oï¿½ï¿½ï¿½ï¿½ÆƒXï¿½ï¿½ï¿½Cï¿½_ï¿½[ï¿½Ì‚æ‚¤ï¿½ÉŠï¿½ï¿½ç‚©ï¿½É“ï¿½ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½Ì”ï¿½ï¿½è‚ªï¿½ï¿½ï¿½ï¿½Ü‚ï¿½ï¿½ï¿½B
+		// ï¿½ï¿½3ï¿½ï¿½ï¿½ï¿½(0.1f)ï¿½ÍAï¿½hï¿½ï¿½ï¿½bï¿½Oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì•Ï‰ï¿½ï¿½Ì‘ï¿½ï¿½xï¿½Å‚ï¿½ï¿½B
+		// Position
+		ImGui::DragFloat3(u8"Position", &position.x, 0.1f);
+		if (ResetButton("rp")) position = DirectX::XMFLOAT3(0, 0, 0);
+
+		// Rotation (edited as Euler degrees; stored internally as quaternion)
+		DirectX::XMFLOAT3 euler = QuatToEulerDeg(rotation);
+		if (ImGui::DragFloat3(u8"Rotation", &euler.x, 0.5f))
+		{
+			rotation = EulerDegToQuat(euler);
+		}
+		if (ResetButton("rr")) rotation = DirectX::XMFLOAT4(0, 0, 0, 1);
+
+		// Scale
+		ImGui::DragFloat3(u8"Scale", &scale.x, 0.05f, 0.001f, 1000.0f);
+		if (ResetButton("rs")) scale = DirectX::XMFLOAT3(1, 1, 1);
 	}
 
 	for (std::shared_ptr<Component>& component : components)
 	{
 		ImGui::Spacing();
-		ImGui::Separator();
 
 		if (ImGui::CollapsingHeader(component->GetName(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::PushID(component.get());
+			ImGui::Indent(8.0f);
 			component->OnGUI();
+			ImGui::Unindent(8.0f);
 			ImGui::PopID();
 		}
 	}
 }
 
 // =====================================================================
-// ActorManager ƒNƒ‰ƒX‚ÌÀ‘•
+// ActorManager ï¿½Nï¿½ï¿½ï¿½Xï¿½Ìï¿½ï¿½ï¿½
 // =====================================================================
 
-// ì¬
+// ï¿½ì¬
 std::shared_ptr<Actor> ActorManager::Create()
 {
 	std::shared_ptr<Actor> actor = std::make_shared<Actor>();
@@ -112,13 +168,13 @@ std::shared_ptr<Actor> ActorManager::Create()
 	return actor;
 }
 
-// íœ
+// ï¿½íœ
 void ActorManager::Remove(std::shared_ptr<Actor> actor)
 {
 	removeActors.insert(actor);
 }
 
-// XV
+// ï¿½Xï¿½V
 void ActorManager::Update(float elapsedTime)
 {
 	for (std::shared_ptr<Actor>& actor : startActors)
@@ -156,7 +212,7 @@ void ActorManager::Update(float elapsedTime)
 	removeActors.clear();
 }
 
-// s—ñXV
+// ï¿½sï¿½ï¿½Xï¿½V
 void ActorManager::UpdateTransform()
 {
 	for (std::shared_ptr<Actor>& actor : updateActors)
@@ -165,7 +221,7 @@ void ActorManager::UpdateTransform()
 	}
 }
 
-// •`‰æ
+// ï¿½`ï¿½ï¿½
 void ActorManager::Render(const RenderContext& rc)
 {
 	for (std::shared_ptr<Actor>& actor : updateActors)
@@ -183,18 +239,36 @@ void ActorManager::Render(const RenderContext& rc)
 	DrawDetail();
 }
 
-// ƒŠƒXƒ^[•`‰æ
+// ï¿½ï¿½ï¿½Xï¿½^ï¿½[ï¿½`ï¿½ï¿½
 void ActorManager::DrawLister()
 {
-	ImGui::SetNextWindowPos(ImVec2(30, 50), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20, 40), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(280, 400), ImGuiCond_FirstUseEver);
 
-	hiddenLister = !ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);
+	hiddenLister = !ImGui::Begin(u8"Hierarchy");
 	if (!hiddenLister)
 	{
+		// --- Toolbar: create + search ---
+		if (ImGui::Button(u8"+ Create"))
+		{
+			std::shared_ptr<Actor> a = Create();
+			selectionActors.clear();
+			selectionActors.insert(a);
+		}
+		ImGui::SameLine();
+		static char filter[128] = "";
+		ImGui::PushItemWidth(-1);
+		ImGui::InputTextWithHint(u8"##filter", u8"Search...", filter, sizeof(filter));
+		ImGui::PopItemWidth();
+		ImGui::Separator();
+
+		const bool filtering = (filter[0] != '\0');
+
 		std::function<void(std::shared_ptr<Actor>)> drawNode = [&](std::shared_ptr<Actor> actor)
 			{
-				ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DefaultOpen;
+				ImGuiTreeNodeFlags nodeFlags =
+					ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
+					ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
 				if (actor->GetChildren().empty())
 				{
@@ -208,10 +282,27 @@ void ActorManager::DrawLister()
 
 				bool isOpen = ImGui::TreeNodeEx(actor.get(), nodeFlags, "%s", actor->GetName());
 
-				if (ImGui::IsItemClicked())
+				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 				{
 					selectionActors.clear();
 					selectionActors.insert(actor);
+				}
+
+				// Right-click context menu (selects this row first)
+				if (ImGui::BeginPopupContextItem())
+				{
+					selectionActors.clear();
+					selectionActors.insert(actor);
+					if (ImGui::MenuItem(u8"Add Child"))
+					{
+						std::shared_ptr<Actor> child = Create();
+						actor->AddChild(child);
+					}
+					if (ImGui::MenuItem(u8"Delete"))
+					{
+						Remove(actor);
+					}
+					ImGui::EndPopup();
 				}
 
 				if (isOpen)
@@ -224,24 +315,48 @@ void ActorManager::DrawLister()
 				}
 			};
 
-		for (std::shared_ptr<Actor>& actor : updateActors)
+		if (filtering)
 		{
-			if (actor->GetParent().expired())
+			// While searching, show flat name matches (ignore hierarchy)
+			for (std::shared_ptr<Actor>& actor : updateActors)
 			{
-				drawNode(actor);
+				if (::strstr(actor->GetName(), filter) == nullptr) continue;
+				bool selected = selectionActors.find(actor) != selectionActors.end();
+				if (ImGui::Selectable(actor->GetName(), selected))
+				{
+					selectionActors.clear();
+					selectionActors.insert(actor);
+				}
 			}
+		}
+		else
+		{
+			for (std::shared_ptr<Actor>& actor : updateActors)
+			{
+				if (actor->GetParent().expired())
+				{
+					drawNode(actor);
+				}
+			}
+		}
+
+		// Click empty space to deselect
+		if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() &&
+			ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+		{
+			selectionActors.clear();
 		}
 	}
 	ImGui::End();
 }
 
-// Ú×•`‰æ
+// ï¿½Ú×•`ï¿½ï¿½
 void ActorManager::DrawDetail()
 {
-	ImGui::SetNextWindowPos(ImVec2(950, 50), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 320.0f, 40), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(300, 420), ImGuiCond_FirstUseEver);
 
-	hiddenDetail = !ImGui::Begin("Inspector", nullptr, ImGuiWindowFlags_None);
+	hiddenDetail = !ImGui::Begin(u8"Inspector");
 	if (!hiddenDetail)
 	{
 		std::shared_ptr<Actor> lastSelected = selectionActors.empty() ? nullptr : *selectionActors.rbegin();
@@ -251,7 +366,8 @@ void ActorManager::DrawDetail()
 		}
 		else
 		{
-			ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No Object Selected");
+			ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), u8"No Object Selected");
+			ImGui::TextDisabled(u8"Select an object in the Hierarchy");
 		}
 	}
 	ImGui::End();

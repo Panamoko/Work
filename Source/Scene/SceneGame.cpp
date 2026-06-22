@@ -183,45 +183,14 @@ void SceneGame::Render(float elapsedTime)
 
 void SceneGame::DrawGUI()
 {
-	// =======================================================
-	// ★プロのハック：テクスチャパージ機能付きの最強PBRデバッグパネル
-	// =======================================================
-	ImGui::Begin(u8"環境光 & PBR デバッグ (IBL Debug)");
+	// Render Settings (global). Per-material editing now lives in each
+	// object's Inspector (ModelComponent::OnGUI).
+	ImGui::SetNextWindowPos(ImVec2(20, 460), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(280, 90), ImGuiCond_FirstUseEver);
 
+	ImGui::Begin(u8"Render Settings");
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
-	ImGui::Checkbox(u8"IBL(環境光反射) を有効にする", &renderer->enableIBL);
-
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ テスト球体の質感(PBR)設定");
-
-	if (pbrSphereActor) {
-		auto modelComp = pbrSphereActor->GetComponent<ModelComponent>();
-		if (modelComp && modelComp->GetModel()) {
-			std::vector<Model::Material>& materials = modelComp->GetModel()->GetMaterials();
-
-			// ★修正：マテリアルが複数ある場合に対応するためループで全て表示する
-			for (size_t i = 0; i < materials.size(); ++i) {
-				ImGui::PushID(static_cast<int>(i));
-				ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"マテリアル [%d]: %s", i, materials[i].name.c_str());
-
-				// ★最強の解決策：邪魔なテクスチャを強制的に引き剥がすボタン
-				if (ImGui::Button(u8"【 テクスチャの呪縛を解除 (スライダーを強制優先) 】")) {
-					materials[i].baseMap.Reset();
-					materials[i].metalnessRoughnessMap.Reset();
-					materials[i].normalMap.Reset();
-					materials[i].emissiveMap.Reset();
-					materials[i].occlusionMap.Reset();
-				}
-				ImGui::Text(u8"※スライダーが効かない時は上のボタンを押してください");
-
-				ImGui::SliderFloat(u8"粗さ (Roughness)", &materials[i].roughness, 0.0f, 1.0f);
-				ImGui::SliderFloat(u8"金属度 (Metalness)", &materials[i].metalness, 0.0f, 1.0f);
-				ImGui::ColorEdit3(u8"ベースカラー (色)", &materials[i].baseColor.x);
-
-				ImGui::PopID();
-				ImGui::Separator();
-			}
-		}
-	}
+	ImGui::Checkbox(u8"IBL (Image Based Lighting)", &renderer->enableIBL);
+	ImGui::TextDisabled(u8"Material params are in each object's Inspector");
 	ImGui::End();
 }
