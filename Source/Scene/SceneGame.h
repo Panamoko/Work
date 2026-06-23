@@ -28,11 +28,14 @@ private:
 	std::shared_ptr<class Actor> pbrSphereActor;
 
 	// =======================================================
-	// ★追加：エディタGUI用の「現在選択中のアクター」保持ポインタ
+	// エディタGUI用の「現在選択中のアクター」保持ポインタ
 	// =======================================================
 	std::shared_ptr<class Actor> selectedActor = nullptr;
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblIrradiance;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblPrefiltered;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> iblBrdfLut;
+
+	// ★追加：弾痕テクスチャ
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> bulletHoleTex;
 };

@@ -33,10 +33,6 @@ void ViewModelComponent::SaveSettings()
 		ofs << offsetPos.x << " " << offsetPos.y << " " << offsetPos.z << "\n";
 		ofs << offsetRot.x << " " << offsetRot.y << " " << offsetRot.z << "\n";
 		ofs << offsetScale.x << " " << offsetScale.y << " " << offsetScale.z << "\n";
-
-		// =======================================================
-		// ★追加：銃口オフセットと、デバッグ表示のON/OFF状態も保存する
-		// =======================================================
 		ofs << muzzleOffset.x << " " << muzzleOffset.y << " " << muzzleOffset.z << "\n";
 		ofs << showDebugMuzzle << "\n";
 	}
@@ -49,10 +45,6 @@ void ViewModelComponent::LoadSettings()
 		ifs >> offsetPos.x >> offsetPos.y >> offsetPos.z;
 		ifs >> offsetRot.x >> offsetRot.y >> offsetRot.z;
 		ifs >> offsetScale.x >> offsetScale.y >> offsetScale.z;
-
-		// =======================================================
-		// ★追加：保存した順番と「全く同じ順番」で読み込む
-		// =======================================================
 		ifs >> muzzleOffset.x >> muzzleOffset.y >> muzzleOffset.z;
 		ifs >> showDebugMuzzle;
 	}
@@ -89,9 +81,6 @@ void ViewModelComponent::Update(float elapsedTime)
 	GetActor()->SetRotation(wRot);
 	GetActor()->SetScale(wScale);
 
-	// =======================================================
-	// ★プロのハック：めり込んでも位置が完璧に分かる「レーザー」を描画する
-	// =======================================================
 	DirectX::XMVECTOR muzzlePosVec = E;
 	muzzlePosVec = DirectX::XMVectorAdd(muzzlePosVec, DirectX::XMVectorScale(R, muzzleOffset.x));
 	muzzlePosVec = DirectX::XMVectorAdd(muzzlePosVec, DirectX::XMVectorScale(U, muzzleOffset.y));
@@ -99,21 +88,17 @@ void ViewModelComponent::Update(float elapsedTime)
 	DirectX::XMStoreFloat3(&currentMuzzlePos, muzzlePosVec);
 
 	ShapeRenderer* shapeRenderer = Graphics::Instance().GetShapeRenderer();
-	if (showDebugMuzzle) {
-		// 1. 基準の球（小さめに設定。銃身にめり込んで見えなくてもOK）
-		shapeRenderer->DrawSphere(currentMuzzlePos, 0.008f, { 0.0f, 1.0f, 0.0f, 1.0f });
+	PrimitiveRenderer* primRenderer = Graphics::Instance().GetPrimitiveRenderer();
 
-		// 2. めり込み対策：マズルから前方へ50cm伸びる「緑のレーザー」を追加
+	if (showDebugMuzzle) {
+		shapeRenderer->DrawSphere(currentMuzzlePos, 0.008f, { 0.0f, 1.0f, 0.0f, 1.0f });
 		float laserLength = 0.5f;
 		DirectX::XMVECTOR Mid = DirectX::XMVectorAdd(muzzlePosVec, DirectX::XMVectorScale(F, laserLength * 0.5f));
-
 		float pitch = asin(-DirectX::XMVectorGetY(F));
 		float yaw = atan2(DirectX::XMVectorGetX(F), DirectX::XMVectorGetZ(F));
 		DirectX::XMMATRIX Rot = DirectX::XMMatrixRotationX(DirectX::XM_PIDIV2) * DirectX::XMMatrixRotationRollPitchYaw(pitch, yaw, 0.0f);
 		Rot.r[3] = DirectX::XMVectorSetW(Mid, 1.0f);
 		DirectX::XMFLOAT4X4 transform; DirectX::XMStoreFloat4x4(&transform, Rot);
-
-		// 非常に細いカプセルをレーザーとして描画（銃身を突き抜けて表示される）
 		shapeRenderer->DrawCapsule(transform, 0.002f, laserLength, { 0.0f, 1.0f, 0.0f, 0.8f });
 	}
 
@@ -139,7 +124,11 @@ void ViewModelComponent::Update(float elapsedTime)
 		}
 		else if (playerController) {
 			PlayerState pState = playerController->GetCurrentState();
-			if (pState == PlayerState::Walk) nextState = WeaponState::Walk;
+			// =======================================================
+			// ★追加：PlayerControllerから「Run」状態を受け取り、武器も「Run」にする
+			// =======================================================
+			if (pState == PlayerState::Run) nextState = WeaponState::Run;
+			else if (pState == PlayerState::Walk) nextState = WeaponState::Walk;
 			else if (pState == PlayerState::Jump || pState == PlayerState::Fall) nextState = WeaponState::Jump;
 			else nextState = WeaponState::Idle;
 		}
@@ -149,9 +138,27 @@ void ViewModelComponent::Update(float elapsedTime)
 		currentWeaponState = nextState;
 		int animIdx = -1; float fadeTime = 0.1f; bool loop = true;
 
+		// アニメーション再生速度（Walkを倍速にして走りに見せるための初期化）
+		animator->SetAnimSpeed(1.0f);
+
 		switch (currentWeaponState) {
 		case WeaponState::Idle: animIdx = model->GetAnimationIndex("Pistol_IDLE"); break;
 		case WeaponState::Walk: animIdx = model->GetAnimationIndex("Pistol_WALK"); fadeTime = 0.2f; break;
+
+			// =======================================================
+			// ★追加：走るアニメーションの再生処理（フォールバック付き）
+			// =======================================================
+		case WeaponState::Run:
+			animIdx = model->GetAnimationIndex("Pistol_RUN");
+			fadeTime = 0.2f;
+			// もしモデルの中に「Pistol_RUN」という名前のアニメが用意されていなければ、
+			// クラッシュさせずに「Pistol_WALK」を1.5倍速で再生して誤魔化す安全装置！
+			if (animIdx < 0) {
+				animIdx = model->GetAnimationIndex("Pistol_WALK");
+				animator->SetAnimSpeed(1.5f);
+			}
+			break;
+
 		case WeaponState::Jump: animIdx = model->GetAnimationIndex("Pistol_JUMP_START"); loop = false; break;
 		case WeaponState::Reload:
 			currentAmmo = maxAmmo;
@@ -177,7 +184,8 @@ void ViewModelComponent::Update(float elapsedTime)
 					vfxList.push_back({ currentMuzzlePos, {0,0,0}, hitPos, {1.0f, 0.9f, 0.0f, 0.8f}, 0.15f, 0.15f, 1 });
 					DirectX::XMVECTOR decalPos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&hitPos), DirectX::XMVectorScale(DirectX::XMLoadFloat3(&hitNorm), 0.01f));
 					DirectX::XMFLOAT3 decalPosF; DirectX::XMStoreFloat3(&decalPosF, decalPos);
-					vfxList.push_back({ decalPosF, hitNorm, {0,0,0}, {0.1f, 0.1f, 0.1f, 1.0f}, 5.0f, 5.0f, 2 });
+
+					vfxList.push_back({ decalPosF, hitNorm, {0,0,0}, {1.0f, 1.0f, 1.0f, 1.0f}, 5.0f, 5.0f, 2 });
 				}
 			}
 			break;
@@ -189,7 +197,8 @@ void ViewModelComponent::Update(float elapsedTime)
 		if (effect.lifeTime <= 0) continue;
 		effect.lifeTime -= elapsedTime;
 		float alpha = effect.lifeTime / effect.maxLifeTime;
-		DirectX::XMFLOAT4 color = effect.color; color.w *= alpha;
+		DirectX::XMFLOAT4 color = effect.color;
+		color.w *= alpha;
 
 		if (effect.type == 0) {
 			shapeRenderer->DrawSphere(effect.position, 0.05f + (1.0f - alpha) * 0.1f, color);
@@ -211,9 +220,34 @@ void ViewModelComponent::Update(float elapsedTime)
 			}
 		}
 		else if (effect.type == 2) {
-			float pitch = asin(-effect.normal.y);
-			float yaw = atan2(effect.normal.x, effect.normal.z);
-			shapeRenderer->DrawBox(effect.position, { pitch, yaw, 0.0f }, { 0.05f, 0.05f, 0.005f }, color);
+			DirectX::XMVECTOR N = DirectX::XMLoadFloat3(&effect.normal);
+			DirectX::XMVECTOR UpAxis = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			if (fabsf(effect.normal.y) > 0.99f) UpAxis = DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+
+			DirectX::XMVECTOR Right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(N, UpAxis));
+			DirectX::XMVECTOR Top = DirectX::XMVector3Cross(Right, N);
+
+			DirectX::XMVECTOR P = DirectX::XMLoadFloat3(&effect.position);
+			float s = 0.05f;
+
+			DirectX::XMVECTOR v0 = DirectX::XMVectorAdd(P, DirectX::XMVectorSubtract(DirectX::XMVectorScale(Top, s), DirectX::XMVectorScale(Right, s)));
+			DirectX::XMVECTOR v1 = DirectX::XMVectorAdd(P, DirectX::XMVectorAdd(DirectX::XMVectorScale(Top, s), DirectX::XMVectorScale(Right, s)));
+			DirectX::XMVECTOR v2 = DirectX::XMVectorSubtract(P, DirectX::XMVectorSubtract(DirectX::XMVectorScale(Top, s), DirectX::XMVectorScale(Right, s)));
+			DirectX::XMVECTOR v3 = DirectX::XMVectorSubtract(P, DirectX::XMVectorAdd(DirectX::XMVectorScale(Top, s), DirectX::XMVectorScale(Right, s)));
+
+			DirectX::XMFLOAT3 p0, p1, p2, p3;
+			DirectX::XMStoreFloat3(&p0, v0);
+			DirectX::XMStoreFloat3(&p1, v1);
+			DirectX::XMStoreFloat3(&p2, v2);
+			DirectX::XMStoreFloat3(&p3, v3);
+
+			primRenderer->AddVertex(p0, color, { 0.0f, 0.0f });
+			primRenderer->AddVertex(p1, color, { 1.0f, 0.0f });
+			primRenderer->AddVertex(p2, color, { 1.0f, 1.0f });
+
+			primRenderer->AddVertex(p0, color, { 0.0f, 0.0f });
+			primRenderer->AddVertex(p2, color, { 1.0f, 1.0f });
+			primRenderer->AddVertex(p3, color, { 0.0f, 1.0f });
 		}
 	}
 	vfxList.erase(std::remove_if(vfxList.begin(), vfxList.end(), [](const VfxEffect& e) { return e.lifeTime <= 0; }), vfxList.end());
@@ -221,7 +255,6 @@ void ViewModelComponent::Update(float elapsedTime)
 
 void ViewModelComponent::OnGUI()
 {
-	// 2Dのヒットマーカー
 	if (hitMarkerTimer > 0.0f && camera) {
 		hitMarkerTimer -= ImGui::GetIO().DeltaTime;
 		DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera->GetRight());
@@ -258,9 +291,6 @@ void ViewModelComponent::OnGUI()
 		}
 	}
 
-	// =======================================================
-	// インスペクタ（操作パネル）
-	// =======================================================
 	ImGui::TextColored(ImVec4(1, 0.5f, 1, 1), u8"▼ FPS腕モデル補正設定 (ViewModel)");
 	if (ImGui::Button(u8"【 補正設定を保存する 】")) SaveSettings();
 	ImGui::Separator();

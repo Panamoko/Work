@@ -1,15 +1,16 @@
 #include <imgui.h>
-#include <functional> // std::function用（ツリー描画の再帰に使用）
+#include <functional>
+#include <cmath>
+#include <cstring>
 #include "Graphics/Graphics.h"
 #include "GameObject/Component.h"
 #include "GameObject/Actor.h"
-#include "Graphics/Model/ModelRenderer.h" // 遅延描画用にインクルード追加
+#include "Graphics/Model/ModelRenderer.h"
 
 // =====================================================================
 // Actor クラスの実装
 // =====================================================================
 
-// 開始処理
 void Actor::Start()
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -18,7 +19,6 @@ void Actor::Start()
 	}
 }
 
-// 更新処理
 void Actor::Update(float elapsedTime)
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -27,7 +27,6 @@ void Actor::Update(float elapsedTime)
 	}
 }
 
-// 行列の更新（シーングラフ対応）
 void Actor::UpdateTransform()
 {
 	DirectX::XMVECTOR Q = DirectX::XMLoadFloat4(&rotation);
@@ -47,7 +46,6 @@ void Actor::UpdateTransform()
 	DirectX::XMStoreFloat4x4(&transform, W);
 }
 
-// 描画登録処理
 void Actor::Draw()
 {
 	for (std::shared_ptr<Component>& component : components)
@@ -56,39 +54,90 @@ void Actor::Draw()
 	}
 }
 
-// GUI表示（インスペクタ）
+// ---------------------------------------------------------------------
+// Inspector 補助関数（このファイル内だけで使う）
+// ---------------------------------------------------------------------
+namespace
+{
+	// クォータニオン → オイラー角（度）
+	DirectX::XMFLOAT3 QuatToEulerDeg(const DirectX::XMFLOAT4& q)
+	{
+		const float x = q.x, y = q.y, z = q.z, w = q.w;
+		float sinp = 2.0f * (w * x - y * z);
+		float pitch = (fabsf(sinp) >= 1.0f) ? copysignf(DirectX::XM_PIDIV2, sinp) : asinf(sinp);
+		float yaw = atan2f(2.0f * (w * y + x * z), 1.0f - 2.0f * (x * x + y * y));
+		float roll = atan2f(2.0f * (w * z + x * y), 1.0f - 2.0f * (x * x + z * z));
+		return { DirectX::XMConvertToDegrees(pitch),
+				 DirectX::XMConvertToDegrees(yaw),
+				 DirectX::XMConvertToDegrees(roll) };
+	}
+
+	// オイラー角（度）→ クォータニオン
+	DirectX::XMFLOAT4 EulerDegToQuat(const DirectX::XMFLOAT3& e)
+	{
+		DirectX::XMVECTOR q = DirectX::XMQuaternionRotationRollPitchYaw(
+			DirectX::XMConvertToRadians(e.x),
+			DirectX::XMConvertToRadians(e.y),
+			DirectX::XMConvertToRadians(e.z));
+		DirectX::XMFLOAT4 r;
+		DirectX::XMStoreFloat4(&r, q);
+		return r;
+	}
+
+	// 行の右端に小さな Reset ボタン。押されたら true
+	bool ResetButton(const char* id)
+	{
+		ImGui::SameLine(ImGui::GetContentRegionAvail().x - 46.0f);
+		ImGui::PushID(id);
+		bool pressed = ImGui::SmallButton(u8"Reset");
+		ImGui::PopID();
+		return pressed;
+	}
+}
+
+// GUI 表示（Inspector）
 void Actor::OnGUI()
 {
-	// 名前
+	// 名前（フル幅）
 	{
-		char buffer[1024];
-		::strncpy_s(buffer, sizeof(buffer), GetName(), sizeof(buffer));
-		if (ImGui::InputText("Name", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue))
+		char buffer[256];
+		::strncpy_s(buffer, sizeof(buffer), GetName(), _TRUNCATE);
+		ImGui::PushItemWidth(-1);
+		if (ImGui::InputText(u8"##Name", buffer, sizeof(buffer)))
 		{
 			SetName(buffer);
 		}
+		ImGui::PopItemWidth();
 	}
 
-	// トランスフォーム
-	if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
+	// Transform
+	if (ImGui::CollapsingHeader(u8"Transform", ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		// ★プロのハック: DragFloat を使用。
-		// 数字の部分を左右にドラッグするとスライダーのように滑らかに動き、上限/下限の縛りがありません。
-		// 第3引数(0.1f)は、ドラッグした時の変化の速度です。
-		ImGui::DragFloat3("Position", &position.x, 0.1f);
-		ImGui::DragFloat4("Rotation", &rotation.x, 0.01f);
-		ImGui::DragFloat3("Scale", &scale.x, 0.05f);
+		ImGui::DragFloat3(u8"Position", &position.x, 0.1f);
+		if (ResetButton("rp")) position = DirectX::XMFLOAT3(0, 0, 0);
+
+		// 回転はオイラー角（度）で編集。内部はクォータニオンのまま
+		DirectX::XMFLOAT3 euler = QuatToEulerDeg(rotation);
+		if (ImGui::DragFloat3(u8"Rotation", &euler.x, 0.5f))
+		{
+			rotation = EulerDegToQuat(euler);
+		}
+		if (ResetButton("rr")) rotation = DirectX::XMFLOAT4(0, 0, 0, 1);
+
+		ImGui::DragFloat3(u8"Scale", &scale.x, 0.05f, 0.001f, 1000.0f);
+		if (ResetButton("rs")) scale = DirectX::XMFLOAT3(1, 1, 1);
 	}
 
+	// 各コンポーネント
 	for (std::shared_ptr<Component>& component : components)
 	{
 		ImGui::Spacing();
-		ImGui::Separator();
-
 		if (ImGui::CollapsingHeader(component->GetName(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::PushID(component.get());
+			ImGui::Indent(8.0f);
 			component->OnGUI();
+			ImGui::Unindent(8.0f);
 			ImGui::PopID();
 		}
 	}
@@ -98,7 +147,6 @@ void Actor::OnGUI()
 // ActorManager クラスの実装
 // =====================================================================
 
-// 作成
 std::shared_ptr<Actor> ActorManager::Create()
 {
 	std::shared_ptr<Actor> actor = std::make_shared<Actor>();
@@ -112,13 +160,11 @@ std::shared_ptr<Actor> ActorManager::Create()
 	return actor;
 }
 
-// 削除
 void ActorManager::Remove(std::shared_ptr<Actor> actor)
 {
 	removeActors.insert(actor);
 }
 
-// 更新
 void ActorManager::Update(float elapsedTime)
 {
 	for (std::shared_ptr<Actor>& actor : startActors)
@@ -135,28 +181,18 @@ void ActorManager::Update(float elapsedTime)
 
 	for (const std::shared_ptr<Actor>& actor : removeActors)
 	{
-		std::vector<std::shared_ptr<Actor>>::iterator itStart = std::find(startActors.begin(), startActors.end(), actor);
-		if (itStart != startActors.end())
-		{
-			startActors.erase(itStart);
-		}
+		auto itStart = std::find(startActors.begin(), startActors.end(), actor);
+		if (itStart != startActors.end()) startActors.erase(itStart);
 
-		std::vector<std::shared_ptr<Actor>>::iterator itUpdate = std::find(updateActors.begin(), updateActors.end(), actor);
-		if (itUpdate != updateActors.end())
-		{
-			updateActors.erase(itUpdate);
-		}
+		auto itUpdate = std::find(updateActors.begin(), updateActors.end(), actor);
+		if (itUpdate != updateActors.end()) updateActors.erase(itUpdate);
 
-		std::set<std::shared_ptr<Actor>>::iterator itSelection = selectionActors.find(actor);
-		if (itSelection != selectionActors.end())
-		{
-			selectionActors.erase(itSelection);
-		}
+		auto itSel = selectionActors.find(actor);
+		if (itSel != selectionActors.end()) selectionActors.erase(itSel);
 	}
 	removeActors.clear();
 }
 
-// 行列更新
 void ActorManager::UpdateTransform()
 {
 	for (std::shared_ptr<Actor>& actor : updateActors)
@@ -165,7 +201,6 @@ void ActorManager::UpdateTransform()
 	}
 }
 
-// 描画
 void ActorManager::Render(const RenderContext& rc)
 {
 	for (std::shared_ptr<Actor>& actor : updateActors)
@@ -183,35 +218,65 @@ void ActorManager::Render(const RenderContext& rc)
 	DrawDetail();
 }
 
-// リスター描画
+// Hierarchy ウィンドウ
 void ActorManager::DrawLister()
 {
-	ImGui::SetNextWindowPos(ImVec2(30, 50), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20, 40), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(280, 400), ImGuiCond_FirstUseEver);
 
-	hiddenLister = !ImGui::Begin("Hierarchy", nullptr, ImGuiWindowFlags_None);
+	hiddenLister = !ImGui::Begin(u8"Hierarchy");
 	if (!hiddenLister)
 	{
+		// ツールバー：新規作成 ＋ 検索
+		if (ImGui::Button(u8"+ 新規作成"))
+		{
+			std::shared_ptr<Actor> a = Create();
+			selectionActors.clear();
+			selectionActors.insert(a);
+		}
+		ImGui::SameLine();
+		static char filter[128] = "";
+		ImGui::PushItemWidth(-1);
+		ImGui::InputTextWithHint(u8"##filter", u8"検索...", filter, sizeof(filter));
+		ImGui::PopItemWidth();
+		ImGui::Separator();
+
+		const bool filtering = (filter[0] != '\0');
+
 		std::function<void(std::shared_ptr<Actor>)> drawNode = [&](std::shared_ptr<Actor> actor)
 			{
-				ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DefaultOpen;
+				ImGuiTreeNodeFlags nodeFlags =
+					ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
+					ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
 
 				if (actor->GetChildren().empty())
-				{
 					nodeFlags |= ImGuiTreeNodeFlags_Leaf;
-				}
-
 				if (selectionActors.find(actor) != selectionActors.end())
-				{
 					nodeFlags |= ImGuiTreeNodeFlags_Selected;
-				}
 
 				bool isOpen = ImGui::TreeNodeEx(actor.get(), nodeFlags, "%s", actor->GetName());
 
-				if (ImGui::IsItemClicked())
+				// 三角の開閉クリックでは選択しない
+				if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
 				{
 					selectionActors.clear();
 					selectionActors.insert(actor);
+				}
+
+				// 右クリックメニュー
+				if (ImGui::BeginPopupContextItem())
+				{
+					selectionActors.clear();
+					selectionActors.insert(actor);
+					if (ImGui::MenuItem(u8"子を追加"))
+					{
+						actor->AddChild(Create());
+					}
+					if (ImGui::MenuItem(u8"削除"))
+					{
+						Remove(actor);
+					}
+					ImGui::EndPopup();
 				}
 
 				if (isOpen)
@@ -224,24 +289,45 @@ void ActorManager::DrawLister()
 				}
 			};
 
-		for (std::shared_ptr<Actor>& actor : updateActors)
+		if (filtering)
 		{
-			if (actor->GetParent().expired())
+			for (std::shared_ptr<Actor>& actor : updateActors)
 			{
-				drawNode(actor);
+				if (::strstr(actor->GetName(), filter) == nullptr) continue;
+				bool selected = selectionActors.find(actor) != selectionActors.end();
+				if (ImGui::Selectable(actor->GetName(), selected))
+				{
+					selectionActors.clear();
+					selectionActors.insert(actor);
+				}
 			}
+		}
+		else
+		{
+			for (std::shared_ptr<Actor>& actor : updateActors)
+			{
+				if (actor->GetParent().expired())
+					drawNode(actor);
+			}
+		}
+
+		// 空白クリックで選択解除
+		if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() &&
+			ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+		{
+			selectionActors.clear();
 		}
 	}
 	ImGui::End();
 }
 
-// 詳細描画
+// Inspector ウィンドウ
 void ActorManager::DrawDetail()
 {
-	ImGui::SetNextWindowPos(ImVec2(950, 50), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 300), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 320.0f, 40), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(300, 420), ImGuiCond_FirstUseEver);
 
-	hiddenDetail = !ImGui::Begin("Inspector", nullptr, ImGuiWindowFlags_None);
+	hiddenDetail = !ImGui::Begin(u8"Inspector");
 	if (!hiddenDetail)
 	{
 		std::shared_ptr<Actor> lastSelected = selectionActors.empty() ? nullptr : *selectionActors.rbegin();
@@ -251,7 +337,8 @@ void ActorManager::DrawDetail()
 		}
 		else
 		{
-			ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "No Object Selected");
+			ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), u8"オブジェクト未選択");
+			ImGui::TextDisabled(u8"Hierarchy でオブジェクトを選択してください");
 		}
 	}
 	ImGui::End();

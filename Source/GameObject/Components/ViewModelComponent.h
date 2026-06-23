@@ -1,14 +1,31 @@
 #pragma once
 
-#include "GameObject/Component.h"
-#include "Camera/Camera.h"
+#include <vector>
+#include <string>
 #include <DirectXMath.h>
-#include <vector> // vectorがインクルードされているか確認
+#include "GameObject/Component.h"
 
-class ViewModelComponent : public Component
-{
+// ★追加：Run（走る）ステートを追加
+enum class WeaponState { Idle, Walk, Run, Jump, Reload, Fire };
+
+struct VfxEffect {
+	DirectX::XMFLOAT3 position;
+	DirectX::XMFLOAT3 normal;
+	DirectX::XMFLOAT3 endPosition;
+	DirectX::XMFLOAT4 color;
+	float lifeTime;
+	float maxLifeTime;
+	int type;
+};
+
+class Camera;
+class PlayerControllerComponent;
+class ModelComponent;
+class AnimatorComponent;
+
+class ViewModelComponent : public Component {
 public:
-	ViewModelComponent(Camera* camera, class PlayerControllerComponent* playerCtrl);
+	ViewModelComponent(Camera* camera, PlayerControllerComponent* playerCtrl);
 	~ViewModelComponent() override = default;
 
 	const char* GetName() const override { return "ViewModel"; }
@@ -22,44 +39,27 @@ public:
 
 private:
 	Camera* camera = nullptr;
-	class PlayerControllerComponent* playerController = nullptr;
+	PlayerControllerComponent* playerController = nullptr;
+	ModelComponent* cachedModelComponent = nullptr;
+	AnimatorComponent* animator = nullptr;
 
-	class ModelComponent* cachedModelComponent = nullptr;
-	class AnimatorComponent* animator = nullptr;
-
-	DirectX::XMFLOAT3 offsetPos = { 0.0f, -0.2f, 0.3f };
-	DirectX::XMFLOAT3 offsetRot = { 0.0f, 0.0f, 0.0f };
-	DirectX::XMFLOAT3 offsetScale = { 0.01f, 0.01f, 0.01f };
-
-	char currentAnimName[128] = "Pistol_IDLE";
-
-	enum class WeaponState { Idle, Walk, Jump, Fire, Reload };
 	WeaponState currentWeaponState = WeaponState::Idle;
-
 	float actionTimer = 0.0f;
 
 	int maxAmmo = 12;
 	int currentAmmo = 12;
 
-	DirectX::XMFLOAT3 lastHitPos = { 0, 0, 0 };
+	DirectX::XMFLOAT3 offsetPos = { 0.1f, -0.2f, 0.3f };
+	DirectX::XMFLOAT3 offsetRot = { 0.0f, 0.0f, 0.0f };
+	DirectX::XMFLOAT3 offsetScale = { 1.0f, 1.0f, 1.0f };
+
+	DirectX::XMFLOAT3 muzzleOffset = { 0.1f, -0.1f, 0.5f };
+	DirectX::XMFLOAT3 currentMuzzlePos = { 0, 0, 0 };
+	bool showDebugMuzzle = false;
+
+	std::vector<VfxEffect> vfxList;
+	DirectX::XMFLOAT3 lastHitPos = { 0,0,0 };
 	float hitMarkerTimer = 0.0f;
 
-	struct VfxEffect {
-		DirectX::XMFLOAT3 position;
-		DirectX::XMFLOAT3 normal;
-		DirectX::XMFLOAT3 endPosition;
-		DirectX::XMFLOAT4 color;
-		float lifeTime;
-		float maxLifeTime;
-		int type;
-	};
-	std::vector<VfxEffect> vfxList;
-
-	DirectX::XMFLOAT3 muzzleOffset = { 0.0f, 0.1f, 0.4f };
-
-	// =======================================================
-	// ★追加：銃口位置のデバッグ表示フラグ
-	// =======================================================
-	bool showDebugMuzzle = true;
-	DirectX::XMFLOAT3 currentMuzzlePos = { 0, 0, 0 };
+	char currentAnimName[64] = "Pistol_IDLE";
 };

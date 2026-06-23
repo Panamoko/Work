@@ -9,8 +9,10 @@ PrimitiveRenderer::PrimitiveRenderer(ID3D11Device* device)
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 }, // ★追加：UV座標
 	};
-	// 頂点シェーダー
+
+	// ★プロの修正：以前起きたクラッシュを防ぐため、安全な CompiledShader を読み込むように修正！
 	GpuResourceUtils::LoadVertexShader(
 		device,
 		"Data/CompiledShader/PrimitiveRendererVS.cso",
@@ -19,7 +21,6 @@ PrimitiveRenderer::PrimitiveRenderer(ID3D11Device* device)
 		inputLayout.GetAddressOf(),
 		vertexShader.GetAddressOf());
 
-	// ピクセルシェーダー
 	GpuResourceUtils::LoadPixelShader(
 		device,
 		"Data/CompiledShader/PrimitiveRendererPS.cso",
@@ -41,14 +42,24 @@ PrimitiveRenderer::PrimitiveRenderer(ID3D11Device* device)
 	desc.StructureByteStride = 0;
 	HRESULT hr = device->CreateBuffer(&desc, nullptr, vertexBuffer.GetAddressOf());
 	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+	// ★追加：テクスチャ描画用のサンプラステートを生成
+	D3D11_SAMPLER_DESC sampDesc{};
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	hr = device->CreateSamplerState(&sampDesc, samplerState.GetAddressOf());
+	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 }
 
 // 頂点追加
-void PrimitiveRenderer::AddVertex(const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT4& color)
+void PrimitiveRenderer::AddVertex(const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT4& color, const DirectX::XMFLOAT2& texcoord)
 {
 	Vertex& v = vertices.emplace_back();
 	v.position = position;
 	v.color = color;
+	v.texcoord = texcoord; // ★追加
 }
 
 // 軸描画
@@ -82,7 +93,6 @@ void PrimitiveRenderer::DrawGrid(int subdivisions, float scale)
 
 	const DirectX::XMFLOAT4 white = DirectX::XMFLOAT4(1, 1, 1, 1);
 
-	// Create vertical lines
 	float scaling = static_cast<float>(subdivisions) * scale;
 	DirectX::XMMATRIX M = DirectX::XMMatrixScaling(scaling, scaling, scaling);
 	DirectX::XMVECTOR V, P;
@@ -102,7 +112,6 @@ void PrimitiveRenderer::DrawGrid(int subdivisions, float scale)
 		s += step;
 	}
 
-	// Create horizontal lines
 	s = -corner;
 	for (int i = 0; i <= subdivisions; i++)
 	{
@@ -119,7 +128,6 @@ void PrimitiveRenderer::DrawGrid(int subdivisions, float scale)
 		s += step;
 	}
 
-	// X軸
 	{
 		const DirectX::XMFLOAT4 red = DirectX::XMFLOAT4(1, 0, 0, 1);
 		V = DirectX::XMVectorSet(0, 0, 0, 0);
@@ -133,7 +141,6 @@ void PrimitiveRenderer::DrawGrid(int subdivisions, float scale)
 		AddVertex(position, red);
 	}
 
-	// Y軸
 	{
 		const DirectX::XMFLOAT4 green = DirectX::XMFLOAT4(0, 1, 0, 1);
 		V = DirectX::XMVectorSet(0, 0, 0, 0);
@@ -147,7 +154,6 @@ void PrimitiveRenderer::DrawGrid(int subdivisions, float scale)
 		AddVertex(position, green);
 	}
 
-	// Z軸
 	{
 		const DirectX::XMFLOAT4 blue = DirectX::XMFLOAT4(0, 0, 1, 1);
 		V = DirectX::XMVectorSet(0, 0, 0, 0);
@@ -169,32 +175,33 @@ void PrimitiveRenderer::Render(
 	const DirectX::XMFLOAT4X4& projection,
 	D3D11_PRIMITIVE_TOPOLOGY primitiveTopology)
 {
-	// シェーダー設定
 	dc->VSSetShader(vertexShader.Get(), nullptr, 0);
 	dc->PSSetShader(pixelShader.Get(), nullptr, 0);
 	dc->IASetInputLayout(inputLayout.Get());
 
-	// 定数バッファ設定
 	dc->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+	dc->PSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf()); // ★追加：ピクセルシェーダーにも定数を送る
 
-	// ビュープロジェクション行列作成
+	// ★追加：テクスチャとサンプラをバインド
+	dc->PSSetSamplers(0, 1, samplerState.GetAddressOf());
+	ID3D11ShaderResourceView* srvs[] = { currentTexture };
+	dc->PSSetShaderResources(0, 1, srvs);
+
 	DirectX::XMMATRIX V = DirectX::XMLoadFloat4x4(&view);
 	DirectX::XMMATRIX P = DirectX::XMLoadFloat4x4(&projection);
 	DirectX::XMMATRIX VP = V * P;
 
-	// 定数バッファ更新
 	CbScene cbScene;
 	DirectX::XMStoreFloat4x4(&cbScene.viewProjection, VP);
+	cbScene.useTexture = (currentTexture != nullptr) ? 1 : 0; // ★テクスチャがセットされていればフラグを立てる
 	dc->UpdateSubresource(constantBuffer.Get(), 0, 0, &cbScene, 0, 0);
 
-	// 頂点バッファ設定
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 	dc->IASetPrimitiveTopology(primitiveTopology);
 	dc->IASetIndexBuffer(nullptr, DXGI_FORMAT_R32_UINT, 0);
 	dc->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
 
-	// 描画
 	UINT totalVertexCount = static_cast<UINT>(vertices.size());
 	UINT start = 0;
 	UINT count = (totalVertexCount < VertexCapacity) ? totalVertexCount : VertexCapacity;

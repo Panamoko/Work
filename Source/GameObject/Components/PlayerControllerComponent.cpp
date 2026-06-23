@@ -1,8 +1,8 @@
 ﻿#include <algorithm>
 #include <imgui.h>
 #include <fstream>
+#include <cmath> 
 #include "GameObject/Components/PlayerControllerComponent.h"
-#include "GameObject/Components/WeaponComponent.h" 
 #include "Physics/SphereCast.h"
 #include "Graphics/Graphics.h"
 #include "Core/Input.h"
@@ -25,6 +25,9 @@ void PlayerControllerComponent::SaveSettings() {
 		ofs << playerScale << "\n";
 		ofs << cameraOffsetPos.x << " " << cameraOffsetPos.y << " " << cameraOffsetPos.z << "\n";
 		ofs << radius << "\n";
+		ofs << manualMoveSpeed << " " << runMoveSpeed << "\n";
+		ofs << gravity << " " << jumpPower << "\n";
+		ofs << acceleration << " " << deceleration << " " << airControl << "\n";
 	}
 }
 
@@ -34,6 +37,20 @@ void PlayerControllerComponent::LoadSettings() {
 		ifs >> playerScale;
 		ifs >> cameraOffsetPos.x >> cameraOffsetPos.y >> cameraOffsetPos.z;
 		ifs >> radius;
+		float tempSpeed, tempRunSpeed, tempGravity, tempJump, tempAccel, tempDecel, tempAir;
+		if (ifs >> tempSpeed >> tempRunSpeed) {
+			manualMoveSpeed = tempSpeed;
+			runMoveSpeed = tempRunSpeed;
+		}
+		if (ifs >> tempGravity >> tempJump) {
+			gravity = tempGravity;
+			jumpPower = tempJump;
+		}
+		if (ifs >> tempAccel >> tempDecel >> tempAir) {
+			acceleration = tempAccel;
+			deceleration = tempDecel;
+			airControl = tempAir;
+		}
 	}
 }
 
@@ -48,64 +65,52 @@ bool PlayerControllerComponent::CheckGrounded() {
 
 void PlayerControllerComponent::OnGUI() {
 	ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), u8"▼ FPS設定・操作 (PlayerController)");
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"【F11キー】 フルスクリーン / ウィンドウ 切り替え");
-	ImGui::Text(u8"【TABキー】を押してマウス操作 / ImGui操作 を切り替え");
-	if (ImGui::Button(u8"【 プレイヤーの設定をファイルに保存する 】")) SaveSettings();
+	if (ImGui::Button(u8"【 プレイヤーの設定を保存 】")) SaveSettings();
 	ImGui::Separator();
 
 	ImGui::Checkbox(u8"マウスロック(FPS操作中)", &isCursorLocked);
 
 	ImGui::Separator();
 	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"【 目の高さ設定 】");
-	ImGui::DragFloat3(u8"カメラ 位置オフセット(X, Y, Z)", &cameraOffsetPos.x, 0.01f, -5.0f, 5.0f);
+	ImGui::DragFloat3(u8"カメラ 位置オフセット", &cameraOffsetPos.x, 0.01f, -5.0f, 5.0f);
 	ImGui::Separator();
 
-	ImGui::DragFloat(u8"当たり判定の半径(radius)", &radius, 0.01f, 0.01f, 2.0f);
-	ImGui::DragFloat(u8"移動速度", &manualMoveSpeed, 0.1f, 0.0f, 20.0f);
-	ImGui::DragFloat(u8"ジャンプ力", &jumpPower, 0.1f, 0.0f, 20.0f);
+	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"【 移動速度・ジャンプ 】");
+	ImGui::DragFloat(u8"歩き速度 (Walk)", &manualMoveSpeed, 0.1f, 0.0f, 20.0f);
+	ImGui::DragFloat(u8"走り速度 (Run)", &runMoveSpeed, 0.1f, 0.0f, 30.0f);
+	ImGui::DragFloat(u8"重力 (Gravity)", &gravity, 0.1f, 0.0f, 100.0f);
+	ImGui::DragFloat(u8"ジャンプ力 (Jump)", &jumpPower, 0.1f, 0.0f, 50.0f);
+
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"【 慣性・操作感の調整 】");
+	ImGui::DragFloat(u8"加速度 (走り出しの鋭さ)", &acceleration, 0.1f, 1.0f, 50.0f);
+	ImGui::DragFloat(u8"摩擦 (止まる時の鋭さ)", &deceleration, 0.1f, 1.0f, 50.0f);
+	ImGui::DragFloat(u8"空中制御 (AirControl)", &airControl, 0.01f, 0.0f, 1.0f);
+
+	ImGui::Separator();
 	ImGui::DragFloat(u8"マウス感度", &mouseSensitivity, 0.0001f, 0.0f, 0.01f, "%.4f");
-
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"▼ 内部状態モニター");
-	ImGui::Text(u8"カメラ Pitch (上下): %.2f", cameraPitch);
-	ImGui::Text(u8"プレイヤー Yaw (左右): %.2f", characterYaw);
 }
 
 void PlayerControllerComponent::Update(float elapsedTime) {
 	HWND hWnd = GetActiveWindow();
 
-	// =======================================================
-	// フルスクリーンの切り替え（無駄なハックを削除したクリーンな実装）
-	// =======================================================
 	bool currF11Key = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
 	if (currF11Key && !prevF11Key && hWnd != nullptr) {
 		if (!isFullscreen) {
-			// フルスクリーン化：現在の安全なウィンドウサイズと位置を記憶しておく
 			GetWindowRect(hWnd, &savedWindowRect);
 			SetWindowLong(hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-
 			HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-			MONITORINFO mi;
-			mi.cbSize = sizeof(mi);
-			GetMonitorInfo(hMonitor, &mi);
-			SetWindowPos(hWnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
-				mi.rcMonitor.right - mi.rcMonitor.left,
-				mi.rcMonitor.bottom - mi.rcMonitor.top,
-				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+			MONITORINFO mi; mi.cbSize = sizeof(mi); GetMonitorInfo(hMonitor, &mi);
+			SetWindowPos(hWnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 			isFullscreen = true;
 		}
 		else {
-			// ★プロの修正：強引な1280x720の計算をやめ、記憶しておいた「直前の状態」に完全復元する
 			SetWindowLong(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-			SetWindowPos(hWnd, nullptr, savedWindowRect.left, savedWindowRect.top,
-				savedWindowRect.right - savedWindowRect.left,
-				savedWindowRect.bottom - savedWindowRect.top,
-				SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+			SetWindowPos(hWnd, nullptr, savedWindowRect.left, savedWindowRect.top, savedWindowRect.right - savedWindowRect.left, savedWindowRect.bottom - savedWindowRect.top, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 			isFullscreen = false;
 		}
 	}
 	prevF11Key = currF11Key;
-	// =======================================================
 
 	Model* characterModel = nullptr;
 	if (cachedModelComponent && cachedModelComponent->GetModel()) {
@@ -119,19 +124,13 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	if (hWnd == GetForegroundWindow()) {
 		if (isCursorLocked) {
 			if (cursorVisibilityState) { ShowCursor(FALSE); cursorVisibilityState = false; }
-
-			// ★プロの修正：Graphicsエンジンが完全に画面を再構築するようになったため、
-			// 面倒な計算はせず、素直にエンジンの数値をそのまま使うだけで完璧に中心が取れます。
-			float screenW = Graphics::Instance().GetScreenWidth();
-			float screenH = Graphics::Instance().GetScreenHeight();
+			float screenW = Graphics::Instance().GetScreenWidth(); float screenH = Graphics::Instance().GetScreenHeight();
 			POINT center = { static_cast<LONG>(screenW / 2.0f), static_cast<LONG>(screenH / 2.0f) };
 			ClientToScreen(hWnd, &center);
-
 			POINT currentMousePos; GetCursorPos(&currentMousePos);
 			characterYaw += static_cast<float>(currentMousePos.x - center.x) * mouseSensitivity;
 			cameraPitch += static_cast<float>(currentMousePos.y - center.y) * mouseSensitivity;
 			cameraPitch = std::clamp(cameraPitch, -DirectX::XM_PIDIV2 + 0.05f, DirectX::XM_PIDIV2 - 0.05f);
-
 			SetCursorPos(center.x, center.y);
 		}
 		else {
@@ -148,6 +147,8 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	if (GetAsyncKeyState('A')) inputX = -1.0f;
 	if (GetAsyncKeyState('D')) inputX = 1.0f;
 
+	bool isShiftPressed = ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0) || (pad.GetTriggerL() > 0.5f);
+
 	DirectX::XMVECTOR vInput = DirectX::XMVectorSet(inputX, 0.0f, inputZ, 0.0f);
 	DirectX::XMVECTOR vInputLengthSq = DirectX::XMVector3LengthSq(vInput);
 	bool currentlyMoving = (vInputLengthSq.m128_f32[0] > 0.001f);
@@ -160,26 +161,45 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	if (usePhysics) isGrounded = (velocityY > 0.0f) ? false : CheckGrounded();
 	else isGrounded = true;
 
+	bool currSpaceKey = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+	bool isSpacePressed = currSpaceKey && !prevSpaceKey;
+
 	PlayerState nextState = currentState;
 	if (isGrounded) {
 		if (currentState == PlayerState::Jump || currentState == PlayerState::Fall) velocityY = 0.0f;
-		if ((pad.GetButtonDown() & GamePad::BTN_A) || GetAsyncKeyState(VK_SPACE)) { velocityY = jumpPower; nextState = PlayerState::Jump; }
-		else nextState = currentlyMoving ? PlayerState::Walk : PlayerState::Idle;
+
+		if ((pad.GetButtonDown() & GamePad::BTN_A) || isSpacePressed) {
+			velocityY = jumpPower; nextState = PlayerState::Jump;
+		}
+		else if (currentlyMoving) {
+			nextState = isShiftPressed ? PlayerState::Run : PlayerState::Walk;
+		}
+		else {
+			nextState = PlayerState::Idle;
+		}
 	}
 	else {
 		nextState = (velocityY > 0.0f) ? PlayerState::Jump : PlayerState::Fall;
 	}
 
+	prevSpaceKey = currSpaceKey;
 	bool stateChanged = (currentState != nextState);
 	currentState = nextState;
 
 	if (animator && characterModel) {
 		animator->SetAnimSpeed(animSpeed);
-		if (currentState == PlayerState::Walk) {
+		if (currentState == PlayerState::Walk || currentState == PlayerState::Run) {
+
 			int animZ = currentAnimZIndex;
-			if (manualVec.z > 0.05f) animZ = characterModel->GetAnimationIndex(animWalkF);
-			else if (manualVec.z < -0.05f) animZ = characterModel->GetAnimationIndex(animWalkB);
-			if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
+			if (currentState == PlayerState::Run) {
+				animZ = characterModel->GetAnimationIndex(animRun);
+				if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
+			}
+			else {
+				if (manualVec.z > 0.05f) animZ = characterModel->GetAnimationIndex(animWalkF);
+				else if (manualVec.z < -0.05f) animZ = characterModel->GetAnimationIndex(animWalkB);
+				if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
+			}
 
 			int animX = currentAnimXIndex;
 			if (manualVec.x > 0.05f) animX = characterModel->GetAnimationIndex(animWalkR);
@@ -212,10 +232,27 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 		}
 	}
 
-	DirectX::XMVECTOR vManualTranslation = DirectX::XMVectorSet(manualVec.x * manualMoveSpeed * elapsedTime, 0.0f, manualVec.z * manualMoveSpeed * elapsedTime, 0.0f);
+	// =======================================================
+	// ★プロの修正1：空中でもShiftキーを基準に目標速度を決定する
+	// =======================================================
+	float currentMoveSpeed = isShiftPressed ? runMoveSpeed : manualMoveSpeed;
+
+	DirectX::XMVECTOR vInputLocal = DirectX::XMVectorSet(manualVec.x, 0.0f, manualVec.z, 0.0f);
 	DirectX::XMMATRIX R_Yaw = DirectX::XMMatrixRotationY(characterYaw);
-	DirectX::XMVECTOR vWorldTranslation = DirectX::XMVector3TransformNormal(vManualTranslation, R_Yaw);
-	DirectX::XMStoreFloat3(&debugManualMotion, vManualTranslation);
+	DirectX::XMVECTOR vTargetVelocity = DirectX::XMVector3TransformNormal(vInputLocal, R_Yaw);
+	vTargetVelocity = DirectX::XMVectorScale(vTargetVelocity, currentMoveSpeed);
+
+	float accelRate = currentlyMoving ? acceleration : deceleration;
+	if (!isGrounded) {
+		accelRate *= airControl;
+	}
+
+	DirectX::XMVECTOR vCurrentVelocity = DirectX::XMLoadFloat3(&currentVelocity);
+	float t = 1.0f - std::exp(-accelRate * elapsedTime);
+	vCurrentVelocity = DirectX::XMVectorLerp(vCurrentVelocity, vTargetVelocity, t);
+	DirectX::XMStoreFloat3(&currentVelocity, vCurrentVelocity);
+
+	DirectX::XMVECTOR vWorldTranslation = DirectX::XMVectorScale(vCurrentVelocity, elapsedTime);
 	DirectX::XMFLOAT3 move; DirectX::XMStoreFloat3(&move, vWorldTranslation);
 
 	if (usePhysics) {
@@ -245,13 +282,99 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 
 	camera->SetLookAt(eyeF, targetF, { 0.0f, 1.0f, 0.0f });
 
-	// ★修正：カメラのアスペクト比も、素直にエンジンの数値をそのまま使う
 	float screenW = Graphics::Instance().GetScreenWidth();
 	float screenH = Graphics::Instance().GetScreenHeight();
 	if (screenW > 0 && screenH > 0) {
-		// ★プロの修正：0.35f だった部分を 0.05f に変更（目の前5cmまで描画可能にする）
-		camera->SetPerspectiveFov(DirectX::XMConvertToRadians(60), screenW / screenH, 0.05f, 1000.0f);
+
+		// =======================================================
+		// ★プロの修正2：実際の「物理的な移動スピード(Velocity)」からFOVを計算する！
+		// これにより、空中に飛び出して慣性でハイスピード移動している間は絶対にFOVが維持される。
+		// =======================================================
+		float currentSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(vCurrentVelocity));
+
+		// 速度0でFOV60、runMoveSpeedでFOV75になるように割合を計算（clampで0.0〜1.0に制限）
+		float speedRatio = std::clamp((currentSpeed - manualMoveSpeed) / (runMoveSpeed - manualMoveSpeed), 0.0f, 1.0f);
+		float targetFov = 60.0f + (15.0f * speedRatio);
+
+		currentFov += (targetFov - currentFov) * 10.0f * elapsedTime;
+		camera->SetPerspectiveFov(DirectX::XMConvertToRadians(currentFov), screenW / screenH, 0.05f, 1000.0f);
 	}
+}
+
+bool PlayerControllerComponent::CapsuleCast(const DirectX::XMFLOAT3& originFoot, const DirectX::XMFLOAT3& originHead, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
+	float distFoot = distance;
+	float distHead = distance;
+	DirectX::XMFLOAT3 hitPosFoot, hitNormFoot, hitPosHead, hitNormHead;
+
+	bool hitFoot = SphereCast(originFoot, direction, radius, distFoot, hitPosFoot, hitNormFoot);
+	bool hitHead = SphereCast(originHead, direction, radius, distHead, hitPosHead, hitNormHead);
+
+	if (hitFoot || hitHead) {
+		if (hitFoot && hitHead) {
+			if (distFoot < distHead) {
+				distance = distFoot; hitPosition = hitPosFoot; hitNormal = hitNormFoot;
+			}
+			else {
+				distance = distHead; hitPosition = hitPosHead; hitNormal = hitNormHead;
+			}
+		}
+		else if (hitFoot) {
+			distance = distFoot; hitPosition = hitPosFoot; hitNormal = hitNormFoot;
+		}
+		else {
+			distance = distHead; hitPosition = hitPosHead; hitNormal = hitNormHead;
+		}
+		return true;
+	}
+	return false;
+}
+
+void PlayerControllerComponent::MoveAndSlide(const DirectX::XMFLOAT3& move, bool vertical) {
+	DirectX::XMVECTOR Position = DirectX::XMLoadFloat3(&position), Move = DirectX::XMLoadFloat3(&move);
+
+	DirectX::XMVECTOR CenterFoot = DirectX::XMVectorSet(0.0f, radius + stepOffset, 0.0f, 0.0f);
+	DirectX::XMVECTOR CenterHead = DirectX::XMVectorSet(0.0f, cameraOffsetPos.y, 0.0f, 0.0f);
+
+	for (int i = 0; i < 3; ++i) {
+		float moveDist = DirectX::XMVectorGetX(DirectX::XMVector3Length(Move));
+		if (moveDist < 0.0001f) break;
+		float castDist = moveDist + skinWidth;
+		if (vertical) castDist += stepOffset;
+
+		DirectX::XMVECTOR OriginFoot = DirectX::XMVectorAdd(Position, CenterFoot);
+		DirectX::XMVECTOR OriginHead = DirectX::XMVectorAdd(Position, CenterHead);
+		DirectX::XMVECTOR Direction = DirectX::XMVector3Normalize(Move);
+
+		DirectX::XMFLOAT3 originFootF, originHeadF, directionF, hitPosition, hitNormal;
+		DirectX::XMStoreFloat3(&originFootF, OriginFoot);
+		DirectX::XMStoreFloat3(&originHeadF, OriginHead);
+		DirectX::XMStoreFloat3(&directionF, Direction);
+
+		if (CapsuleCast(originFootF, originHeadF, directionF, radius, castDist, hitPosition, hitNormal)) {
+			castDist -= skinWidth;
+			if (vertical) castDist -= stepOffset;
+			if (castDist < 0.0f) castDist = 0.0f;
+
+			DirectX::XMVECTOR Vec = DirectX::XMVectorScale(Direction, castDist);
+			Position = DirectX::XMVectorAdd(Position, Vec);
+
+			DirectX::XMVECTOR HitNormal = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&hitNormal)), Up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			float dot = std::clamp(DirectX::XMVectorGetX(DirectX::XMVector3Dot(HitNormal, Up)), -1.0f, 1.0f);
+			if (DirectX::XMConvertToDegrees(acosf(dot)) <= slopeLimit) break;
+
+			Move = DirectX::XMVectorSubtract(Move, Vec);
+			DirectX::XMVECTOR dotVec = DirectX::XMVector3Dot(Move, HitNormal);
+			if (DirectX::XMVectorGetX(dotVec) < 0.0f) {
+				Move = DirectX::XMVectorSubtract(Move, DirectX::XMVectorMultiply(HitNormal, dotVec));
+			}
+			if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(Move)) < 0.00001f) break;
+		}
+		else {
+			Position = DirectX::XMVectorAdd(Position, Move);
+			break;
+		}
+	}
+	DirectX::XMStoreFloat3(&position, Position);
 }
 
 bool PlayerControllerComponent::SphereCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
@@ -303,43 +426,12 @@ bool PlayerControllerComponent::SphereCast(const DirectX::XMFLOAT3& origin, cons
 	return hit;
 }
 
-void PlayerControllerComponent::MoveAndSlide(const DirectX::XMFLOAT3& move, bool vertical) {
-	DirectX::XMVECTOR Position = DirectX::XMLoadFloat3(&position), Move = DirectX::XMLoadFloat3(&move);
-	DirectX::XMVECTOR CenterOffset = DirectX::XMVectorSet(0.0f, radius + stepOffset, 0.0f, 0.0f);
-	for (int i = 0; i < 3; ++i) {
-		float moveDist = DirectX::XMVectorGetX(DirectX::XMVector3Length(Move));
-		if (moveDist < 0.0001f) break;
-		float castDist = moveDist + skinWidth; if (vertical) castDist += stepOffset;
-		DirectX::XMVECTOR Origin = DirectX::XMVectorAdd(Position, CenterOffset), Direction = DirectX::XMVector3Normalize(Move);
-		DirectX::XMFLOAT3 origin, direction, hitPosition, hitNormal;
-		DirectX::XMStoreFloat3(&origin, Origin); DirectX::XMStoreFloat3(&direction, Direction);
-		if (SphereCast(origin, direction, radius, castDist, hitPosition, hitNormal)) {
-			castDist -= skinWidth; if (vertical) castDist -= stepOffset;
-			DirectX::XMVECTOR Vec = DirectX::XMVectorScale(Direction, castDist);
-			Position = DirectX::XMVectorAdd(Position, Vec);
-			DirectX::XMVECTOR HitNormal = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&hitNormal)), Up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-			float dot = std::clamp(DirectX::XMVectorGetX(DirectX::XMVector3Dot(HitNormal, Up)), -1.0f, 1.0f);
-			if (DirectX::XMConvertToDegrees(acosf(dot)) <= slopeLimit) break;
-			Move = DirectX::XMVectorSubtract(Move, Vec);
-			DirectX::XMVECTOR dotVec = DirectX::XMVector3Dot(Move, HitNormal);
-			if (DirectX::XMVectorGetX(dotVec) < 0.0f) Move = DirectX::XMVectorSubtract(Move, DirectX::XMVectorMultiply(HitNormal, dotVec));
-			if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(Move)) < 0.00001f) break;
-		}
-		else { Position = DirectX::XMVectorAdd(Position, Move); break; }
-	}
-	DirectX::XMStoreFloat3(&position, Position);
-}
-
-// =======================================================
-// ★追加：Hitscan用のRaycast処理 (Möller-Trumboreアルゴリズム)
-// =======================================================
 bool PlayerControllerComponent::RayCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float maxDistance, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
 	bool hit = false;
 	distance = maxDistance;
 	DirectX::XMVECTOR Start = DirectX::XMLoadFloat3(&origin);
 	DirectX::XMVECTOR Dir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&direction));
 
-	// Rayが通る可能性のある空間ハッシュの範囲を特定
 	float minX = (std::min)(origin.x, origin.x + direction.x * maxDistance);
 	float minY = (std::min)(origin.y, origin.y + direction.y * maxDistance);
 	float minZ = (std::min)(origin.z, origin.z + direction.z * maxDistance);
@@ -380,7 +472,7 @@ bool PlayerControllerComponent::RayCast(const DirectX::XMFLOAT3& origin, const D
 		DirectX::XMVECTOR edge2 = DirectX::XMVectorSubtract(v2, v0);
 		DirectX::XMVECTOR h = DirectX::XMVector3Cross(Dir, edge2);
 		float a = DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge1, h));
-		if (a > -EPSILON && a < EPSILON) continue; // 平行な場合はスキップ
+		if (a > -EPSILON && a < EPSILON) continue;
 
 		float f = 1.0f / a;
 		DirectX::XMVECTOR s = DirectX::XMVectorSubtract(Start, v0);
@@ -393,7 +485,6 @@ bool PlayerControllerComponent::RayCast(const DirectX::XMFLOAT3& origin, const D
 
 		float t = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge2, q));
 
-		// 最も手前にある衝突点を記録する
 		if (t > EPSILON && t < distance) {
 			distance = t;
 			DirectX::XMStoreFloat3(&hitNormal, DirectX::XMVector3Normalize(DirectX::XMVector3Cross(edge1, edge2)));
