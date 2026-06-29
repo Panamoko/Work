@@ -12,6 +12,23 @@ ModelComponent::ModelComponent(const char* filename)
 	if (model != nullptr)
 	{
 		model->GetNodePoses(nodePoses);
+
+		// =======================================================
+		// ★プロのハック（グレーボックステスト用）：
+		// モデルがロードされた直後、強制的にすべてのテクスチャをパージする。
+		// =======================================================
+		auto& materials = model->GetMaterials();
+		for (auto& m : materials)
+		{
+			m.baseMap.Reset();
+			m.metalnessRoughnessMap.Reset();
+			m.normalMap.Reset();
+			m.emissiveMap.Reset();
+			m.occlusionMap.Reset();
+		}
+
+		// テクスチャをパージした後に、保存しておいたカスタムカラー（.mat）を復元する
+		// これにより、テクスチャのノイズがない綺麗な「自分好みのトゥーンカラー」が完成する
 		LoadMaterialSettings();
 	}
 }
@@ -153,15 +170,10 @@ void ModelComponent::OnGUI()
 
 		auto& materials = model->GetMaterials();
 
-		// =======================================================
-		// ★プロのハック：全マテリアルのテクスチャを一括削除する機能
-		// 誤爆防止のため、ImGuiの機能を使ってボタンを「警告の赤色」に染めています
-		// =======================================================
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
 
-		// ImVec2(-1, 0) を指定することで、ウィンドウの横幅いっぱいの巨大ボタンにする
 		if (ImGui::Button(u8"【 全マテリアルのテクスチャを一括削除 (パージ) 】", ImVec2(-1, 0)))
 		{
 			for (auto& m : materials)
@@ -173,7 +185,7 @@ void ModelComponent::OnGUI()
 				m.occlusionMap.Reset();
 			}
 		}
-		ImGui::PopStyleColor(3); // 変えた色を元に戻す
+		ImGui::PopStyleColor(3);
 		ImGui::Separator();
 
 		for (size_t i = 0; i < materials.size(); ++i)
