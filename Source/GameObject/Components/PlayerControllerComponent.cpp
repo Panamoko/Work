@@ -63,32 +63,88 @@ bool PlayerControllerComponent::CheckGrounded() {
 }
 
 
-void PlayerControllerComponent::OnGUI() {
-	ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), u8"▼ FPS設定・操作 (PlayerController)");
-	if (ImGui::Button(u8"【 プレイヤーの設定を保存 】")) SaveSettings();
-	ImGui::Separator();
+void PlayerControllerComponent::OnGUI()
+{
+	// ---- Top bar ----
+	if (ImGui::Button("Save Settings")) SaveSettings();
+	ImGui::SameLine();
+	if (ImGui::Button("Load Settings")) LoadSettings();
+	ImGui::TextDisabled("Keys:  F11 = Fullscreen   /   TAB = Toggle cursor");
+	ImGui::Spacing();
 
-	ImGui::Checkbox(u8"マウスロック(FPS操作中)", &isCursorLocked);
+	// ---- Movement ----
+	if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::DragFloat("Walk Speed", &manualMoveSpeed, 0.1f, 0.0f, 30.0f);
+		ImGui::DragFloat("Run Speed", &runMoveSpeed, 0.1f, 0.0f, 40.0f);
+		ImGui::Checkbox("Use Physics (gravity / collision)", &usePhysics);
+	}
 
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"【 目の高さ設定 】");
-	ImGui::DragFloat3(u8"カメラ 位置オフセット", &cameraOffsetPos.x, 0.01f, -5.0f, 5.0f);
-	ImGui::Separator();
+	// ---- Jump & Gravity ----
+	if (ImGui::CollapsingHeader("Jump & Gravity", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::DragFloat("Jump Power", &jumpPower, 0.1f, 0.0f, 50.0f);
+		ImGui::DragFloat("Gravity", &gravity, 0.1f, 0.0f, 100.0f);
+	}
 
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"【 移動速度・ジャンプ 】");
-	ImGui::DragFloat(u8"歩き速度 (Walk)", &manualMoveSpeed, 0.1f, 0.0f, 20.0f);
-	ImGui::DragFloat(u8"走り速度 (Run)", &runMoveSpeed, 0.1f, 0.0f, 30.0f);
-	ImGui::DragFloat(u8"重力 (Gravity)", &gravity, 0.1f, 0.0f, 100.0f);
-	ImGui::DragFloat(u8"ジャンプ力 (Jump)", &jumpPower, 0.1f, 0.0f, 50.0f);
+	// ---- Feel (Inertia) ----
+	if (ImGui::CollapsingHeader("Feel (Inertia)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::DragFloat("Acceleration", &acceleration, 0.1f, 1.0f, 50.0f);
+		ImGui::DragFloat("Deceleration", &deceleration, 0.1f, 1.0f, 50.0f);
+		ImGui::SliderFloat("Air Control", &airControl, 0.0f, 1.0f);
+	}
 
-	ImGui::Separator();
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"【 慣性・操作感の調整 】");
-	ImGui::DragFloat(u8"加速度 (走り出しの鋭さ)", &acceleration, 0.1f, 1.0f, 50.0f);
-	ImGui::DragFloat(u8"摩擦 (止まる時の鋭さ)", &deceleration, 0.1f, 1.0f, 50.0f);
-	ImGui::DragFloat(u8"空中制御 (AirControl)", &airControl, 0.01f, 0.0f, 1.0f);
+	// ---- Camera ----
+	if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::DragFloat3("Eye Offset (X,Y,Z)", &cameraOffsetPos.x, 0.01f, -5.0f, 5.0f);
+		ImGui::SliderFloat("Field of View", &currentFov, 30.0f, 120.0f, "%.0f deg");
+		ImGui::DragFloat("Mouse Sensitivity", &mouseSensitivity, 0.0001f, 0.0f, 0.02f, "%.4f");
+		ImGui::Checkbox("Lock Cursor", &isCursorLocked);
+	}
 
-	ImGui::Separator();
-	ImGui::DragFloat(u8"マウス感度", &mouseSensitivity, 0.0001f, 0.0f, 0.01f, "%.4f");
+	// ---- Collision / Capsule ----
+	if (ImGui::CollapsingHeader("Collision"))
+	{
+		ImGui::DragFloat("Capsule Radius", &radius, 0.01f, 0.01f, 2.0f);
+		ImGui::DragFloat("Skin Width", &skinWidth, 0.001f, 0.0f, 0.5f, "%.3f");
+		ImGui::DragFloat("Step Offset", &stepOffset, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("Slope Limit (deg)", &slopeLimit, 0.5f, 0.0f, 89.0f);
+		ImGui::DragFloat("Player Scale", &playerScale, 0.01f, 0.05f, 10.0f);
+	}
+
+	// ---- Animation ----
+	if (ImGui::CollapsingHeader("Animation"))
+	{
+		ImGui::DragFloat("Anim Speed", &animSpeed, 0.01f, 0.0f, 5.0f);
+		ImGui::DragFloat("Cross Fade Time", &crossFadeTime, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("Fall Clamp (sec)", &fallClampSeconds, 0.05f, 0.0f, 5.0f);
+		ImGui::Separator();
+		ImGui::TextDisabled("Animation clip names");
+		ImGui::InputText("Idle", animIdle, sizeof(animIdle));
+		ImGui::InputText("Walk Fwd", animWalkF, sizeof(animWalkF));
+		ImGui::InputText("Walk Back", animWalkB, sizeof(animWalkB));
+		ImGui::InputText("Walk Left", animWalkL, sizeof(animWalkL));
+		ImGui::InputText("Walk Right", animWalkR, sizeof(animWalkR));
+		ImGui::InputText("Run", animRun, sizeof(animRun));
+		ImGui::InputText("Jump", animJump, sizeof(animJump));
+		ImGui::InputText("Fall", animFall, sizeof(animFall));
+	}
+
+	// ---- Runtime State (read-only monitor) ----
+	if (ImGui::CollapsingHeader("Runtime State", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		const char* stateNames[] = { "Idle", "Walk", "Run", "Jump", "Fall" };
+		int s = static_cast<int>(currentState);
+		ImGui::Text("State     : %s", (s >= 0 && s < 5) ? stateNames[s] : "?");
+		ImGui::TextColored(isGrounded ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.5f, 0, 1),
+			"Grounded  : %s", isGrounded ? "YES" : "NO (airborne)");
+		ImGui::Text("Position  : %.2f, %.2f, %.2f", position.x, position.y, position.z);
+		ImGui::Text("Velocity  : %.2f, %.2f, %.2f", currentVelocity.x, currentVelocity.y, currentVelocity.z);
+		ImGui::Text("Vertical V: %.2f", velocityY);
+		ImGui::Text("Yaw/Pitch : %.1f / %.1f", characterYaw, cameraPitch);
+	}
 }
 
 void PlayerControllerComponent::Update(float elapsedTime) {

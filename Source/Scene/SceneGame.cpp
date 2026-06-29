@@ -1,14 +1,83 @@
 #include "Graphics/Graphics.h"
-#include "Graphics/GpuResourceUtils.h" 
+#include "Graphics/GpuResourceUtils.h"
 #include "Scene/SceneGame.h"
 #include "GameObject/Actor.h"
 #include "GameObject/Components/ModelComponent.h"
-#include "GameObject/Components/PlayerControllerComponent.h" 
-#include "GameObject/Components/AnimatorComponent.h" 
-#include "GameObject/Components/ViewModelComponent.h" 
+#include "GameObject/Components/PlayerControllerComponent.h"
+#include "GameObject/Components/AnimatorComponent.h"
+#include "GameObject/Components/ViewModelComponent.h"
 #include "GameObject/Components/CrosshairComponent.h"
 #include <imgui.h>
-#include <string> 
+#include <string>
+#include <d3dcompiler.h>
+#pragma comment(lib, "d3dcompiler.lib")
+
+// Constant buffer for the procedural sky.
+struct SkyboxCB
+{
+	DirectX::XMFLOAT4X4 invViewProj;
+	DirectX::XMFLOAT4   cameraPos;
+	DirectX::XMFLOAT4   zenithColor;
+	DirectX::XMFLOAT4   horizonColor;
+	DirectX::XMFLOAT4   groundColor;
+	DirectX::XMFLOAT4   params; // x = horizonExp, y = bands
+};
+
+// Procedural gradient sky HLSL (compiled at runtime; no extra files).
+static const char* kSkyboxHLSL = R"(
+cbuffer SkyboxCB : register(b0)
+{
+	row_major float4x4 invViewProj;
+	float4 cameraPos;
+	float4 zenithColor;
+	float4 horizonColor;
+	float4 groundColor;
+	float4 params; // x=horizonExp, y=bands
+};
+
+struct VSOut
+{
+	float4 pos : SV_POSITION;
+	float3 dir : TEXCOORD0;
+};
+
+VSOut VSMain(uint id : SV_VertexID)
+{
+	float2 uv = float2((id << 1) & 2, id & 2); // fullscreen triangle
+	VSOut o;
+	o.pos = float4(uv * 2.0f - 1.0f, 1.0f, 1.0f); // z = 1 (far)
+	float4 world = mul(float4(o.pos.xy, 1.0f, 1.0f), invViewProj);
+	o.dir = world.xyz / world.w - cameraPos.xyz;  // view ray in world space
+	return o;
+}
+
+float4 PSMain(VSOut pin) : SV_TARGET
+{
+	float3 dir = normalize(pin.dir);
+	float h = dir.y; // -1 (down) .. +1 (up)
+
+	float horizonExp = max(params.x, 0.01f);
+
+	// upper hemisphere: horizon -> zenith
+	float tu = pow(saturate(h), horizonExp);
+	float3 upper = lerp(horizonColor.rgb, zenithColor.rgb, tu);
+
+	// lower hemisphere: horizon -> ground
+	float tl = pow(saturate(-h), horizonExp);
+	float3 lower = lerp(horizonColor.rgb, groundColor.rgb, tl);
+
+	float3 col = (h >= 0.0f) ? upper : lower;
+
+	// optional toon posterization
+	float bands = params.y;
+	if (bands >= 2.0f)
+	{
+		col = floor(col * bands) / bands;
+	}
+
+	return float4(col, 1.0f);
+}
+)";
 
 SceneGame::SceneGame()
 {
@@ -99,6 +168,8 @@ SceneGame::SceneGame()
 			materials[0].roughness = 0.1f;
 		}
 	}
+
+	InitSkybox(device);
 }
 
 SceneGame::~SceneGame()
@@ -108,6 +179,78 @@ SceneGame::~SceneGame()
 	ActorManager::Instance().Remove(viewModelActor);
 	ActorManager::Instance().Remove(helmetActor);
 	ActorManager::Instance().Remove(pbrSphereActor);
+}
+
+void SceneGame::InitSkybox(ID3D11Device* device)
+{
+	GpuResourceUtils::CreateConstantBuffer(device, sizeof(SkyboxCB), skyCB.GetAddressOf());
+
+	UINT flags = 0;
+#if defined(_DEBUG)
+	flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+	size_t len = strlen(kSkyboxHLSL);
+
+	Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, errBlob;
+
+	HRESULT hr = D3DCompile(kSkyboxHLSL, len, "Skybox", nullptr, nullptr,
+		"VSMain", "vs_5_0", flags, 0, vsBlob.GetAddressOf(), errBlob.GetAddressOf());
+	if (FAILED(hr))
+	{
+		if (errBlob) OutputDebugStringA(static_cast<const char*>(errBlob->GetBufferPointer()));
+		return;
+	}
+	device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, skyVS.GetAddressOf());
+
+	hr = D3DCompile(kSkyboxHLSL, len, "Skybox", nullptr, nullptr,
+		"PSMain", "ps_5_0", flags, 0, psBlob.GetAddressOf(), errBlob.ReleaseAndGetAddressOf());
+	if (FAILED(hr))
+	{
+		if (errBlob) OutputDebugStringA(static_cast<const char*>(errBlob->GetBufferPointer()));
+		return;
+	}
+	device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, skyPS.GetAddressOf());
+}
+
+void SceneGame::DrawSkybox()
+{
+	if (!skyVS || !skyPS) return;
+
+	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
+	RenderState* rs = Graphics::Instance().GetRenderState();
+
+	DirectX::XMMATRIX V = DirectX::XMLoadFloat4x4(&camera.GetView());
+	DirectX::XMMATRIX P = DirectX::XMLoadFloat4x4(&camera.GetProjection());
+	DirectX::XMMATRIX invVP = DirectX::XMMatrixInverse(nullptr, V * P);
+
+	SkyboxCB cb{};
+	DirectX::XMStoreFloat4x4(&cb.invViewProj, invVP);
+	const DirectX::XMFLOAT3& eye = camera.GetEye();
+	cb.cameraPos = { eye.x, eye.y, eye.z, 1.0f };
+	cb.zenithColor = { skyZenith.x,  skyZenith.y,  skyZenith.z,  1.0f };
+	cb.horizonColor = { skyHorizon.x, skyHorizon.y, skyHorizon.z, 1.0f };
+	cb.groundColor = { skyGround.x,  skyGround.y,  skyGround.z,  1.0f };
+	cb.params = { skyHorizonExp, skyBands, 0.0f, 0.0f };
+	dc->UpdateSubresource(skyCB.Get(), 0, 0, &cb, 0, 0);
+
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
+	dc->OMSetBlendState(rs->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
+	dc->RSSetState(rs->GetRasterizerState(RasterizerState::SolidCullNone));
+
+	ID3D11Buffer* nullVB = nullptr; UINT zero = 0;
+	dc->IASetInputLayout(nullptr);
+	dc->IASetVertexBuffers(0, 1, &nullVB, &zero, &zero);
+	dc->IASetIndexBuffer(nullptr, DXGI_FORMAT_R32_UINT, 0);
+	dc->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	dc->VSSetShader(skyVS.Get(), nullptr, 0);
+	dc->PSSetShader(skyPS.Get(), nullptr, 0);
+	dc->VSSetConstantBuffers(0, 1, skyCB.GetAddressOf());
+	dc->PSSetConstantBuffers(0, 1, skyCB.GetAddressOf());
+
+	dc->Draw(3, 0);
+
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
 }
 
 void SceneGame::Update(float elapsedTime)
@@ -123,16 +266,14 @@ void SceneGame::Render(float elapsedTime)
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	// =======================================================
-	// ★プロのFPSハック Step 1：ワールド描画の前にViewModelを一旦隠す
-	// =======================================================
+	// Draw the gradient sky first, as the far background.
+	DrawSkybox();
+
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();
 	if (vmModelComp) vmModelComp->SetVisible(false);
 
-	// 背景や敵など、ワールド全体を描画
 	ActorManager::Instance().Render(rc);
 
-	// エフェクト（弾道・火花・弾痕）を描画
 	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera.GetRight());
 	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera.GetUp());
 	DirectX::XMVECTOR F = DirectX::XMLoadFloat3(&camera.GetFront());
@@ -159,10 +300,6 @@ void SceneGame::Render(float elapsedTime)
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
-	// =======================================================
-	// ★プロのFPSハック Step 2：深度バッファ(Zバッファ)を強制クリア
-	// DirectX11のコア機能にアクセスして、画面の奥行き情報をリセットする
-	// =======================================================
 	ID3D11RenderTargetView* rtv = nullptr;
 	ID3D11DepthStencilView* dsv = nullptr;
 	rc.deviceContext->OMGetRenderTargets(1, &rtv, &dsv);
@@ -172,23 +309,31 @@ void SceneGame::Render(float elapsedTime)
 	}
 	if (rtv) rtv->Release();
 
-	// =======================================================
-	// ★プロのFPSハック Step 3：ViewModelだけを「最前面」に描画
-	// =======================================================
 	if (vmModelComp) {
 		vmModelComp->SetVisible(true);
-		vmModelComp->Draw(); // ModelRendererのキューに登録
-		Graphics::Instance().GetModelRenderer()->Render(rc); // キューをフラッシュして単独で描画
+		vmModelComp->Draw();
+		Graphics::Instance().GetModelRenderer()->Render(rc);
 	}
 }
 
 void SceneGame::DrawGUI()
 {
-	ImGui::SetNextWindowPos(ImVec2(20, 460), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(280, 70), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20, 420), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(300, 240), ImGuiCond_FirstUseEver);
 
-	ImGui::Begin(u8"Render Settings");
+	ImGui::Begin("Render Settings");
+
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
-	ImGui::Checkbox(u8"IBL（環境光反射）を有効にする", &renderer->enableIBL);
+	ImGui::Checkbox("IBL (Image Based Lighting)", &renderer->enableIBL);
+
+	if (ImGui::CollapsingHeader("Sky (Gradient)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::ColorEdit3("Zenith (top)", &skyZenith.x);
+		ImGui::ColorEdit3("Horizon (mid)", &skyHorizon.x);
+		ImGui::ColorEdit3("Ground (bottom)", &skyGround.x);
+		ImGui::SliderFloat("Horizon Width", &skyHorizonExp, 0.05f, 2.0f);
+		ImGui::SliderFloat("Toon Bands (0=off)", &skyBands, 0.0f, 16.0f, "%.0f");
+	}
+
 	ImGui::End();
 }

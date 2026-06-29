@@ -13,22 +13,9 @@ ModelComponent::ModelComponent(const char* filename)
 	{
 		model->GetNodePoses(nodePoses);
 
-		// =======================================================
-		// ★プロのハック（グレーボックステスト用）：
-		// モデルがロードされた直後、強制的にすべてのテクスチャをパージする。
-		// =======================================================
-		auto& materials = model->GetMaterials();
-		for (auto& m : materials)
-		{
-			m.baseMap.Reset();
-			m.metalnessRoughnessMap.Reset();
-			m.normalMap.Reset();
-			m.emissiveMap.Reset();
-			m.occlusionMap.Reset();
-		}
-
-		// テクスチャをパージした後に、保存しておいたカスタムカラー（.mat）を復元する
-		// これにより、テクスチャのノイズがない綺麗な「自分好みのトゥーンカラー」が完成する
+		// Keep the model's original textures.
+		// (The old "purge all textures on load" hack was removed; that was
+		//  what made Helmet / Player turn white.)
 		LoadMaterialSettings();
 	}
 }
@@ -135,80 +122,52 @@ void ModelComponent::OnGUI()
 {
 	if (model == nullptr)
 	{
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), u8"モデルが読み込まれていません");
+		ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model not loaded");
 		return;
 	}
 
 	int currentShader = static_cast<int>(shaderId);
 	const char* shaderNames[] = { "Basic", "Lambert", "PBR", "Toon" };
-	if (ImGui::Combo(u8"Shader", &currentShader, shaderNames, IM_ARRAYSIZE(shaderNames)))
+	if (ImGui::Combo("Shader", &currentShader, shaderNames, IM_ARRAYSIZE(shaderNames)))
 	{
 		shaderId = static_cast<ShaderId>(currentShader);
 	}
 
 	ImGui::Separator();
-	ImGui::Text(u8"Animation");
-	ImGui::SliderFloat(u8"Speed", &animSpeed, 0.0f, 5.0f);
+	ImGui::Text("Animation");
+	ImGui::SliderFloat("Speed", &animSpeed, 0.0f, 5.0f);
 	if (animationIndex >= 0)
 	{
-		ImGui::Text(u8"Index: %d  Time: %.2f", animationIndex, animationSeconds);
+		ImGui::Text("Index: %d  Time: %.2f", animationIndex, animationSeconds);
 	}
 	else
 	{
-		ImGui::TextDisabled(u8"アニメーションなし");
+		ImGui::TextDisabled("No animation");
 	}
 
 	ImGui::Separator();
-	if (ImGui::CollapsingHeader(u8"マテリアル (PBR / Toon)"))
+	if (ImGui::CollapsingHeader("Materials (PBR / Toon)"))
 	{
-		if (ImGui::Button(u8"【 このモデルのマテリアル設定を保存する 】"))
+		if (ImGui::Button("Save material settings (.mat)"))
 		{
 			SaveMaterialSettings();
 		}
-		ImGui::TextDisabled(u8"※保存ファイル: %s.mat", modelFilename.c_str());
+		ImGui::TextDisabled("Save file: %s.mat", modelFilename.c_str());
 		ImGui::Separator();
 
 		auto& materials = model->GetMaterials();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
-
-		if (ImGui::Button(u8"【 全マテリアルのテクスチャを一括削除 (パージ) 】", ImVec2(-1, 0)))
-		{
-			for (auto& m : materials)
-			{
-				m.baseMap.Reset();
-				m.metalnessRoughnessMap.Reset();
-				m.normalMap.Reset();
-				m.emissiveMap.Reset();
-				m.occlusionMap.Reset();
-			}
-		}
-		ImGui::PopStyleColor(3);
-		ImGui::Separator();
 
 		for (size_t i = 0; i < materials.size(); ++i)
 		{
 			ImGui::PushID(static_cast<int>(i));
 			Model::Material& m = materials[i];
 			const char* label = m.name.empty() ? "Material" : m.name.c_str();
-			if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen,
-				u8"[%d] %s", (int)i, label))
+			if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen, "[%d] %s", (int)i, label))
 			{
-				ImGui::ColorEdit4(u8"ベースカラー", &m.baseColor.x);
-				ImGui::SliderFloat(u8"粗さ (Roughness)", &m.roughness, 0.0f, 1.0f);
-				ImGui::SliderFloat(u8"金属度 (Metalness)", &m.metalness, 0.0f, 1.0f);
-				ImGui::ColorEdit3(u8"発光 (Emissive)", &m.emissiveColor.x);
-
-				if (ImGui::SmallButton(u8"テクスチャ削除 (個別)"))
-				{
-					m.baseMap.Reset();
-					m.metalnessRoughnessMap.Reset();
-					m.normalMap.Reset();
-					m.emissiveMap.Reset();
-					m.occlusionMap.Reset();
-				}
+				ImGui::ColorEdit4("Base Color", &m.baseColor.x);
+				ImGui::SliderFloat("Roughness", &m.roughness, 0.0f, 1.0f);
+				ImGui::SliderFloat("Metalness", &m.metalness, 0.0f, 1.0f);
+				ImGui::ColorEdit3("Emissive", &m.emissiveColor.x);
 				ImGui::TreePop();
 			}
 			ImGui::PopID();

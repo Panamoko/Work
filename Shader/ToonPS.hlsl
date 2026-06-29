@@ -73,7 +73,7 @@ float4 main(VS_OUT pin) : SV_TARGET
         float4 texColor = BaseColorMap.Sample(LinearSampler, pin.texcoord);
         albedo *= texColor;
     }
-    
+
     if (alphaMode == 1 && albedo.a < alphaCutoff)
         discard;
 
@@ -109,55 +109,44 @@ float4 main(VS_OUT pin) : SV_TARGET
     F0 = lerp(F0, albedo.rgb, metalness);
 
     // ==========================================
-    // Hybrid Toon Logic (PBR + Cel Shading)
+    // Hybrid look: PBR + Lambert + Toon
     // ==========================================
-    
-    // 1. Diffuse (Base Shadow)
-    float halfLambert = dot(N, L) * 0.5f + 0.5f;
-    float toonStep = smoothstep(0.48f, 0.52f, halfLambert);
-    
-    // Blend 20% of PBR gradient into Toon shadow for depth
-    float blendFactor = 0.2f;
+
+    // 1. Diffuse: soft toon ramp blended toward Lambert (no harsh edge, no black)
+    float halfLambert = saturate(dot(N, L) * 0.5f + 0.5f);
+    float toonStep = smoothstep(0.42f, 0.58f, halfLambert); // softened cel step
+    float blendFactor = 0.40f; // 40% Lambert softness mixed in
     float hybridDiffuse = lerp(toonStep, halfLambert, blendFactor);
 
-    float shadowStrength = 0.5f;
+    float shadowStrength = 0.55f; // shadow brightness floor (higher = brighter shadows)
     float3 toonAlbedo = albedo.rgb * lerp(shadowStrength, 1.0f, hybridDiffuse);
 
-    // 2. Specular (Highlight)
+    // 2. Specular (PBR Cook-Torrance, lightly toon-ized)
     float D = DistributionGGX(NdotH, roughness);
     float G = GeometrySmith(NdotV, NdotL, roughness);
     float3 F = FresnelSchlick(VdotH, F0);
     float3 specularPBR = (D * G * F) / max(4.0f * NdotV * NdotL, 1e-4f);
-    
+
     float specIntensity = length(specularPBR);
     float specThreshold = lerp(1.0f, 0.1f, 1.0f - roughness);
     float toonSpecular = smoothstep(specThreshold - 0.05f, specThreshold + 0.05f, specIntensity);
-    
+
     float3 finalSpecular = F0 * toonSpecular;
     float3 kD = (1.0f - F) * (1.0f - metalness);
-    
+
     float3 Lo = (kD * toonAlbedo / PI + finalSpecular) * lightColor.rgb * halfLambert;
 
-    // 3. IBL (Image Based Lighting / Ambient)
+    // 3. IBL (PBR ambient: diffuse irradiance + specular reflection)
     float3 kS_ibl = FresnelSchlickRoughness(NdotV, F0, roughness);
     float3 kD_ibl = (1.0f - kS_ibl) * (1.0f - metalness);
-    
+
     float3 irradiance = IrradianceMap.Sample(LinearClampSampler, N).rgb;
-    float irradIntensity = length(irradiance);
-    
-    float toonIrrad = smoothstep(0.4f, 0.6f, irradIntensity);
-    float hybridIrrad = lerp(toonIrrad, irradIntensity, 0.2f);
-    
-    irradiance = lerp(irradiance * 0.5f, irradiance, hybridIrrad);
     float3 diffuseIBL = kD_ibl * irradiance * albedo.rgb;
 
     float3 R = reflect(-V, N);
     float3 prefiltered = PrefilteredMap.SampleLevel(LinearClampSampler, R, roughness * 10.0f).rgb;
     float2 envBRDF = BrdfLut.Sample(LinearClampSampler, float2(NdotV, roughness)).rg;
     float3 specularIBL = prefiltered * (kS_ibl * envBRDF.x + envBRDF.y);
-    float iblSpecIntensity = length(specularIBL);
-    float toonIblSpec = smoothstep(0.5f, 0.6f, iblSpecIntensity);
-    specularIBL = specularIBL * toonIblSpec;
 
     float ao = 1.0f;
     if (hasOcclusionMap)
@@ -167,8 +156,13 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     float3 ambient = (diffuseIBL + specularIBL) * ao;
+
+    // Ambient floor: guarantees a minimum brightness so nothing turns pure black.
+    ambient += albedo.rgb * 0.12f;
+
     float3 color = Lo + ambient;
 
+    // 4. Emissive
     if (hasEmissiveMap)
     {
         float3 emissive = EmissiveMap.Sample(LinearSampler, pin.texcoord).rgb;
@@ -179,14 +173,7 @@ float4 main(VS_OUT pin) : SV_TARGET
         color += emissiveFactor;
     }
 
-    // ==========================================
-    // Distance Fog
-    // ==========================================
-    float distanceToCamera = length(cameraPosition.xyz - pin.worldPosition);
-    float fogFactor = smoothstep(15.0f, 50.0f, distanceToCamera);
-    float3 fogColor = float3(0.45f, 0.55f, 0.70f);
-    
-    color = lerp(color, fogColor, fogFactor);
+    // (Distance fog removed: distant areas no longer turn gray.)
 
     return float4(color, albedo.a);
 }
