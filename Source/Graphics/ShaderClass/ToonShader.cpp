@@ -1,30 +1,50 @@
+#include <d3dcompiler.h>
+#pragma comment(lib, "d3dcompiler.lib")
 #include "Core/Misc.h"
 #include "Graphics/GpuResourceUtils.h"
 #include "Graphics/ShaderClass/ToonShader.h"
 
+// Compile an HLSL file at runtime (so .hlsli edits always take effect; no cso).
+static Microsoft::WRL::ComPtr<ID3DBlob> CompileToonShader(
+    const wchar_t* filename, const char* entryPoint, const char* target)
+{
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined(_DEBUG)
+    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+    Microsoft::WRL::ComPtr<ID3DBlob> blob, errBlob;
+    HRESULT hr = D3DCompileFromFile(
+        filename, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        entryPoint, target, flags, 0, blob.GetAddressOf(), errBlob.GetAddressOf());
+    if (FAILED(hr))
+    {
+        if (errBlob) OutputDebugStringA(static_cast<const char*>(errBlob->GetBufferPointer()));
+        _ASSERT_EXPR(SUCCEEDED(hr), L"Toon HLSL compile failed (see Output window)");
+    }
+    return blob;
+}
+
 // =======================================================
-// ToonShader 実装
+// ToonShader (runtime-compiled from Shader/ToonVS.hlsl + Shader/ToonPS.hlsl)
 // =======================================================
 ToonShader::ToonShader(ID3D11Device* device)
 {
-    // ★ VSでコンパイルされた最新の .cso を確実に読み込む
-    GpuResourceUtils::LoadVertexShader(
-        device,
-        "Data/CompiledShader/ToonVS.cso",
-        Model::InputElementDescs.data(),
-        static_cast<UINT>(Model::InputElementDescs.size()),
-        inputLayout.GetAddressOf(),
-        vertexShader.GetAddressOf());
+    auto vsBlob = CompileToonShader(L"Shader/ToonVS.hlsl", "main", "vs_5_0");
+    HRESULT hr = device->CreateVertexShader(
+        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, vertexShader.GetAddressOf());
+    _ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 
-    GpuResourceUtils::LoadPixelShader(
-        device,
-        "Data/CompiledShader/ToonPS.cso",
-        pixelShader.GetAddressOf());
+    hr = device->CreateInputLayout(
+        Model::InputElementDescs.data(), static_cast<UINT>(Model::InputElementDescs.size()),
+        vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), inputLayout.GetAddressOf());
+    _ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 
-    GpuResourceUtils::CreateConstantBuffer(
-        device,
-        sizeof(CbMesh),
-        meshConstantBuffer.GetAddressOf());
+    auto psBlob = CompileToonShader(L"Shader/ToonPS.hlsl", "main", "ps_5_0");
+    hr = device->CreatePixelShader(
+        psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, pixelShader.GetAddressOf());
+    _ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+
+    GpuResourceUtils::CreateConstantBuffer(device, sizeof(CbMesh), meshConstantBuffer.GetAddressOf());
 }
 
 void ToonShader::Begin(const RenderContext& rc)
@@ -40,8 +60,6 @@ void ToonShader::Update(const RenderContext& rc, const Model::Mesh& mesh)
 {
     ID3D11DeviceContext* dc = rc.deviceContext;
     const Model::Material* m = mesh.material;
-
-    // ★安全装置：マテリアルが存在しない異常なメッシュはクラッシュを防ぐためスキップ
     if (m == nullptr) return;
 
     CbMesh cb{};
@@ -57,7 +75,6 @@ void ToonShader::Update(const RenderContext& rc, const Model::Mesh& mesh)
     cb.hasMetalnessRoughnessMap = m->metalnessRoughnessMap ? 1 : 0;
     cb.hasEmissiveMap = m->emissiveMap ? 1 : 0;
     cb.hasOcclusionMap = m->occlusionMap ? 1 : 0;
-
     dc->UpdateSubresource(meshConstantBuffer.Get(), 0, 0, &cb, 0, 0);
 
     ID3D11ShaderResourceView* srvs[] = {
@@ -69,7 +86,7 @@ void ToonShader::Update(const RenderContext& rc, const Model::Mesh& mesh)
 void ToonShader::End(const RenderContext& rc) {}
 
 // =======================================================
-// ToonOutlineShader 実装
+// ToonOutlineShader (unchanged: still loads cso)
 // =======================================================
 ToonOutlineShader::ToonOutlineShader(ID3D11Device* device)
 {
@@ -104,7 +121,6 @@ void ToonOutlineShader::Begin(const RenderContext& rc)
 void ToonOutlineShader::Update(const RenderContext& rc, const Model::Mesh& mesh)
 {
     ID3D11DeviceContext* dc = rc.deviceContext;
-
     CbOutline cb{};
     cb.outlineWidth = 0.005f;
     dc->UpdateSubresource(outlineConstantBuffer.Get(), 0, 0, &cb, 0, 0);

@@ -3,18 +3,19 @@
 #include <wrl.h>
 #include <d3d11.h>
 
-// サンプラステート
+// Sampler states
 enum class SamplerState
 {
 	PointWrap,
 	PointClamp,
 	LinearWrap,
 	LinearClamp,
+	ShadowCompare, // comparison sampler for shadow mapping (PCF)
 
 	EnumCount
 };
 
-// デプスステート
+// Depth-stencil states
 enum class DepthState
 {
 	TestAndWrite,
@@ -25,7 +26,7 @@ enum class DepthState
 	EnumCount
 };
 
-// ブレンドステート
+// Blend states
 enum class BlendState
 {
 	Opaque,
@@ -37,44 +38,41 @@ enum class BlendState
 	EnumCount
 };
 
-// ラスタライザステート
+// Rasterizer states
 enum class RasterizerState
 {
 	SolidCullNone,
 	SolidCullBack,
-	SolidCullFront, // ★追加：トゥーンのアウトライン（表面カリング・裏面描画）用
+	SolidCullFront, // for toon outline (front-face culling)
 	WireCullNone,
 	WireCullBack,
+	ShadowDepth,    // solid + depth bias, for the shadow depth pass
 
 	EnumCount
 };
 
-// レンダーステート
+// Render state container
 class RenderState
 {
 public:
 	RenderState(ID3D11Device* device);
 	~RenderState() = default;
 
-	// サンプラステート取得
 	ID3D11SamplerState* GetSamplerState(SamplerState state) const
 	{
 		return samplerStates[static_cast<int>(state)].Get();
 	}
 
-	// デプスステート取得
 	ID3D11DepthStencilState* GetDepthStencilState(DepthState state) const
 	{
 		return depthStencilStates[static_cast<int>(state)].Get();
 	}
 
-	// ブレンドステート取得
 	ID3D11BlendState* GetBlendState(BlendState state) const
 	{
 		return blendStates[static_cast<int>(state)].Get();
 	}
 
-	// ラスタライザーステート取得
 	ID3D11RasterizerState* GetRasterizerState(RasterizerState state) const
 	{
 		return rasterizerStates[static_cast<int>(state)].Get();

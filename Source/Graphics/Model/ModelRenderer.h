@@ -13,7 +13,7 @@ enum class ShaderId
 	Basic,
 	Lambert,
 	Pbr,
-	Toon, // ★追加：アニメ調（NPR-PBR）用シェーダー
+	Toon,
 
 	EnumCount
 };
@@ -37,6 +37,16 @@ public:
 		iblBrdfLut = brdfLut;
 	}
 	bool enableIBL = true;
+
+	// ---- Shadow settings (tunable) ----
+	bool  enableShadow = true;
+	float shadowRadius = 25.0f;
+	float shadowDistance = 80.0f;
+	float shadowNear = 1.0f;
+	float shadowFar = 200.0f;
+	float shadowStrength = 0.35f;   // direct-light brightness inside shadow (0=black, 1=none)
+	float shadowBias = 0.0015f; // depth bias to remove acne
+
 private:
 	struct CbScene
 	{
@@ -44,11 +54,18 @@ private:
 		DirectX::XMFLOAT4   lightDirection;
 		DirectX::XMFLOAT4   lightColor;
 		DirectX::XMFLOAT4   cameraPosition;
+		DirectX::XMFLOAT4X4 lightViewProjection;
+		DirectX::XMFLOAT4   shadowParams;
 	};
 
 	struct CbSkeleton
 	{
 		DirectX::XMFLOAT4X4 boneTransforms[256];
+	};
+
+	struct CbShadow
+	{
+		DirectX::XMFLOAT4X4 lightViewProjection;
 	};
 
 	struct DrawInfo
@@ -64,8 +81,11 @@ private:
 		float              distance;
 	};
 
+	void InitShadow(ID3D11Device* device);
+	void RenderShadowDepth(const RenderContext& rc);
+
 	std::unique_ptr<Shader>           shaders[static_cast<int>(ShaderId::EnumCount)];
-	std::unique_ptr<Shader>           toonOutlineShader; // ★追加：アウトライン描画専用シェーダー
+	std::unique_ptr<Shader>           toonOutlineShader;
 
 	std::vector<DrawInfo>             drawInfos;
 	std::vector<TransparencyDrawInfo> transparencyDrawInfos;
@@ -76,4 +96,13 @@ private:
 	ID3D11ShaderResourceView* iblIrradiance = nullptr;
 	ID3D11ShaderResourceView* iblPrefiltered = nullptr;
 	ID3D11ShaderResourceView* iblBrdfLut = nullptr;
+
+	// ---- Shadow map resources ----
+	UINT                                             shadowMapSize = 2048;
+	Microsoft::WRL::ComPtr<ID3D11DepthStencilView>   shadowDSV;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shadowSRV;
+	Microsoft::WRL::ComPtr<ID3D11VertexShader>       shadowVS;
+	Microsoft::WRL::ComPtr<ID3D11InputLayout>        shadowInputLayout;
+	Microsoft::WRL::ComPtr<ID3D11Buffer>             shadowConstantBuffer;
+	DirectX::XMFLOAT4X4                              lightViewProjection;
 };

@@ -1,10 +1,9 @@
 #include "Core/Misc.h"
 #include "Graphics/RenderState.h"
 
-// コンストラクタ
 RenderState::RenderState(ID3D11Device* device)
 {
-	// ポイントサンプリング＆テクスチャ繰り返しあり
+	// --- Point sampling, wrap ---
 	{
 		D3D11_SAMPLER_DESC desc;
 		desc.MipLODBias = 0.0f;
@@ -24,7 +23,7 @@ RenderState::RenderState(ID3D11Device* device)
 			samplerStates[static_cast<int>(SamplerState::PointWrap)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// ポイントサンプリング＆テクスチャ繰り返しなし
+	// --- Point sampling, clamp ---
 	{
 		D3D11_SAMPLER_DESC desc;
 		desc.MipLODBias = 0.0f;
@@ -44,7 +43,7 @@ RenderState::RenderState(ID3D11Device* device)
 			samplerStates[static_cast<int>(SamplerState::PointClamp)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// リニアサンプリング＆テクスチャ繰り返しあり
+	// --- Linear sampling, wrap ---
 	{
 		D3D11_SAMPLER_DESC desc;
 		desc.MipLODBias = 0.0f;
@@ -64,7 +63,7 @@ RenderState::RenderState(ID3D11Device* device)
 			samplerStates[static_cast<int>(SamplerState::LinearWrap)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// リニアサンプリング＆テクスチャ繰り返しなし
+	// --- Linear sampling, clamp ---
 	{
 		D3D11_SAMPLER_DESC desc;
 		desc.MipLODBias = 0.0f;
@@ -84,8 +83,29 @@ RenderState::RenderState(ID3D11Device* device)
 			samplerStates[static_cast<int>(SamplerState::LinearClamp)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
+	// --- Shadow comparison sampler (PCF) ---
+	// Border = 1.0 (far depth) so samples outside the shadow map are treated as "lit".
+	{
+		D3D11_SAMPLER_DESC desc{};
+		desc.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+		desc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+		desc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+		desc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+		desc.MipLODBias = 0.0f;
+		desc.MaxAnisotropy = 1;
+		desc.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+		desc.BorderColor[0] = 1.0f;
+		desc.BorderColor[1] = 1.0f;
+		desc.BorderColor[2] = 1.0f;
+		desc.BorderColor[3] = 1.0f;
+		desc.MinLOD = 0.0f;
+		desc.MaxLOD = D3D11_FLOAT32_MAX;
+		HRESULT hr = device->CreateSamplerState(&desc,
+			samplerStates[static_cast<int>(SamplerState::ShadowCompare)].GetAddressOf());
+		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	}
 
-	// 深度テストあり＆深度書き込みあり
+	// --- Depth test on, depth write on ---
 	{
 		D3D11_DEPTH_STENCIL_DESC desc{};
 		desc.DepthEnable = true;
@@ -95,7 +115,7 @@ RenderState::RenderState(ID3D11Device* device)
 			depthStencilStates[static_cast<int>(DepthState::TestAndWrite)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 深度テストあり＆深度書き込みなし
+	// --- Depth test on, depth write off ---
 	{
 		D3D11_DEPTH_STENCIL_DESC desc{};
 		desc.DepthEnable = true;
@@ -105,7 +125,7 @@ RenderState::RenderState(ID3D11Device* device)
 			depthStencilStates[static_cast<int>(DepthState::TestOnly)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 深度テストなし＆深度書き込みあり
+	// --- Depth test off, depth write on ---
 	{
 		D3D11_DEPTH_STENCIL_DESC desc{};
 		desc.DepthEnable = true;
@@ -115,7 +135,7 @@ RenderState::RenderState(ID3D11Device* device)
 			depthStencilStates[static_cast<int>(DepthState::WriteOnly)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 深度テストなし＆深度書き込みなし
+	// --- Depth test off, depth write off ---
 	{
 		D3D11_DEPTH_STENCIL_DESC desc{};
 		desc.DepthEnable = false;
@@ -126,7 +146,7 @@ RenderState::RenderState(ID3D11Device* device)
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
 
-	// 合成なし
+	// --- Blend: Opaque ---
 	{
 		D3D11_BLEND_DESC desc{};
 		desc.AlphaToCoverageEnable = false;
@@ -143,7 +163,7 @@ RenderState::RenderState(ID3D11Device* device)
 			blendStates[static_cast<int>(BlendState::Opaque)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 通常合成
+	// --- Blend: Transparency ---
 	{
 		D3D11_BLEND_DESC desc{};
 		desc.AlphaToCoverageEnable = false;
@@ -160,7 +180,7 @@ RenderState::RenderState(ID3D11Device* device)
 			blendStates[static_cast<int>(BlendState::Transparency)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 加算合成
+	// --- Blend: Additive ---
 	{
 		D3D11_BLEND_DESC desc{};
 		desc.AlphaToCoverageEnable = false;
@@ -177,7 +197,7 @@ RenderState::RenderState(ID3D11Device* device)
 			blendStates[static_cast<int>(BlendState::Additive)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 減算合成
+	// --- Blend: Subtraction ---
 	{
 		D3D11_BLEND_DESC desc{};
 		desc.AlphaToCoverageEnable = false;
@@ -194,7 +214,7 @@ RenderState::RenderState(ID3D11Device* device)
 			blendStates[static_cast<int>(BlendState::Subtraction)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// 乗算合成
+	// --- Blend: Multiply ---
 	{
 		D3D11_BLEND_DESC desc{};
 		desc.AlphaToCoverageEnable = false;
@@ -212,7 +232,7 @@ RenderState::RenderState(ID3D11Device* device)
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
 
-	// ベタ塗り＆カリングなし
+	// --- Rasterizer: Solid, cull none ---
 	{
 		D3D11_RASTERIZER_DESC desc{};
 		desc.FrontCounterClockwise = false;
@@ -229,7 +249,7 @@ RenderState::RenderState(ID3D11Device* device)
 			rasterizerStates[static_cast<int>(RasterizerState::SolidCullNone)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// ベタ塗り＆裏面カリング
+	// --- Rasterizer: Solid, cull back ---
 	{
 		D3D11_RASTERIZER_DESC desc{};
 		desc.FrontCounterClockwise = false;
@@ -246,9 +266,7 @@ RenderState::RenderState(ID3D11Device* device)
 			rasterizerStates[static_cast<int>(RasterizerState::SolidCullBack)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// =======================================================
-	// ★追加：ベタ塗り＆表面カリング（トゥーンのアウトライン描画用）
-	// =======================================================
+	// --- Rasterizer: Solid, cull front (toon outline) ---
 	{
 		D3D11_RASTERIZER_DESC desc{};
 		desc.FrontCounterClockwise = false;
@@ -259,13 +277,13 @@ RenderState::RenderState(ID3D11Device* device)
 		desc.ScissorEnable = false;
 		desc.MultisampleEnable = true;
 		desc.FillMode = D3D11_FILL_SOLID;
-		desc.CullMode = D3D11_CULL_FRONT; // ココがミソ：表面を消して裏面だけ描画する
+		desc.CullMode = D3D11_CULL_FRONT;
 		desc.AntialiasedLineEnable = false;
 		HRESULT hr = device->CreateRasterizerState(&desc,
 			rasterizerStates[static_cast<int>(RasterizerState::SolidCullFront)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// ワイヤーフレーム＆カリングなし
+	// --- Rasterizer: Wireframe, cull none ---
 	{
 		D3D11_RASTERIZER_DESC desc{};
 		desc.FrontCounterClockwise = false;
@@ -282,7 +300,7 @@ RenderState::RenderState(ID3D11Device* device)
 			rasterizerStates[static_cast<int>(RasterizerState::WireCullNone)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
-	// ワイヤーフレーム＆裏面カリング
+	// --- Rasterizer: Wireframe, cull back ---
 	{
 		D3D11_RASTERIZER_DESC desc{};
 		desc.FrontCounterClockwise = false;
@@ -297,6 +315,23 @@ RenderState::RenderState(ID3D11Device* device)
 		desc.AntialiasedLineEnable = true;
 		HRESULT hr = device->CreateRasterizerState(&desc,
 			rasterizerStates[static_cast<int>(RasterizerState::WireCullBack)].GetAddressOf());
+		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	}
+	// --- Rasterizer: Shadow depth pass (solid + depth bias to avoid shadow acne) ---
+	{
+		D3D11_RASTERIZER_DESC desc{};
+		desc.FrontCounterClockwise = false;
+		desc.DepthBias = 1000;             // constant bias (tune later)
+		desc.DepthBiasClamp = 0.0f;
+		desc.SlopeScaledDepthBias = 2.0f;  // slope-scaled bias
+		desc.DepthClipEnable = true;
+		desc.ScissorEnable = false;
+		desc.MultisampleEnable = true;
+		desc.FillMode = D3D11_FILL_SOLID;
+		desc.CullMode = D3D11_CULL_BACK;
+		desc.AntialiasedLineEnable = false;
+		HRESULT hr = device->CreateRasterizerState(&desc,
+			rasterizerStates[static_cast<int>(RasterizerState::ShadowDepth)].GetAddressOf());
 		_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
 	}
 }
