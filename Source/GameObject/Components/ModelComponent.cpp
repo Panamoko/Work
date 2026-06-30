@@ -4,22 +4,28 @@
 #include "GameObject/Components/ModelComponent.h"
 #include "Core/ResourceManager.h"
 
+// ---------------------------------------------------------
+// コンストラクタ
+// ---------------------------------------------------------
 ModelComponent::ModelComponent(const char* filename)
 {
 	modelFilename = filename;
+
+	// Flyweightパターンによる高速読み込み
 	model = ResourceManager::Instance().LoadModel(filename);
 
 	if (model != nullptr)
 	{
 		model->GetNodePoses(nodePoses);
 
-		// Keep the model's original textures.
-		// (The old "purge all textures on load" hack was removed; that was
-		//  what made Helmet / Player turn white.)
+		// ロード直後に、過去に保存したマテリアル設定(.mat)があれば自動復元する
 		LoadMaterialSettings();
 	}
 }
 
+// ---------------------------------------------------------
+// アニメーション再生
+// ---------------------------------------------------------
 void ModelComponent::PlayAnimation(const char* animName)
 {
 	if (model == nullptr) return;
@@ -32,10 +38,14 @@ void ModelComponent::PlayAnimation(const char* animName)
 	}
 }
 
+// ---------------------------------------------------------
+// 更新処理 (アニメーション進行と行列同期)
+// ---------------------------------------------------------
 void ModelComponent::Update(float elapsedTime)
 {
 	if (model != nullptr)
 	{
+		// アニメーションの進行計算
 		if (animationIndex >= 0)
 		{
 			const Model::Animation& anim = model->GetAnimations().at(animationIndex);
@@ -43,6 +53,7 @@ void ModelComponent::Update(float elapsedTime)
 			model->ComputeAnimation(animationIndex, animationSeconds, nodePoses);
 			model->SetNodePoses(nodePoses);
 
+			// ループ処理
 			animationSeconds += elapsedTime * animSpeed;
 			if (animationSeconds > anim.secondsLength)
 			{
@@ -50,6 +61,7 @@ void ModelComponent::Update(float elapsedTime)
 			}
 		}
 
+		// アクターのTransform（座標・回転・スケール）をモデルに反映
 		std::shared_ptr<Actor> owner = GetActor();
 		if (owner != nullptr)
 		{
@@ -58,6 +70,9 @@ void ModelComponent::Update(float elapsedTime)
 	}
 }
 
+// ---------------------------------------------------------
+// 描画登録
+// ---------------------------------------------------------
 void ModelComponent::Draw()
 {
 	if (!isVisible) return;
@@ -72,6 +87,9 @@ void ModelComponent::Draw()
 	}
 }
 
+// ---------------------------------------------------------
+// マテリアル設定の保存 (.mat ファイル書き出し)
+// ---------------------------------------------------------
 void ModelComponent::SaveMaterialSettings()
 {
 	if (!model) return;
@@ -82,6 +100,7 @@ void ModelComponent::SaveMaterialSettings()
 
 	auto& materials = model->GetMaterials();
 
+	// 安全装置：読み込み時のクラッシュを防ぐため、マテリアル数を記録
 	ofs << materials.size() << "\n";
 
 	for (const auto& m : materials)
@@ -93,19 +112,23 @@ void ModelComponent::SaveMaterialSettings()
 	}
 }
 
+// ---------------------------------------------------------
+// マテリアル設定の復元 (.mat ファイル読み込み)
+// ---------------------------------------------------------
 void ModelComponent::LoadMaterialSettings()
 {
 	if (!model) return;
 
 	std::string loadPath = modelFilename + ".mat";
 	std::ifstream ifs(loadPath);
-	if (!ifs) return;
+	if (!ifs) return; // セーブデータがなければ初期値のまま続行
 
 	size_t count = 0;
 	ifs >> count;
 
 	auto& materials = model->GetMaterials();
 
+	// Blender側でマテリアル数が増減していた場合、配列外アクセスでクラッシュするため破棄
 	if (count != materials.size()) return;
 
 	for (size_t i = 0; i < count; ++i)
@@ -118,6 +141,9 @@ void ModelComponent::LoadMaterialSettings()
 	}
 }
 
+// ---------------------------------------------------------
+// Inspector用 GUI描画
+// ---------------------------------------------------------
 void ModelComponent::OnGUI()
 {
 	if (model == nullptr)
@@ -126,6 +152,7 @@ void ModelComponent::OnGUI()
 		return;
 	}
 
+	// シェーダー切り替え
 	int currentShader = static_cast<int>(shaderId);
 	const char* shaderNames[] = { "Basic", "Lambert", "PBR", "Toon" };
 	if (ImGui::Combo("Shader", &currentShader, shaderNames, IM_ARRAYSIZE(shaderNames)))
@@ -134,6 +161,8 @@ void ModelComponent::OnGUI()
 	}
 
 	ImGui::Separator();
+
+	// アニメーションモニター
 	ImGui::Text("Animation");
 	ImGui::SliderFloat("Speed", &animSpeed, 0.0f, 5.0f);
 	if (animationIndex >= 0)
@@ -146,6 +175,8 @@ void ModelComponent::OnGUI()
 	}
 
 	ImGui::Separator();
+
+	// マテリアルエディタ
 	if (ImGui::CollapsingHeader("Materials (PBR / Toon)"))
 	{
 		if (ImGui::Button("Save material settings (.mat)"))
