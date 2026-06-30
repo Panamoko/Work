@@ -30,6 +30,7 @@ private:
 	std::shared_ptr<class Actor> viewModelActor;
 	std::shared_ptr<class Actor> helmetActor;
 	std::shared_ptr<class Actor> pbrSphereActor;
+	std::shared_ptr<class Actor> enemyActor;   // Åöí«â¡ÅFìG
 
 	std::shared_ptr<class Actor> selectedActor = nullptr;
 
@@ -44,10 +45,9 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11PixelShader>  skyPS;
 	Microsoft::WRL::ComPtr<ID3D11Buffer>       skyCB;
 
-	// Sky colors / params (editable in Render Settings GUI)
-	DirectX::XMFLOAT3 skyZenith = { 0.18f, 0.42f, 0.82f }; // top
-	DirectX::XMFLOAT3 skyHorizon = { 0.80f, 0.88f, 0.96f }; // middle
-	DirectX::XMFLOAT3 skyGround = { 0.32f, 0.34f, 0.38f }; // bottom
-	float skyHorizonExp = 0.55f; // gradient sharpness (smaller = wider horizon band)
-	float skyBands = 0.0f;  // 0 = smooth, >=2 = posterized (toon)
+	DirectX::XMFLOAT3 skyZenith = { 0.18f, 0.42f, 0.82f };
+	DirectX::XMFLOAT3 skyHorizon = { 0.80f, 0.88f, 0.96f };
+	DirectX::XMFLOAT3 skyGround = { 0.32f, 0.34f, 0.38f };
+	float skyHorizonExp = 0.55f;
+	float skyBands = 0.0f;
 };

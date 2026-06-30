@@ -7,6 +7,7 @@
 #include "GameObject/Components/AnimatorComponent.h"
 #include "GameObject/Components/ViewModelComponent.h"
 #include "GameObject/Components/CrosshairComponent.h"
+#include "GameObject/Components/EnemyComponent.h"
 #include <imgui.h>
 #include <string>
 #include <d3dcompiler.h>
@@ -58,17 +59,14 @@ float4 PSMain(VSOut pin) : SV_TARGET
 
 	float horizonExp = max(params.x, 0.01f);
 
-	// upper hemisphere: horizon -> zenith
 	float tu = pow(saturate(h), horizonExp);
 	float3 upper = lerp(horizonColor.rgb, zenithColor.rgb, tu);
 
-	// lower hemisphere: horizon -> ground
 	float tl = pow(saturate(-h), horizonExp);
 	float3 lower = lerp(horizonColor.rgb, groundColor.rgb, tl);
 
 	float3 col = (h >= 0.0f) ? upper : lower;
 
-	// optional toon posterization
 	float bands = params.y;
 	if (bands >= 2.0f)
 	{
@@ -169,6 +167,17 @@ SceneGame::SceneGame()
 		}
 	}
 
+
+	// 敵（アニメ入りキャラ：Player3.glb）
+	enemyActor = ActorManager::Instance().Create();
+	enemyActor->SetName("Enemy");
+	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Mr.Incredible/Player3.glb");
+	enemyModelComp->SetShaderId(ShaderId::Toon);
+	enemyActor->AddComponent<AnimatorComponent>();           // ★追加：クロスフェード用
+	enemyActor->AddComponent<EnemyComponent>(playerActor);
+	enemyActor->SetPosition({ 10.0f, 2.1f, 4.0f });
+	enemyActor->SetScale({ 1.0f, 1.0f, 1.0f });
+
 	InitSkybox(device);
 }
 
@@ -179,6 +188,7 @@ SceneGame::~SceneGame()
 	ActorManager::Instance().Remove(viewModelActor);
 	ActorManager::Instance().Remove(helmetActor);
 	ActorManager::Instance().Remove(pbrSphereActor);
+	ActorManager::Instance().Remove(enemyActor);
 }
 
 void SceneGame::InitSkybox(ID3D11Device* device)
@@ -266,7 +276,7 @@ void SceneGame::Render(float elapsedTime)
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	// Draw the gradient sky first, as the far background.
+	// 背景（スカイ）を最初に描く
 	DrawSkybox();
 
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();

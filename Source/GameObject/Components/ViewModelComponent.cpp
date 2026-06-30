@@ -8,6 +8,7 @@
 #include "GameObject/Components/CrosshairComponent.h"
 #include "Graphics/Graphics.h"
 #include "Core/Input.h" 
+#include "GameObject/Components/EnemyComponent.h"
 
 ViewModelComponent::ViewModelComponent(Camera* camera, PlayerControllerComponent* playerCtrl)
 	: camera(camera), playerController(playerCtrl) {
@@ -176,15 +177,35 @@ void ViewModelComponent::Update(float elapsedTime)
 				auto crosshair = GetActor()->GetComponent<CrosshairComponent>();
 				if (crosshair) crosshair->AddDynamicOffset(15.0f);
 
-				DirectX::XMFLOAT3 hitPos, hitNorm; float dist = 0.0f;
-				if (playerController->RayCast(camera->GetEye(), camera->GetFront(), 1000.0f, dist, hitPos, hitNorm)) {
-					lastHitPos = hitPos; hitMarkerTimer = 1.0f;
+				DirectX::XMFLOAT3 origin = camera->GetEye();
+				DirectX::XMFLOAT3 dir = camera->GetFront();
 
-					vfxList.push_back({ currentMuzzlePos, {0,0,0}, {0,0,0}, {1.0f, 0.8f, 0.2f, 1.0f}, 0.05f, 0.05f, 0 });
+				// 壁（ステージ）へのレイ
+				DirectX::XMFLOAT3 hitPos, hitNorm; float wallDist = 0.0f;
+				bool wallHit = playerController->RayCast(origin, dir, 1000.0f, wallDist, hitPos, hitNorm);
+
+				// 敵へのレイ
+				float enemyDist = 0.0f;
+				EnemyComponent* enemy = EnemyComponent::Raycast(origin, dir, 1000.0f, enemyDist);
+
+				// マズルフラッシュは常に出す
+				vfxList.push_back({ currentMuzzlePos, {0,0,0}, {0,0,0}, {1.0f, 0.8f, 0.2f, 1.0f}, 0.05f, 0.05f, 0 });
+
+				if (enemy && (!wallHit || enemyDist < wallDist)) {
+					// 敵に命中：ダメージ＋トレーサー（弾痕は出さない）
+					enemy->ApplyDamage(34.0f);
+					hitMarkerTimer = 1.0f;
+
+					DirectX::XMVECTOR hp = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&origin), DirectX::XMVectorScale(DirectX::XMLoadFloat3(&dir), enemyDist));
+					DirectX::XMFLOAT3 enemyHitPos; DirectX::XMStoreFloat3(&enemyHitPos, hp);
+					vfxList.push_back({ currentMuzzlePos, {0,0,0}, enemyHitPos, {1.0f, 0.3f, 0.2f, 0.9f}, 0.15f, 0.15f, 1 });
+				}
+				else if (wallHit) {
+					// 壁に命中：従来通り（トレーサー＋弾痕デカール）
+					lastHitPos = hitPos; hitMarkerTimer = 1.0f;
 					vfxList.push_back({ currentMuzzlePos, {0,0,0}, hitPos, {1.0f, 0.9f, 0.0f, 0.8f}, 0.15f, 0.15f, 1 });
 					DirectX::XMVECTOR decalPos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&hitPos), DirectX::XMVectorScale(DirectX::XMLoadFloat3(&hitNorm), 0.01f));
 					DirectX::XMFLOAT3 decalPosF; DirectX::XMStoreFloat3(&decalPosF, decalPos);
-
 					vfxList.push_back({ decalPosF, hitNorm, {0,0,0}, {1.0f, 1.0f, 1.0f, 1.0f}, 5.0f, 5.0f, 2 });
 				}
 			}

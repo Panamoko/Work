@@ -216,6 +216,9 @@
     <ClInclude Include="Source\Graphics\ShaderClass\ToonShader.h">
       <Filter>Source\Graphics\ShaderClass</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GameObject\Components\EnemyComponent.h">
+      <Filter>Source\GameObject\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -349,6 +352,9 @@
     </ClCompile>
     <ClCompile Include="Source\Graphics\ShaderClass\ToonShader.cpp">
       <Filter>Source\Graphics\ShaderClass</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\GameObject\Components\EnemyComponent.cpp">
+      <Filter>Source\GameObject\Components</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
