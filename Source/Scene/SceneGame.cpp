@@ -318,15 +318,88 @@ void SceneGame::Render(float elapsedTime)
 
 void SceneGame::DrawGUI()
 {
-	ImGui::SetNextWindowPos(ImVec2(20, 420), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 240), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowPos(ImVec2(20, 340), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(340, 460), ImGuiCond_FirstUseEver);
 
 	ImGui::Begin("Render Settings");
 
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
+
+	// One-click "look" that sets sky + post + shadow together (unified art direction).
+	auto applyLook = [&](
+		float zx, float zy, float zz, float hx, float hy, float hz, float gx, float gy, float gz,
+		float hExp, float bands,
+		float exposure, float contrast, float saturation, float bThresh, float bInt,
+		float vig, float vigR, float tr, float tg, float tb, float shadow)
+		{
+			skyZenith = { zx, zy, zz };
+			skyHorizon = { hx, hy, hz };
+			skyGround = { gx, gy, gz };
+			skyHorizonExp = hExp;
+			skyBands = bands;
+
+			Graphics& g = Graphics::Instance();
+			g.postExposure = exposure;
+			g.postContrast = contrast;
+			g.postSaturation = saturation;
+			g.postTonemap = true;
+			g.postBloomEnable = true;
+			g.postBloomThreshold = bThresh;
+			g.postBloomIntensity = bInt;
+			g.postVignette = vig;
+			g.postVignetteRadius = vigR;
+			g.postTint[0] = tr; g.postTint[1] = tg; g.postTint[2] = tb;
+
+			renderer->shadowStrength = shadow;
+		};
+
+	if (ImGui::CollapsingHeader("Art Style (Presets)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (ImGui::Button("Anime Bright"))
+			applyLook(0.35f, 0.62f, 0.95f, 0.85f, 0.93f, 1.00f, 0.45f, 0.50f, 0.55f,
+				0.50f, 0.0f, 1.20f, 1.05f, 1.20f, 1.10f, 0.50f, 0.15f, 0.70f, 1.00f, 1.00f, 1.00f, 0.55f);
+		ImGui::SameLine();
+		if (ImGui::Button("Cinematic Dusk"))
+			applyLook(0.25f, 0.30f, 0.55f, 0.95f, 0.60f, 0.40f, 0.20f, 0.18f, 0.20f,
+				0.70f, 0.0f, 1.10f, 1.15f, 1.10f, 0.90f, 0.80f, 0.45f, 0.50f, 1.05f, 0.95f, 0.85f, 0.30f);
+
+		if (ImGui::Button("Cool Stylized"))
+			applyLook(0.20f, 0.40f, 0.70f, 0.70f, 0.85f, 0.95f, 0.25f, 0.30f, 0.35f,
+				0.60f, 4.0f, 1.00f, 1.10f, 1.00f, 1.20f, 0.50f, 0.30f, 0.60f, 0.92f, 0.97f, 1.05f, 0.40f);
+		ImGui::SameLine();
+		if (ImGui::Button("Neutral"))
+			applyLook(0.18f, 0.42f, 0.82f, 0.80f, 0.88f, 0.96f, 0.32f, 0.34f, 0.38f,
+				0.55f, 0.0f, 1.00f, 1.00f, 1.00f, 1.00f, 0.60f, 0.35f, 0.60f, 1.00f, 1.00f, 1.00f, 0.35f);
+	}
+
 	ImGui::Checkbox("IBL (Image Based Lighting)", &renderer->enableIBL);
 
-	if (ImGui::CollapsingHeader("Sky (Gradient)", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader("Post Process"))
+	{
+		ImGui::Checkbox("Tone Mapping (ACES)", &Graphics::Instance().postTonemap);
+		ImGui::SliderFloat("Exposure", &Graphics::Instance().postExposure, 0.1f, 4.0f);
+		ImGui::SliderFloat("Contrast", &Graphics::Instance().postContrast, 0.5f, 2.0f);
+		ImGui::SliderFloat("Saturation", &Graphics::Instance().postSaturation, 0.0f, 2.0f);
+		ImGui::Separator();
+		ImGui::Checkbox("Bloom", &Graphics::Instance().postBloomEnable);
+		ImGui::SliderFloat("Bloom Threshold", &Graphics::Instance().postBloomThreshold, 0.0f, 3.0f);
+		ImGui::SliderFloat("Bloom Intensity", &Graphics::Instance().postBloomIntensity, 0.0f, 2.0f);
+		ImGui::Separator();
+		ImGui::SliderFloat("Vignette", &Graphics::Instance().postVignette, 0.0f, 1.0f);
+		ImGui::SliderFloat("Vignette Start", &Graphics::Instance().postVignetteRadius, 0.2f, 1.0f);
+		ImGui::ColorEdit3("Color Filter (Tint)", Graphics::Instance().postTint);
+	}
+
+	if (ImGui::CollapsingHeader("Shadow"))
+	{
+		ImGui::Checkbox("Enable Shadow", &renderer->enableShadow);
+		ImGui::SliderFloat("Shadow Brightness", &renderer->shadowStrength, 0.0f, 1.0f);
+		ImGui::SliderFloat("Shadow Bias", &renderer->shadowBias, 0.0f, 0.01f, "%.4f");
+		ImGui::SliderFloat("Shadow Radius", &renderer->shadowRadius, 5.0f, 80.0f);
+		ImGui::SliderFloat("Light Distance", &renderer->shadowDistance, 20.0f, 200.0f);
+	}
+
+	if (ImGui::CollapsingHeader("Sky (Gradient)"))
 	{
 		ImGui::ColorEdit3("Zenith (top)", &skyZenith.x);
 		ImGui::ColorEdit3("Horizon (mid)", &skyHorizon.x);

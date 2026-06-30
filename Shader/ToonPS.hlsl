@@ -137,8 +137,8 @@ float4 main(VS_OUT pin) : SV_TARGET
     float blendFactor = 0.40f;
     float hybridDiffuse = lerp(toonStep, halfLambert, blendFactor);
 
-    float shadowStrength = 0.55f;
-    float3 toonAlbedo = albedo.rgb * lerp(shadowStrength, 1.0f, hybridDiffuse);
+    float diffuseShadow = 0.55f;
+    float3 toonAlbedo = albedo.rgb * lerp(diffuseShadow, 1.0f, hybridDiffuse);
 
     // 2. Specular
     float D = DistributionGGX(NdotH, roughness);
@@ -153,11 +153,6 @@ float4 main(VS_OUT pin) : SV_TARGET
 
     float3 kD = (1.0f - F) * (1.0f - metalness);
     float3 Lo = (kD * toonAlbedo / PI + finalSpecular) * lightColor.rgb * halfLambert;
-
-    // ---- Cast shadow: darken only the direct light, keep ambient ----
-    float shadow = ComputeShadow(pin.worldPosition);
-    float shadowFactor = lerp(shadowParams.x, 1.0f, shadow);
-    Lo *= shadowFactor;
 
     // 3. IBL ambient
     float3 kS_ibl = FresnelSchlickRoughness(NdotV, F0, roughness);
@@ -187,8 +182,13 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 ambient = (diffuseIBL + specularIBL) * ao;
     ambient += albedo.rgb * 0.12f; // ambient floor
 
-    float3 color = Lo + ambient;
+    // ---- Cast shadow: darken direct + ambient together (with a floor) ----
+    float shadow = ComputeShadow(pin.worldPosition);
+    float shade = lerp(shadowParams.x, 1.0f, shadow); // shadowParams.x = brightness inside shadow
 
+    float3 color = (Lo + ambient) * shade;
+
+    // emissive is not affected by shadow
     if (hasEmissiveMap)
         color += EmissiveMap.Sample(LinearSampler, pin.texcoord).rgb * emissiveFactor;
     else

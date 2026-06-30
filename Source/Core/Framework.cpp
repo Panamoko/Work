@@ -50,22 +50,18 @@ void Framework::Render(float elapsedTime)
 {
 	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
 
-	// 画面クリア
-	Graphics::Instance().Clear(0.5f, 0.5f, 0.5f, 1.0f);
-
-	// レンダーターゲット設定
-	Graphics::Instance().SetRenderTargets();
-
-	// シーン描画処理
+	// Render the scene into an offscreen HDR target.
+	Graphics::Instance().BeginScene(0.5f, 0.5f, 0.5f, 1.0f);
 	scene->Render(elapsedTime);
 
-	// シーンGUI描画処理
-	scene->DrawGUI();
+	// Post-process: offscreen -> back buffer (passthrough for now).
+	Graphics::Instance().ApplyPostProcess();
 
-	// IMGUI描画
+	// GUI on the back buffer.
+	scene->DrawGUI();
 	ImGuiRenderer::Render(dc);
 
-	// 画面表示
+	// Present.
 	Graphics::Instance().Present(syncInterval);
 }
 
