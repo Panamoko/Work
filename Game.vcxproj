@@ -163,6 +163,7 @@
     <ClInclude Include="Source\Physics\TransformUtils.h" />
     <ClInclude Include="Source\Scene\Scene.h" />
     <ClInclude Include="Source\Scene\SceneGame.h" />
+    <ClInclude Include="Source\Scene\Skybox.h" />
     <ClInclude Include="Source\UI\Dialog.h" />
     <ClInclude Include="Source\UI\ImGuiRenderer.h" />
   </ItemGroup>
@@ -210,6 +211,7 @@
     <ClCompile Include="Source\Physics\TransformUtils.cpp" />
     <ClCompile Include="Source\Scene\Scene.cpp" />
     <ClCompile Include="Source\Scene\SceneGame.cpp" />
+    <ClCompile Include="Source\Scene\Skybox.cpp" />
     <ClCompile Include="Source\UI\Dialog.cpp" />
     <ClCompile Include="Source\UI\ImGuiRenderer.cpp" />
   </ItemGroup>
