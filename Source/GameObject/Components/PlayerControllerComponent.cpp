@@ -3,7 +3,7 @@
 #include <fstream>
 #include <cmath> 
 #include "GameObject/Components/PlayerControllerComponent.h"
-#include "Physics/SphereCast.h"
+#include "Core/WindowUtils.h"
 #include "Graphics/Graphics.h"
 #include "Core/Input.h"
 #include "GameObject/Actor.h"
@@ -59,7 +59,7 @@ bool PlayerControllerComponent::CheckGrounded() {
 	DirectX::XMFLOAT3 originF; DirectX::XMStoreFloat3(&originF, Origin);
 	DirectX::XMFLOAT3 hitPos, hitNormal;
 	float checkDistance = stepOffset + skinWidth + 0.1f;
-	return SphereCast(originF, { 0.0f, -1.0f, 0.0f }, radius, checkDistance, hitPos, hitNormal);
+	return collisionMesh.SphereCast(originF, { 0.0f, -1.0f, 0.0f }, radius, checkDistance, hitPos, hitNormal);
 }
 
 
@@ -151,20 +151,8 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	HWND hWnd = GetActiveWindow();
 
 	bool currF11Key = (GetAsyncKeyState(VK_F11) & 0x8000) != 0;
-	if (currF11Key && !prevF11Key && hWnd != nullptr) {
-		if (!isFullscreen) {
-			GetWindowRect(hWnd, &savedWindowRect);
-			SetWindowLong(hWnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-			HMONITOR hMonitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
-			MONITORINFO mi; mi.cbSize = sizeof(mi); GetMonitorInfo(hMonitor, &mi);
-			SetWindowPos(hWnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-			isFullscreen = true;
-		}
-		else {
-			SetWindowLong(hWnd, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-			SetWindowPos(hWnd, nullptr, savedWindowRect.left, savedWindowRect.top, savedWindowRect.right - savedWindowRect.left, savedWindowRect.bottom - savedWindowRect.top, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-			isFullscreen = false;
-		}
+	if (currF11Key && !prevF11Key) {
+		WindowUtils::ToggleFullscreen(hWnd, isFullscreen, savedWindowRect);
 	}
 	prevF11Key = currF11Key;
 
@@ -177,22 +165,12 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	if (currTabKey && !prevTabKey) isCursorLocked = !isCursorLocked;
 	prevTabKey = currTabKey;
 
-	if (hWnd == GetForegroundWindow()) {
-		if (isCursorLocked) {
-			if (cursorVisibilityState) { ShowCursor(FALSE); cursorVisibilityState = false; }
-			float screenW = Graphics::Instance().GetScreenWidth(); float screenH = Graphics::Instance().GetScreenHeight();
-			POINT center = { static_cast<LONG>(screenW / 2.0f), static_cast<LONG>(screenH / 2.0f) };
-			ClientToScreen(hWnd, &center);
-			POINT currentMousePos; GetCursorPos(&currentMousePos);
-			characterYaw += static_cast<float>(currentMousePos.x - center.x) * mouseSensitivity;
-			cameraPitch += static_cast<float>(currentMousePos.y - center.y) * mouseSensitivity;
-			cameraPitch = std::clamp(cameraPitch, -DirectX::XM_PIDIV2 + 0.05f, DirectX::XM_PIDIV2 - 0.05f);
-			SetCursorPos(center.x, center.y);
-		}
-		else {
-			if (!cursorVisibilityState) { ShowCursor(TRUE); cursorVisibilityState = true; }
-		}
-	}
+	float mouseDX = 0.0f, mouseDY = 0.0f;
+	WindowUtils::UpdateCursorLock(hWnd, isCursorLocked, cursorVisibilityState,
+		Graphics::Instance().GetScreenWidth(), Graphics::Instance().GetScreenHeight(), mouseDX, mouseDY);
+	characterYaw += mouseDX * mouseSensitivity;
+	cameraPitch += mouseDY * mouseSensitivity;
+	cameraPitch = std::clamp(cameraPitch, -DirectX::XM_PIDIV2 + 0.05f, DirectX::XM_PIDIV2 - 0.05f);
 
 	DirectX::XMFLOAT3 manualVec = { 0, 0, 0 };
 	GamePad& pad = Input::Instance().GetGamePad();
@@ -242,51 +220,7 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	bool stateChanged = (currentState != nextState);
 	currentState = nextState;
 
-	if (animator && characterModel) {
-		animator->SetAnimSpeed(animSpeed);
-		if (currentState == PlayerState::Walk || currentState == PlayerState::Run) {
-
-			int animZ = currentAnimZIndex;
-			if (currentState == PlayerState::Run) {
-				animZ = characterModel->GetAnimationIndex(animRun);
-				if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
-			}
-			else {
-				if (manualVec.z > 0.05f) animZ = characterModel->GetAnimationIndex(animWalkF);
-				else if (manualVec.z < -0.05f) animZ = characterModel->GetAnimationIndex(animWalkB);
-				if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
-			}
-
-			int animX = currentAnimXIndex;
-			if (manualVec.x > 0.05f) animX = characterModel->GetAnimationIndex(animWalkR);
-			else if (manualVec.x < -0.05f) animX = characterModel->GetAnimationIndex(animWalkL);
-			if (animX < 0) animX = characterModel->GetAnimationIndex(animWalkR);
-
-			float weightZ = std::abs(manualVec.z), weightX = std::abs(manualVec.x);
-			float ratio = (weightZ + weightX > 0.001f) ? (weightX / (weightZ + weightX)) : 0.0f;
-
-			if (stateChanged || animZ != currentAnimZIndex || animX != currentAnimXIndex) {
-				currentAnimZIndex = animZ; currentAnimXIndex = animX;
-				animator->PlayBlend(animZ, animX, ratio, crossFadeTime, true);
-			}
-			else {
-				animator->UpdateBlendRatio(ratio);
-			}
-		}
-		else {
-			if (stateChanged) {
-				currentAnimZIndex = currentAnimXIndex = -1;
-				int animIdx = -1; bool loop = true; float clampTime = -1.0f;
-				switch (currentState) {
-				case PlayerState::Idle: animIdx = characterModel->GetAnimationIndex(animIdle); loop = true; break;
-				case PlayerState::Jump: animIdx = characterModel->GetAnimationIndex(animJump); loop = false; break;
-				case PlayerState::Fall: animIdx = characterModel->GetAnimationIndex(animFall); loop = false; clampTime = fallClampSeconds; break;
-				}
-				if (animIdx < 0) animIdx = characterModel->GetAnimationIndex(animIdle);
-				animator->Play(animIdx, crossFadeTime, loop, clampTime);
-			}
-		}
-	}
+	UpdateAnimation(characterModel, stateChanged, manualVec);
 
 	// =======================================================
 	// ★プロの修正1：空中でもShiftキーを基準に目標速度を決定する
@@ -327,34 +261,7 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	GetActor()->SetRotation(rot);
 	GetActor()->SetScale({ playerScale, playerScale, playerScale });
 
-	DirectX::XMVECTOR vEyePos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), DirectX::XMLoadFloat3(&cameraOffsetPos));
-
-	DirectX::XMMATRIX R_Camera = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, characterYaw, 0.0f);
-	DirectX::XMVECTOR vTargetDirection = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Camera);
-	DirectX::XMVECTOR vTargetPos = DirectX::XMVectorAdd(vEyePos, vTargetDirection);
-
-	DirectX::XMFLOAT3 eyeF, targetF;
-	DirectX::XMStoreFloat3(&eyeF, vEyePos); DirectX::XMStoreFloat3(&targetF, vTargetPos);
-
-	camera->SetLookAt(eyeF, targetF, { 0.0f, 1.0f, 0.0f });
-
-	float screenW = Graphics::Instance().GetScreenWidth();
-	float screenH = Graphics::Instance().GetScreenHeight();
-	if (screenW > 0 && screenH > 0) {
-
-		// =======================================================
-		// ★プロの修正2：実際の「物理的な移動スピード(Velocity)」からFOVを計算する！
-		// これにより、空中に飛び出して慣性でハイスピード移動している間は絶対にFOVが維持される。
-		// =======================================================
-		float currentSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(vCurrentVelocity));
-
-		// 速度0でFOV60、runMoveSpeedでFOV75になるように割合を計算（clampで0.0〜1.0に制限）
-		float speedRatio = std::clamp((currentSpeed - manualMoveSpeed) / (runMoveSpeed - manualMoveSpeed), 0.0f, 1.0f);
-		float targetFov = 60.0f + (15.0f * speedRatio);
-
-		currentFov += (targetFov - currentFov) * 10.0f * elapsedTime;
-		camera->SetPerspectiveFov(DirectX::XMConvertToRadians(currentFov), screenW / screenH, 0.05f, 1000.0f);
-	}
+	UpdateCameraFollow(vCurrentVelocity, elapsedTime);
 }
 
 bool PlayerControllerComponent::CapsuleCast(const DirectX::XMFLOAT3& originFoot, const DirectX::XMFLOAT3& originHead, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
@@ -362,8 +269,8 @@ bool PlayerControllerComponent::CapsuleCast(const DirectX::XMFLOAT3& originFoot,
 	float distHead = distance;
 	DirectX::XMFLOAT3 hitPosFoot, hitNormFoot, hitPosHead, hitNormHead;
 
-	bool hitFoot = SphereCast(originFoot, direction, radius, distFoot, hitPosFoot, hitNormFoot);
-	bool hitHead = SphereCast(originHead, direction, radius, distHead, hitPosHead, hitNormHead);
+	bool hitFoot = collisionMesh.SphereCast(originFoot, direction, radius, distFoot, hitPosFoot, hitNormFoot);
+	bool hitHead = collisionMesh.SphereCast(originHead, direction, radius, distHead, hitPosHead, hitNormHead);
 
 	if (hitFoot || hitHead) {
 		if (hitFoot && hitHead) {
@@ -433,123 +340,80 @@ void PlayerControllerComponent::MoveAndSlide(const DirectX::XMFLOAT3& move, bool
 	DirectX::XMStoreFloat3(&position, Position);
 }
 
-bool PlayerControllerComponent::SphereCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
-	bool hit = false;
-	DirectX::XMVECTOR Start = DirectX::XMLoadFloat3(&origin), Direction = DirectX::XMLoadFloat3(&direction);
-	DirectX::XMVECTOR End = DirectX::XMVectorAdd(Start, DirectX::XMVectorScale(Direction, distance));
-
-	float minX = (std::min)(origin.x, origin.x + direction.x * distance) - radius;
-	float minY = (std::min)(origin.y, origin.y + direction.y * distance) - radius;
-	float minZ = (std::min)(origin.z, origin.z + direction.z * distance) - radius;
-	float maxX = (std::max)(origin.x, origin.x + direction.x * distance) + radius;
-	float maxY = (std::max)(origin.y, origin.y + direction.y * distance) + radius;
-	float maxZ = (std::max)(origin.z, origin.z + direction.z * distance) + radius;
-
-	int startX = static_cast<int>(std::floor(minX / collisionMesh.cellSize));
-	int startY = static_cast<int>(std::floor(minY / collisionMesh.cellSize));
-	int startZ = static_cast<int>(std::floor(minZ / collisionMesh.cellSize));
-	int endX = static_cast<int>(std::floor(maxX / collisionMesh.cellSize));
-	int endY = static_cast<int>(std::floor(maxY / collisionMesh.cellSize));
-	int endZ = static_cast<int>(std::floor(maxZ / collisionMesh.cellSize));
-
-	std::vector<size_t> candidateIndices;
-	for (int x = startX; x <= endX; ++x) {
-		for (int y = startY; y <= endY; ++y) {
-			for (int z = startZ; z <= endZ; ++z) {
-				auto it = collisionMesh.gridCells.find(collisionMesh.ComputeHash(x, y, z));
-				if (it != collisionMesh.gridCells.end()) {
-					candidateIndices.insert(candidateIndices.end(), it->second.begin(), it->second.end());
-				}
-			}
-		}
-	}
-
-	std::sort(candidateIndices.begin(), candidateIndices.end());
-	candidateIndices.erase(std::unique(candidateIndices.begin(), candidateIndices.end()), candidateIndices.end());
-
-	for (size_t idx : candidateIndices) {
-		const auto& triangle = collisionMesh.triangles[idx];
-		DirectX::XMVECTOR Positions[3] = { DirectX::XMLoadFloat3(&triangle.positions[0]), DirectX::XMLoadFloat3(&triangle.positions[1]), DirectX::XMLoadFloat3(&triangle.positions[2]) };
-		SphereCastResult result;
-		if (IntersectSphereCastVsTriangle(Start, End, radius, Positions, &result)) {
-			if (distance < result.distance) continue;
-			distance = result.distance;
-			DirectX::XMStoreFloat3(&hitPosition, DirectX::XMVectorAdd(Start, DirectX::XMVectorScale(Direction, distance)));
-			DirectX::XMStoreFloat3(&hitNormal, result.normal);
-			hit = true;
-		}
-	}
-	return hit;
-}
 
 bool PlayerControllerComponent::RayCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float maxDistance, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal) {
-	bool hit = false;
-	distance = maxDistance;
-	DirectX::XMVECTOR Start = DirectX::XMLoadFloat3(&origin);
-	DirectX::XMVECTOR Dir = DirectX::XMVector3Normalize(DirectX::XMLoadFloat3(&direction));
+	return collisionMesh.RayCast(origin, direction, maxDistance, distance, hitPosition, hitNormal);
+}
 
-	float minX = (std::min)(origin.x, origin.x + direction.x * maxDistance);
-	float minY = (std::min)(origin.y, origin.y + direction.y * maxDistance);
-	float minZ = (std::min)(origin.z, origin.z + direction.z * maxDistance);
-	float maxX = (std::max)(origin.x, origin.x + direction.x * maxDistance);
-	float maxY = (std::max)(origin.y, origin.y + direction.y * maxDistance);
-	float maxZ = (std::max)(origin.z, origin.z + direction.z * maxDistance);
+void PlayerControllerComponent::UpdateAnimation(Model* characterModel, bool stateChanged, const DirectX::XMFLOAT3& manualVec) {
+	if (!(animator && characterModel)) return;
 
-	int startX = static_cast<int>(std::floor(minX / collisionMesh.cellSize));
-	int startY = static_cast<int>(std::floor(minY / collisionMesh.cellSize));
-	int startZ = static_cast<int>(std::floor(minZ / collisionMesh.cellSize));
-	int endX = static_cast<int>(std::floor(maxX / collisionMesh.cellSize));
-	int endY = static_cast<int>(std::floor(maxY / collisionMesh.cellSize));
-	int endZ = static_cast<int>(std::floor(maxZ / collisionMesh.cellSize));
+	animator->SetAnimSpeed(animSpeed);
+	if (currentState == PlayerState::Walk || currentState == PlayerState::Run) {
 
-	std::vector<size_t> candidateIndices;
-	for (int x = startX; x <= endX; ++x) {
-		for (int y = startY; y <= endY; ++y) {
-			for (int z = startZ; z <= endZ; ++z) {
-				auto it = collisionMesh.gridCells.find(collisionMesh.ComputeHash(x, y, z));
-				if (it != collisionMesh.gridCells.end()) {
-					candidateIndices.insert(candidateIndices.end(), it->second.begin(), it->second.end());
-				}
+		int animZ = currentAnimZIndex;
+		if (currentState == PlayerState::Run) {
+			animZ = characterModel->GetAnimationIndex(animRun);
+			if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
+		}
+		else {
+			if (manualVec.z > 0.05f) animZ = characterModel->GetAnimationIndex(animWalkF);
+			else if (manualVec.z < -0.05f) animZ = characterModel->GetAnimationIndex(animWalkB);
+			if (animZ < 0) animZ = characterModel->GetAnimationIndex(animWalkF);
+		}
+
+		int animX = currentAnimXIndex;
+		if (manualVec.x > 0.05f) animX = characterModel->GetAnimationIndex(animWalkR);
+		else if (manualVec.x < -0.05f) animX = characterModel->GetAnimationIndex(animWalkL);
+		if (animX < 0) animX = characterModel->GetAnimationIndex(animWalkR);
+
+		float weightZ = std::abs(manualVec.z), weightX = std::abs(manualVec.x);
+		float ratio = (weightZ + weightX > 0.001f) ? (weightX / (weightZ + weightX)) : 0.0f;
+
+		if (stateChanged || animZ != currentAnimZIndex || animX != currentAnimXIndex) {
+			currentAnimZIndex = animZ; currentAnimXIndex = animX;
+			animator->PlayBlend(animZ, animX, ratio, crossFadeTime, true);
+		}
+		else {
+			animator->UpdateBlendRatio(ratio);
+		}
+	}
+	else {
+		if (stateChanged) {
+			currentAnimZIndex = currentAnimXIndex = -1;
+			int animIdx = -1; bool loop = true; float clampTime = -1.0f;
+			switch (currentState) {
+			case PlayerState::Idle: animIdx = characterModel->GetAnimationIndex(animIdle); loop = true; break;
+			case PlayerState::Jump: animIdx = characterModel->GetAnimationIndex(animJump); loop = false; break;
+			case PlayerState::Fall: animIdx = characterModel->GetAnimationIndex(animFall); loop = false; clampTime = fallClampSeconds; break;
 			}
+			if (animIdx < 0) animIdx = characterModel->GetAnimationIndex(animIdle);
+			animator->Play(animIdx, crossFadeTime, loop, clampTime);
 		}
 	}
+}
 
-	std::sort(candidateIndices.begin(), candidateIndices.end());
-	candidateIndices.erase(std::unique(candidateIndices.begin(), candidateIndices.end()), candidateIndices.end());
+void PlayerControllerComponent::UpdateCameraFollow(DirectX::FXMVECTOR currentVelocity, float elapsedTime) {
+	DirectX::XMVECTOR vEyePos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), DirectX::XMLoadFloat3(&cameraOffsetPos));
 
-	const float EPSILON = 0.0000001f;
-	for (size_t idx : candidateIndices) {
-		const auto& triangle = collisionMesh.triangles[idx];
-		DirectX::XMVECTOR v0 = DirectX::XMLoadFloat3(&triangle.positions[0]);
-		DirectX::XMVECTOR v1 = DirectX::XMLoadFloat3(&triangle.positions[1]);
-		DirectX::XMVECTOR v2 = DirectX::XMLoadFloat3(&triangle.positions[2]);
+	DirectX::XMMATRIX R_Camera = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, characterYaw, 0.0f);
+	DirectX::XMVECTOR vTargetDirection = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Camera);
+	DirectX::XMVECTOR vTargetPos = DirectX::XMVectorAdd(vEyePos, vTargetDirection);
 
-		DirectX::XMVECTOR edge1 = DirectX::XMVectorSubtract(v1, v0);
-		DirectX::XMVECTOR edge2 = DirectX::XMVectorSubtract(v2, v0);
-		DirectX::XMVECTOR h = DirectX::XMVector3Cross(Dir, edge2);
-		float a = DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge1, h));
-		if (a > -EPSILON && a < EPSILON) continue;
+	DirectX::XMFLOAT3 eyeF, targetF;
+	DirectX::XMStoreFloat3(&eyeF, vEyePos); DirectX::XMStoreFloat3(&targetF, vTargetPos);
 
-		float f = 1.0f / a;
-		DirectX::XMVECTOR s = DirectX::XMVectorSubtract(Start, v0);
-		float u = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(s, h));
-		if (u < 0.0f || u > 1.0f) continue;
+	camera->SetLookAt(eyeF, targetF, { 0.0f, 1.0f, 0.0f });
 
-		DirectX::XMVECTOR q = DirectX::XMVector3Cross(s, edge1);
-		float v = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(Dir, q));
-		if (v < 0.0f || u + v > 1.0f) continue;
-
-		float t = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge2, q));
-
-		if (t > EPSILON && t < distance) {
-			distance = t;
-			DirectX::XMStoreFloat3(&hitNormal, DirectX::XMVector3Normalize(DirectX::XMVector3Cross(edge1, edge2)));
-			hit = true;
-		}
+	float screenW = Graphics::Instance().GetScreenWidth();
+	float screenH = Graphics::Instance().GetScreenHeight();
+	if (screenW > 0 && screenH > 0) {
+		// Speed-based FOV: scales from 60 (idle) toward 75 (run) using the actual
+		// physical velocity, so the widened FOV holds during airborne inertia.
+		float currentSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(currentVelocity));
+		float speedRatio = std::clamp((currentSpeed - manualMoveSpeed) / (runMoveSpeed - manualMoveSpeed), 0.0f, 1.0f);
+		float targetFov = 60.0f + (15.0f * speedRatio);
+		currentFov += (targetFov - currentFov) * 10.0f * elapsedTime;
+		camera->SetPerspectiveFov(DirectX::XMConvertToRadians(currentFov), screenW / screenH, 0.05f, 1000.0f);
 	}
-
-	if (hit) {
-		DirectX::XMStoreFloat3(&hitPosition, DirectX::XMVectorAdd(Start, DirectX::XMVectorScale(Dir, distance)));
-	}
-	return hit;
 }

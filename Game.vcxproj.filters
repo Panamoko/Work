@@ -102,6 +102,9 @@
     <ClInclude Include="Source\UI\ImGuiRenderer.h">
       <Filter>Source\UI</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Physics\CollisionMesh.h">
+      <Filter>Source\Physics</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Physics\SphereCast.h">
       <Filter>Source\Physics</Filter>
     </ClInclude>
@@ -148,6 +151,9 @@
       <Filter>Source\GameObject\Components</Filter>
     </ClInclude>
     <ClInclude Include="Source\Core\Framework.h">
+      <Filter>Source\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\WindowUtils.h">
       <Filter>Source\Core</Filter>
     </ClInclude>
     <ClInclude Include="Source\Core\HighResolutionTimer.h">
@@ -260,6 +266,9 @@
     <ClCompile Include="Source\UI\ImGuiRenderer.cpp">
       <Filter>Source\UI</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Physics\CollisionMesh.cpp">
+      <Filter>Source\Physics</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Physics\SphereCast.cpp">
       <Filter>Source\Physics</Filter>
     </ClCompile>
@@ -300,6 +309,9 @@
       <Filter>Source\GameObject\Components</Filter>
     </ClCompile>
     <ClCompile Include="Source\Core\Framework.cpp">
+      <Filter>Source\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Core\WindowUtils.cpp">
       <Filter>Source\Core</Filter>
     </ClCompile>
     <ClCompile Include="Source\Core\Main.cpp">
