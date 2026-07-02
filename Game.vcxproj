@@ -222,6 +222,10 @@
     <None Include="Shader\PrimitiveRenderer.hlsli" />
     <None Include="Shader\Skinning.hlsli" />
     <None Include="Shader\Sprite.hlsli" />
+    <None Include="Shader\Brdf.hlsli" />
+    <None Include="Shader\Material.hlsli" />
+    <None Include="Shader\Shadow.hlsli" />
+    <None Include="Shader\Ibl.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shader\BasicPS.hlsl">

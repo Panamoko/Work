@@ -1,96 +1,8 @@
-#include "Pbr.hlsli"
-
-cbuffer CbMesh : register(b0)
-{
-    float4 baseColorFactor;
-    float3 emissiveFactor;
-    float metalnessFactor;
-    float roughnessFactor;
-    float occlusionStrength;
-    float alphaCutoff;
-    int alphaMode;
-    int hasBaseColorMap;
-    int hasNormalMap;
-    int hasMetalnessRoughnessMap;
-    int hasEmissiveMap;
-    int hasOcclusionMap;
-    int _pad0;
-    int _pad1;
-    int _pad2;
-};
-
-Texture2D BaseColorMap : register(t0);
-Texture2D NormalMap : register(t1);
-Texture2D MetalnessRoughnessMap : register(t2);
-Texture2D EmissiveMap : register(t3);
-Texture2D OcclusionMap : register(t4);
-TextureCube IrradianceMap : register(t5);
-TextureCube PrefilteredMap : register(t6);
-Texture2D BrdfLut : register(t7);
-Texture2D ShadowMap : register(t8);
-
-SamplerState LinearSampler : register(s0);
-SamplerState LinearClampSampler : register(s1);
-SamplerComparisonState ShadowSampler : register(s2);
-
-static const float PI = 3.14159265358979f;
-
-float DistributionGGX(float NdotH, float roughness)
-{
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float d = (NdotH * NdotH * (a2 - 1.0f) + 1.0f);
-    return a2 / (PI * d * d);
-}
-
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = (roughness + 1.0f);
-    float k = (r * r) / 8.0f;
-    return NdotV / (NdotV * (1.0f - k) + k);
-}
-
-float GeometrySmith(float NdotV, float NdotL, float roughness)
-{
-    return GeometrySchlickGGX(NdotV, roughness) * GeometrySchlickGGX(NdotL, roughness);
-}
-
-float3 FresnelSchlick(float cosTheta, float3 F0)
-{
-    return F0 + (1.0f - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
-}
-
-float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
-{
-    return F0 + (max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), F0) - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
-}
-
-// 0 = fully shadowed, 1 = fully lit (PCF 3x3)
-float ComputeShadow(float3 worldPos)
-{
-    if (shadowParams.z < 0.5f)
-        return 1.0f;
-
-    float4 lp = mul(float4(worldPos, 1.0f), lightViewProjection);
-    lp.xyz /= lp.w;
-    if (lp.z > 1.0f || lp.z < 0.0f)
-        return 1.0f;
-
-    float2 uv = lp.xy * float2(0.5f, -0.5f) + 0.5f;
-    if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f)
-        return 1.0f;
-
-    float depth = lp.z - shadowParams.y;
-    float texel = shadowParams.w;
-
-    float s = 0.0f;
-    [unroll]
-    for (int y = -1; y <= 1; y++)
-        [unroll]
-        for (int x = -1; x <= 1; x++)
-            s += ShadowMap.SampleCmpLevelZero(ShadowSampler, uv + float2(x, y) * texel, depth);
-    return s / 9.0f;
-}
+#include "Pbr.hlsli"      // VS_OUT + CbScene
+#include "Material.hlsli" // CbMesh, texture / sampler slots
+#include "Brdf.hlsli"     // PI + Cook-Torrance terms
+#include "Shadow.hlsli"   // ShadowMap (t8) + ComputeShadow
+#include "Ibl.hlsli"      // SampleIrradiance / DiffuseIBL / SpecularIBL
 
 float4 main(VS_OUT pin) : SV_TARGET
 {
@@ -140,7 +52,7 @@ float4 main(VS_OUT pin) : SV_TARGET
     float diffuseShadow = 0.55f;
     float3 toonAlbedo = albedo.rgb * lerp(diffuseShadow, 1.0f, hybridDiffuse);
 
-    // 2. Specular
+    // 2. Specular: PBR spec shaped into a hard toon highlight
     float D = DistributionGGX(NdotH, roughness);
     float G = GeometrySmith(NdotV, NdotL, roughness);
     float3 F = FresnelSchlick(VdotH, F0);
@@ -154,21 +66,19 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 kD = (1.0f - F) * (1.0f - metalness);
     float3 Lo = (kD * toonAlbedo / PI + finalSpecular) * lightColor.rgb * halfLambert;
 
-    // 3. IBL ambient
+    // 3. IBL ambient (toon-modulated)
     float3 kS_ibl = FresnelSchlickRoughness(NdotV, F0, roughness);
     float3 kD_ibl = (1.0f - kS_ibl) * (1.0f - metalness);
 
-    float3 irradiance = IrradianceMap.Sample(LinearClampSampler, N).rgb;
+    float3 irradiance = SampleIrradiance(N);
     float irradIntensity = length(irradiance);
     float toonIrrad = smoothstep(0.4f, 0.6f, irradIntensity);
     float hybridIrrad = lerp(toonIrrad, irradIntensity, 0.2f);
     irradiance = lerp(irradiance * 0.5f, irradiance, hybridIrrad);
-    float3 diffuseIBL = kD_ibl * irradiance * albedo.rgb;
+    float3 diffuseIBL = DiffuseIBL(kD_ibl, irradiance, albedo.rgb);
 
     float3 R = reflect(-V, N);
-    float3 prefiltered = PrefilteredMap.SampleLevel(LinearClampSampler, R, roughness * 10.0f).rgb;
-    float2 envBRDF = BrdfLut.Sample(LinearClampSampler, float2(NdotV, roughness)).rg;
-    float3 specularIBL = prefiltered * (kS_ibl * envBRDF.x + envBRDF.y);
+    float3 specularIBL = SpecularIBL(kS_ibl, R, roughness, NdotV);
     float toonIblSpec = smoothstep(0.5f, 0.6f, length(specularIBL));
     specularIBL *= toonIblSpec;
 

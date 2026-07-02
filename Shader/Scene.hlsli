@@ -1,3 +1,6 @@
+#ifndef SCENE_HLSLI
+#define SCENE_HLSLI
+
 cbuffer CbScene : register(b7)
 {
     row_major float4x4 viewProjection;
@@ -7,3 +10,5 @@ cbuffer CbScene : register(b7)
     row_major float4x4 lightViewProjection;
     float4 shadowParams; // x=shadow brightness, y=bias, z=enable, w=texelSize
 };
+
+#endif // SCENE_HLSLI

@@ -382,6 +382,18 @@
     <None Include="Shader\Pbr.hlsli">
       <Filter>Shader</Filter>
     </None>
+    <None Include="Shader\Brdf.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Material.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Shadow.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Ibl.hlsli">
+      <Filter>Shader</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shader\SpriteVS.hlsl">
