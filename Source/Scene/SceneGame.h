@@ -7,6 +7,7 @@
 #include "Scene.h"
 #include "Camera/Camera.h"
 #include "Camera/FpsCameraController.h"
+#include "Scene/Skybox.h"
 
 class SceneGame : public Scene
 {
@@ -19,8 +20,6 @@ public:
 	void DrawGUI() override;
 
 private:
-	void InitSkybox(ID3D11Device* device);
-	void DrawSkybox();
 
 	Camera camera;
 	FpsCameraController cameraController;
@@ -40,14 +39,5 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> bulletHoleTex;
 
-	// Procedural gradient sky
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> skyVS;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader>  skyPS;
-	Microsoft::WRL::ComPtr<ID3D11Buffer>       skyCB;
-
-	DirectX::XMFLOAT3 skyZenith = { 0.18f, 0.42f, 0.82f };
-	DirectX::XMFLOAT3 skyHorizon = { 0.80f, 0.88f, 0.96f };
-	DirectX::XMFLOAT3 skyGround = { 0.32f, 0.34f, 0.38f };
-	float skyHorizonExp = 0.55f;
-	float skyBands = 0.0f;
+	Skybox skybox;
 };
