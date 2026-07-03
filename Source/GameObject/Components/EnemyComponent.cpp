@@ -3,16 +3,17 @@
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <random>
 #include "GameObject/Components/EnemyComponent.h"
 #include "GameObject/Components/ModelComponent.h"
 #include "GameObject/Components/AnimatorComponent.h"
-#include "GameObject/Actor.h"
-#include <random>                 
-#include "AI/EnemyBehaviors.h"    
-#include "Physics/CollisionMesh.h"
 #include "GameObject/Components/HealthComponent.h"
+#include "GameObject/Actor.h"
+#include "AI/EnemyBehaviors.h"
+#include "Physics/CollisionMesh.h"
+#include "AI/NavGrid.h"
 
-// 生存中の敵レジストリ（このTU内で共有）
+// Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
 {
 	static std::vector<EnemyComponent*> reg;
@@ -29,20 +30,13 @@ EnemyComponent::~EnemyComponent()
 	Unregister();
 }
 
-void EnemyComponent::Register()
-{
-	EnemyRegistry().push_back(this);
-}
-
+void EnemyComponent::Register() { EnemyRegistry().push_back(this); }
 void EnemyComponent::Unregister()
 {
 	auto& v = EnemyRegistry();
 	v.erase(std::remove(v.begin(), v.end(), this), v.end());
 }
 
-// ---------------------------------------------------------
-// 開始
-// ---------------------------------------------------------
 void EnemyComponent::Start()
 {
 	std::shared_ptr<Actor> owner = GetActor();
@@ -55,22 +49,21 @@ void EnemyComponent::Start()
 		if (modelComp && modelComp->GetModel())
 		{
 			idleIndex = modelComp->GetModel()->GetAnimationIndex("IDLE");
-			walkIndex = modelComp->GetModel()->GetAnimationIndex("RUN");        // 移動＝RUN（WALKが無いため）
-			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // 無ければ -1（死亡アニメ無し）
-			attackIndex = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT"); // 攻撃＝パンチ
+			walkIndex = modelComp->GetModel()->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
+			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // -1 if none (no death anim)
+			attackIndex = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT");
 		}
 	}
+
 	LoadSettings();
 	Register();
 	PlayState(State::Idle, true);
 
-	if (owner) homePos = owner->GetPosition(); 
-	BuildBehaviorTree();                       
+	if (owner) homePos = owner->GetPosition();
+	BuildBehaviorTree();
+	navGrid.Build(stageCollision, navCellSize, navAgentHeight); // ← 追加：ナビ格子を生成
 }
 
-// ---------------------------------------------------------
-// 更新
-// ---------------------------------------------------------
 void EnemyComponent::Update(float elapsedTime)
 {
 	if (dead)
@@ -78,21 +71,17 @@ void EnemyComponent::Update(float elapsedTime)
 		deathTimer -= elapsedTime;
 		if (deathTimer <= 0.0f)
 		{
-			std::shared_ptr<Actor> owner = GetActor();
-			if (owner) ActorManager::Instance().Remove(owner);
+			if (std::shared_ptr<Actor> owner = GetActor())
+				ActorManager::Instance().Remove(owner);
 		}
 		return;
 	}
 
-	UpdatePerception(elapsedTime); // 知覚を1回評価（判定はこのキャッシュを見る）
-	tree.Update(elapsedTime);
-
-	tree.Update(elapsedTime);
+	UpdatePerception(elapsedTime); // evaluate sight/cooldowns once
+	tree.Update(elapsedTime);      // decide + act (single tick)
 }
 
-// ---------------------------------------------------------
-// 被弾・死亡
-// ---------------------------------------------------------
+// ---- Damage / death (enemy's own HP; the player's gun calls ApplyDamage) ----
 void EnemyComponent::ApplyDamage(float dmg)
 {
 	if (dead) return;
@@ -108,12 +97,12 @@ void EnemyComponent::Die()
 {
 	if (dead) return;
 	dead = true;
-	Unregister(); // 以後は撃たれない
-	if (animator && fallIndex >= 0) animator->Play(fallIndex, 0.1f, false); // 倒れる風
+	Unregister();
+	if (animator && fallIndex >= 0) animator->Play(fallIndex, 0.1f, false);
 	deathTimer = deathTime;
 }
 
-// レイ vs 敵の球（dir は正規化済み前提）
+// ---- Gun hit test (sphere) ----
 bool EnemyComponent::RayHitSelf(const DirectX::XMFLOAT3& o, const DirectX::XMFLOAT3& d, float maxDist, float& outT)
 {
 	std::shared_ptr<Actor> owner = GetActor();
@@ -160,64 +149,80 @@ EnemyComponent* EnemyComponent::Raycast(const DirectX::XMFLOAT3& origin, const D
 	return best;
 }
 
-// ---------------------------------------------------------
-// インスペクタ
-// ---------------------------------------------------------
+// ---- Inspector ----
 void EnemyComponent::OnGUI()
 {
 	ImGui::Text("Enemy  (%s)", dead ? "DEAD" : (state == State::Walk ? "WALK" : "IDLE"));
 	ImGui::ProgressBar(maxHp > 0.0f ? hp / maxHp : 0.0f, ImVec2(-1, 0));
 	ImGui::Text("HP: %.0f / %.0f", hp, maxHp);
 
-	ImGui::Separator();
-	ImGui::SliderFloat("Detect Range", &detectRange, 1.0f, 50.0f);
-	ImGui::SliderFloat("Stop Distance", &stopDistance, 0.5f, 10.0f);
-	ImGui::SliderFloat("Move Speed", &moveSpeed, 0.0f, 10.0f);
-	ImGui::SliderFloat("Turn Speed", &turnSpeed, 1.0f, 20.0f);
-	ImGui::SliderFloat("Blend Time", &blendTime, 0.0f, 0.6f);
-	ImGui::Separator();
-	ImGui::TextDisabled("Patrol (wander)");
-	ImGui::SliderFloat("Wander Radius", &wanderRadius, 1.0f, 30.0f);
-	ImGui::SliderFloat("Arrive Radius", &arriveRadius, 0.1f, 3.0f);
-	ImGui::SliderFloat("Idle Min", &idleMin, 0.0f, 5.0f);
-	ImGui::SliderFloat("Idle Max", &idleMax, 0.0f, 8.0f);
+	if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::SliderFloat("Detect Range", &detectRange, 1.0f, 50.0f);
+		ImGui::SliderFloat("Stop Distance", &stopDistance, 0.5f, 10.0f);
+		ImGui::SliderFloat("Move Speed", &moveSpeed, 0.0f, 10.0f);
+		ImGui::SliderFloat("Turn Speed", &turnSpeed, 1.0f, 20.0f);
+		ImGui::SliderFloat("Blend Time", &blendTime, 0.0f, 0.6f);
+	}
 
-	ImGui::Separator();
-	ImGui::TextDisabled("Perception (sight)");
-	ImGui::SliderFloat("FOV (deg)", &fovDegrees, 20.0f, 180.0f);
-	ImGui::SliderFloat("Eye Height", &eyeHeight, 0.0f, 3.0f);
+	if (ImGui::CollapsingHeader("Patrol"))
+	{
+		ImGui::SliderFloat("Wander Radius", &wanderRadius, 1.0f, 30.0f);
+		ImGui::SliderFloat("Arrive Radius", &arriveRadius, 0.1f, 3.0f);
+		ImGui::SliderFloat("Idle Min", &idleMin, 0.0f, 5.0f);
+		ImGui::SliderFloat("Idle Max", &idleMax, 0.0f, 8.0f);
+	}
 
-	ImGui::SliderFloat("Eye Height", &eyeHeight, 0.0f, 3.0f);
+	if (ImGui::CollapsingHeader("Perception"))
+	{
+		ImGui::SliderFloat("FOV (deg)", &fovDegrees, 20.0f, 180.0f);
+		ImGui::SliderFloat("Eye Height", &eyeHeight, 0.0f, 3.0f);
+		ImGui::Text("Dist to player : %.1f  (range %.0f)", dbgDist, detectRange);
+		ImGui::TextColored(dbgInRange ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "In range  : %s", dbgInRange ? "YES" : "no");
+		ImGui::TextColored(dbgInFov ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "In FOV    : %s", dbgInFov ? "YES" : "no");
+		ImGui::TextColored(dbgLosClear ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "LOS clear : %s", dbgLosClear ? "YES" : "no");
+		ImGui::TextColored(dbgCanSee ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "CAN SEE   : %s", dbgCanSee ? "YES" : "no");
+		ImGui::Text("Search timer : %.1f", searchTimer);
+	}
 
-	ImGui::Separator();
-	ImGui::TextDisabled("Perception debug");
-	ImGui::Text("Dist to player : %.1f  (range %.0f)", dbgDist, detectRange);
-	ImGui::TextColored(dbgInRange ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "In range  : %s", dbgInRange ? "YES" : "no");
-	ImGui::TextColored(dbgInFov ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "In FOV    : %s", dbgInFov ? "YES" : "no");
-	ImGui::TextColored(dbgLosClear ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "LOS clear : %s", dbgLosClear ? "YES" : "no");
-	ImGui::TextColored(dbgCanSee ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0.4f, 0, 1), "CAN SEE   : %s", dbgCanSee ? "YES" : "no");
-	ImGui::Text("Search timer : %.1f", searchTimer); // ← 追加
-	ImGui::Separator();
-	ImGui::TextDisabled("Attack");
-	ImGui::SliderFloat("Attack Range", &attackRange, 0.5f, 6.0f);
-	ImGui::SliderFloat("Attack Interval", &attackInterval, 0.2f, 5.0f);
-	ImGui::SliderFloat("Attack Duration", &attackDuration, 0.1f, 3.0f);
-	ImGui::Separator();
-	ImGui::TextDisabled("Hit volume (sphere)");
-	ImGui::SliderFloat("Center Y", &sphereCenterY, 0.0f, 3.0f);
-	ImGui::SliderFloat("Radius", &sphereRadius, 0.2f, 3.0f);
-	if (ImGui::Button("Damage 34")) ApplyDamage(34.0f);
-	ImGui::SliderFloat("Attack Duration", &attackDuration, 0.1f, 3.0f);
-	ImGui::SliderFloat("Attack Damage", &attackDamage, 0.0f, 50.0f); // ← 追加
+	if (ImGui::CollapsingHeader("Navigation"))
+	{
+		ImGui::Text("Grid built : %s", navGrid.IsBuilt() ? "YES" : "no");
+		ImGui::Text("Path nodes : %d", (int)path.size());
+		ImGui::SliderFloat("Repath Interval", &repathInterval, 0.1f, 1.0f);
+
+		ImGui::Separator();
+		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 2.0f);
+		if (ImGui::Button("Rebuild Nav Grid"))
+			navGrid.Build(stageCollision, navCellSize, navAgentHeight); // その場で格子を作り直す
+
+		ImGui::SliderFloat("Collision Radius", &collisionRadius, 0.1f, 1.0f);
+		ImGui::SliderFloat("Collision Center Y", &collisionCenterY, 0.2f, 2.0f);
+		ImGui::SliderFloat("Waypoint Radius", &waypointRadius, 0.15f, 1.0f);
+	}
+
+	if (ImGui::CollapsingHeader("Attack"))
+	{
+		ImGui::SliderFloat("Attack Range", &attackRange, 0.5f, 6.0f);
+		ImGui::SliderFloat("Attack Interval", &attackInterval, 0.2f, 5.0f);
+		ImGui::SliderFloat("Hit Timing", &attackHitTiming, 0.0f, 1.0f);
+		ImGui::SliderFloat("Attack Damage", &attackDamage, 0.0f, 50.0f);
+	}
+
+	if (ImGui::CollapsingHeader("Hit volume (sphere)"))
+	{
+		ImGui::SliderFloat("Center Y", &sphereCenterY, 0.0f, 3.0f);
+		ImGui::SliderFloat("Radius", &sphereRadius, 0.2f, 3.0f);
+		if (ImGui::Button("Damage 34")) ApplyDamage(34.0f);
+	}
+
 	ImGui::Separator();
 	if (ImGui::Button("Save Transform")) SaveSettings();
 	ImGui::SameLine();
 	if (ImGui::Button("Load Transform")) LoadSettings();
 }
 
-// ---------------------------------------------------------
-// 保存／読込
-// ---------------------------------------------------------
+// ---- Save / load transform ----
 void EnemyComponent::SaveSettings()
 {
 	std::shared_ptr<Actor> owner = GetActor();
@@ -251,9 +256,7 @@ void EnemyComponent::LoadSettings()
 	currentYaw = QuatToYaw(r);
 }
 
-// ---------------------------------------------------------
-// 内部ヘルパー
-// ---------------------------------------------------------
+// ---- Small helpers ----
 void EnemyComponent::PlayState(State s, bool force)
 {
 	if (!force && s == state) return;
@@ -265,22 +268,53 @@ void EnemyComponent::PlayState(State s, bool force)
 	}
 }
 
+void EnemyComponent::PlayWalk() { PlayState(State::Walk, false); }
+void EnemyComponent::PlayIdle() { PlayState(State::Idle, false); }
+
+float EnemyComponent::NextIdleDuration() { return RandomRange(idleMin, idleMax); }
+
+float EnemyComponent::RandomRange(float mn, float mx)
+{
+	static std::mt19937 rng{ std::random_device{}() };
+	std::uniform_real_distribution<float> dist(mn, mx);
+	return dist(rng);
+}
+
 float EnemyComponent::QuatToYaw(const DirectX::XMFLOAT4& q)
 {
 	return atan2f(2.0f * (q.w * q.y + q.x * q.z), 1.0f - 2.0f * (q.y * q.y + q.x * q.x));
 }
 
-// ---------------------------------------------------------
-// AI action API / behavior tree
-// ---------------------------------------------------------
+void EnemyComponent::FaceTowards(float elapsedTime, float dirX, float dirZ)
+{
+	if (dirX * dirX + dirZ * dirZ < 1e-6f) return;
+
+	float targetYaw = atan2f(dirX, dirZ);
+	float d = targetYaw - currentYaw;
+	while (d > DirectX::XM_PI)  d -= DirectX::XM_2PI;
+	while (d < -DirectX::XM_PI) d += DirectX::XM_2PI;
+
+	float t = turnSpeed * elapsedTime;
+	if (t > 1.0f) t = 1.0f;
+	currentYaw += d * t;
+
+	if (std::shared_ptr<Actor> owner = GetActor())
+	{
+		DirectX::XMFLOAT4 rot;
+		DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, currentYaw, 0.0f));
+		owner->SetRotation(rot);
+	}
+}
+
+// ---- Behavior tree ----
 void EnemyComponent::BuildBehaviorTree()
 {
 	// Root(Priority)
-	//  ├ Combat (0, 判定:見えている) ─ Priority
-	//  │   ├ Attack (0, 判定:射程内＆CD明け) : 攻撃
-	//  │   └ Chase  (1)                      : 接近
-	//  ├ Search (1, 判定:探索中)             : 最後に見た位置へ→見回す
-	//  └ Patrol (2, SequentialLooping)       : Wander → Idle
+	//  |- Combat (0, visible)   - Priority
+	//  |    |- Attack (0, in range & off cooldown)
+	//  |    \- Chase  (1)       - approach
+	//  |- Search (1, searching) - go to last known pos, look around
+	//  \- Patrol (2, looping)   - wander -> idle
 	tree.AddNode("", "Root", 0, SelectRule::Priority, nullptr, nullptr);
 
 	tree.AddNode("Root", "Combat", 0, SelectRule::Priority,
@@ -298,76 +332,37 @@ void EnemyComponent::BuildBehaviorTree()
 	tree.AddNode("Patrol", "Idle", 1, SelectRule::None, nullptr, std::make_unique<IdleAction>(this));
 }
 
+// ---- Patrol ----
 void EnemyComponent::SetWanderTarget()
 {
-	float angle = RandomRange(0.0f, DirectX::XM_2PI);
-	float r = RandomRange(0.0f, wanderRadius);
-	target.x = homePos.x + cosf(angle) * r;
-	target.y = homePos.y;
-	target.z = homePos.z + sinf(angle) * r;
+	for (int i = 0; i < 8; ++i)
+	{
+		float angle = RandomRange(0.0f, DirectX::XM_2PI);
+		float r = RandomRange(0.0f, wanderRadius);
+		DirectX::XMFLOAT3 t = { homePos.x + cosf(angle) * r, homePos.y, homePos.z + sinf(angle) * r };
+		if (!navGrid.IsBuilt() || navGrid.IsWalkable(t)) { target = t; return; }
+	}
+	target = homePos; // fallback
 }
 
 bool EnemyComponent::MoveToTarget(float elapsedTime)
 {
-	std::shared_ptr<Actor> owner = GetActor();
-	if (!owner) return true;
-
-	DirectX::XMFLOAT3 pos = owner->GetPosition();
-	float dx = target.x - pos.x;
-	float dz = target.z - pos.z;
-	float distSq = dx * dx + dz * dz;
-	if (distSq <= arriveRadius * arriveRadius) return true; // 到着
-
-	float dist = sqrtf(distSq);
-	FaceTowards(elapsedTime, dx, dz);
-
-	float inv = 1.0f / dist;
-	pos.x += dx * inv * moveSpeed * elapsedTime;
-	pos.z += dz * inv * moveSpeed * elapsedTime;
-	owner->SetPosition(pos);
-	return false;
+	return MoveTowards(target, elapsedTime, arriveRadius);
 }
 
-void EnemyComponent::FaceTowards(float elapsedTime, float dirX, float dirZ)
-{
-	if (dirX * dirX + dirZ * dirZ < 1e-6f) return;
-
-	float targetYaw = atan2f(dirX, dirZ);
-	float d = targetYaw - currentYaw;
-	while (d > DirectX::XM_PI)  d -= DirectX::XM_2PI;
-	while (d < -DirectX::XM_PI) d += DirectX::XM_2PI;
-
-	float t = turnSpeed * elapsedTime;
-	if (t > 1.0f) t = 1.0f;
-	currentYaw += d * t;
-
-	std::shared_ptr<Actor> owner = GetActor();
-	if (owner)
-	{
-		DirectX::XMFLOAT4 rot;
-		DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, currentYaw, 0.0f));
-		owner->SetRotation(rot);
-	}
-}
-
-void EnemyComponent::PlayWalk() { PlayState(State::Walk, false); }
-void EnemyComponent::PlayIdle() { PlayState(State::Idle, false); }
-
-float EnemyComponent::NextIdleDuration() { return RandomRange(idleMin, idleMax); }
-
-float EnemyComponent::RandomRange(float mn, float mx)
-{
-	static std::mt19937 rng{ std::random_device{}() };
-	std::uniform_real_distribution<float> dist(mn, mx);
-	return dist(rng);
-}
-
-// ---------------------------------------------------------
-// Perception / chase (Step 3)
-// ---------------------------------------------------------
+// ---- Perception ----
 void EnemyComponent::SetStageCollision(const CollisionMesh& mesh)
 {
-	stageCollision = mesh; // 視線判定用にコピーして保持
+	stageCollision = mesh;
+}
+
+void EnemyComponent::UpdatePerception(float elapsedTime)
+{
+	perceptVisible = CanSeePlayer();
+	if (perceptVisible) searchTimer = searchDuration;
+	else if (searchTimer > 0.0f) searchTimer -= elapsedTime;
+
+	if (attackTimer > 0.0f) attackTimer -= elapsedTime;
 }
 
 bool EnemyComponent::CanSeePlayer()
@@ -383,38 +378,31 @@ bool EnemyComponent::CanSeePlayer()
 	DirectX::XMFLOAT3 eye = { myPos.x, myPos.y + eyeHeight, myPos.z };
 	DirectX::XMFLOAT3 tgt = { plPos.x, plPos.y + eyeHeight, plPos.z };
 
-	float dx = tgt.x - eye.x;
-	float dy = tgt.y - eye.y;
-	float dz = tgt.z - eye.z;
+	float dx = tgt.x - eye.x, dy = tgt.y - eye.y, dz = tgt.z - eye.z;
 	float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 	dbgDist = dist;
 
-	// ① 距離
 	if (dist > detectRange || dist < 1e-4f) return false;
 	dbgInRange = true;
 
-	// ② 視野角（水平）
 	float horiz = sqrtf(dx * dx + dz * dz);
 	if (horiz > 1e-4f)
 	{
-		float toX = dx / horiz;
-		float toZ = dz / horiz;
-		float fwdX = sinf(currentYaw);
-		float fwdZ = cosf(currentYaw);
+		float toX = dx / horiz, toZ = dz / horiz;
+		float fwdX = sinf(currentYaw), fwdZ = cosf(currentYaw);
 		float cosAngle = fwdX * toX + fwdZ * toZ;
 		float cosHalfFov = cosf(DirectX::XMConvertToRadians(fovDegrees) * 0.5f);
 		if (cosAngle < cosHalfFov) return false;
 	}
 	dbgInFov = true;
 
-	// ③ 視線（壁）
 	if (!stageCollision.triangles.empty())
 	{
 		DirectX::XMFLOAT3 dir = { dx / dist, dy / dist, dz / dist };
 		float hitDist = 0.0f;
 		DirectX::XMFLOAT3 hitPos, hitNormal;
 		if (stageCollision.RayCast(eye, dir, dist, hitDist, hitPos, hitNormal) && hitDist < dist - 0.1f)
-			return false; // 壁に遮られている
+			return false; // blocked by a wall
 	}
 	dbgLosClear = true;
 
@@ -423,46 +411,30 @@ bool EnemyComponent::CanSeePlayer()
 	return true;
 }
 
+bool EnemyComponent::IsSearching() const
+{
+	return !perceptVisible && searchTimer > 0.0f;
+}
+
+// ---- Chase / search ----
 void EnemyComponent::ChaseUpdate(float elapsedTime)
 {
 	std::shared_ptr<Actor> owner = GetActor();
 	std::shared_ptr<Actor> player = playerRef.lock();
 	if (!owner || !player) return;
 
-	DirectX::XMFLOAT3 pos = owner->GetPosition();
 	DirectX::XMFLOAT3 plPos = player->GetPosition();
-	float dx = plPos.x - pos.x;
-	float dz = plPos.z - pos.z;
-	float dist = sqrtf(dx * dx + dz * dz);
-
-	FaceTowards(elapsedTime, dx, dz); // 常にプレイヤーを向く
-
-	if (dist > stopDistance)
+	if (MoveTowards(plPos, elapsedTime, stopDistance))
 	{
-		float inv = (dist > 1e-4f) ? 1.0f / dist : 0.0f;
-		pos.x += dx * inv * moveSpeed * elapsedTime;
-		pos.z += dz * inv * moveSpeed * elapsedTime;
-		owner->SetPosition(pos);
-		PlayWalk();
+		// 射程に到達：プレイヤーを向いて待機
+		DirectX::XMFLOAT3 pos = owner->GetPosition();
+		FaceTowards(elapsedTime, plPos.x - pos.x, plPos.z - pos.z);
+		PlayIdle();
 	}
 	else
 	{
-		PlayIdle(); // 射程に到達（攻撃は Step5）
+		PlayWalk();
 	}
-}
-
-void EnemyComponent::UpdatePerception(float elapsedTime)
-{
-	perceptVisible = CanSeePlayer();
-	if (perceptVisible) searchTimer = searchDuration;
-	else if (searchTimer > 0.0f) searchTimer -= elapsedTime;
-
-	if (attackTimer > 0.0f) attackTimer -= elapsedTime; // ← 追加：攻撃クールダウン
-}
-
-bool EnemyComponent::IsSearching() const
-{
-	return !perceptVisible && searchTimer > 0.0f;
 }
 
 void EnemyComponent::SearchUpdate(float elapsedTime)
@@ -470,35 +442,24 @@ void EnemyComponent::SearchUpdate(float elapsedTime)
 	std::shared_ptr<Actor> owner = GetActor();
 	if (!owner) return;
 
-	DirectX::XMFLOAT3 pos = owner->GetPosition();
-	float dx = lastKnownPos.x - pos.x;
-	float dz = lastKnownPos.z - pos.z;
-	float dist = sqrtf(dx * dx + dz * dz);
-
-	if (dist > arriveRadius)
+	if (!MoveTowards(lastKnownPos, elapsedTime, arriveRadius))
 	{
-		// 最後に見た位置へ向かう
-		FaceTowards(elapsedTime, dx, dz);
-		float inv = (dist > 1e-4f) ? 1.0f / dist : 0.0f;
-		pos.x += dx * inv * moveSpeed * elapsedTime;
-		pos.z += dz * inv * moveSpeed * elapsedTime;
-		owner->SetPosition(pos);
 		PlayWalk();
+		return;
 	}
-	else
-	{
-		// 到着：その場で見回す（ゆっくり回転してプレイヤーを探す）
-		currentYaw += searchTurnSpeed * elapsedTime;
-		DirectX::XMFLOAT4 rot;
-		DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, currentYaw, 0.0f));
-		owner->SetRotation(rot);
-		PlayIdle();
-	}
+
+	// 到着：その場で見回す
+	currentYaw += searchTurnSpeed * elapsedTime;
+	DirectX::XMFLOAT4 rot;
+	DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, currentYaw, 0.0f));
+	owner->SetRotation(rot);
+	PlayIdle();
 }
 
+// ---- Attack (synced to the attack animation) ----
 bool EnemyComponent::CanAttack()
 {
-	if (attackTimer > 0.0f) return false; // クールダウン中
+	if (attackTimer > 0.0f) return false;
 
 	std::shared_ptr<Actor> owner = GetActor();
 	std::shared_ptr<Actor> player = playerRef.lock();
@@ -506,8 +467,7 @@ bool EnemyComponent::CanAttack()
 
 	DirectX::XMFLOAT3 a = owner->GetPosition();
 	DirectX::XMFLOAT3 b = player->GetPosition();
-	float dx = b.x - a.x;
-	float dz = b.z - a.z;
+	float dx = b.x - a.x, dz = b.z - a.z;
 	return (dx * dx + dz * dz) <= attackRange * attackRange;
 }
 
@@ -515,8 +475,7 @@ void EnemyComponent::BeginAttack()
 {
 	if (animator && attackIndex >= 0) animator->Play(attackIndex, blendTime, false);
 	attacking = true;
-	attackAnimTimer = attackDuration;
-	damageDealt = false; // ← 追加
+	damageDealt = false;
 }
 
 bool EnemyComponent::AttackUpdate(float elapsedTime)
@@ -527,23 +486,26 @@ bool EnemyComponent::AttackUpdate(float elapsedTime)
 	{
 		DirectX::XMFLOAT3 a = owner->GetPosition();
 		DirectX::XMFLOAT3 b = player->GetPosition();
-		FaceTowards(elapsedTime, b.x - a.x, b.z - a.z); // 攻撃中もプレイヤーを向く
+		FaceTowards(elapsedTime, b.x - a.x, b.z - a.z);
 	}
 
-	attackAnimTimer -= elapsedTime;
+	// Progress through the actual attack animation (0..1).
+	float t = (animator && attackIndex >= 0) ? animator->GetNormalizedTime() : 1.0f;
 
-	// モーション中盤で1回だけ命中判定（この瞬間に射程内なら当たる＝避けられる余地あり）
-	if (!damageDealt && attackAnimTimer <= attackDuration * 0.5f)
+	// Land the hit once, at the configured moment of the swing.
+	if (!damageDealt && t >= attackHitTiming)
 	{
 		DealDamageToPlayer();
 		damageDealt = true;
 	}
 
-	if (attackAnimTimer <= 0.0f)
+	// Finish when the animation has played out.
+	bool finished = (animator && attackIndex >= 0) ? animator->IsAnimationFinished() : true;
+	if (finished)
 	{
 		attacking = false;
-		attackTimer = attackInterval; // クールダウン開始
-		return true;                  // 攻撃1回分が完了
+		attackTimer = attackInterval; // start cooldown
+		return true;
 	}
 	return false;
 }
@@ -554,15 +516,146 @@ void EnemyComponent::DealDamageToPlayer()
 	std::shared_ptr<Actor> player = playerRef.lock();
 	if (!owner || !player) return;
 
-	// 命中の瞬間も射程内か（離れていれば空振り）
 	DirectX::XMFLOAT3 a = owner->GetPosition();
 	DirectX::XMFLOAT3 b = player->GetPosition();
-	float dx = b.x - a.x;
-	float dz = b.z - a.z;
-	if (dx * dx + dz * dz > attackRange * attackRange) return;
+	float dx = b.x - a.x, dz = b.z - a.z;
+	if (dx * dx + dz * dz > attackRange * attackRange) return; // player dodged out of range
 
 	if (auto health = player->GetComponent<HealthComponent>())
-	{
 		health->ApplyDamage(attackDamage);
-	}
 }
+
+// Move toward worldTarget along the nav path. Returns true when within
+// 'stopDist' of the final target. Falls back to a straight line if no path.
+bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float elapsedTime, float stopDist)
+{
+	std::shared_ptr<Actor> owner = GetActor();
+	if (!owner) return true;
+
+	DirectX::XMFLOAT3 pos = owner->GetPosition();
+
+	// Reached the final target?
+	float fdx = worldTarget.x - pos.x;
+	float fdz = worldTarget.z - pos.z;
+	if (fdx * fdx + fdz * fdz <= stopDist * stopDist)
+	{
+		path.clear();
+		stuckTimer = 0.0f;
+		return true;
+	}
+
+	// Recompute the path on a timer, or when the target moved a lot.
+	float tdx = worldTarget.x - lastPathTarget.x;
+	float tdz = worldTarget.z - lastPathTarget.z;
+	bool targetMoved = (tdx * tdx + tdz * tdz) > (2.0f * 2.0f);
+	repathTimer -= elapsedTime;
+	if (repathTimer <= 0.0f || path.empty() || targetMoved)
+	{
+		repathTimer = repathInterval;
+		lastPathTarget = worldTarget;
+		pathIndex = 0;
+		if (!navGrid.IsBuilt() || !navGrid.FindPath(pos, worldTarget, path))
+			path.clear();
+	}
+
+	// Grid built but no route -> unreachable. Give up instead of beelining into a wall.
+	if (navGrid.IsBuilt() && path.empty())
+	{
+		stuckTimer = 0.0f;
+		return true;
+	}
+
+	// Steer toward the next waypoint (or straight to target if no path).
+	DirectX::XMFLOAT3 wp = worldTarget;
+	if (!path.empty())
+	{
+		while (pathIndex < (int)path.size())
+		{
+			float wx = path[pathIndex].x - pos.x;
+			float wz = path[pathIndex].z - pos.z;
+			if (wx * wx + wz * wz <= waypointRadius * waypointRadius) { ++pathIndex; continue; }
+			break;
+		}
+		wp = (pathIndex < (int)path.size()) ? path[pathIndex] : worldTarget;
+	}
+
+	float mdx = wp.x - pos.x;
+	float mdz = wp.z - pos.z;
+	float dist = sqrtf(mdx * mdx + mdz * mdz);
+	FaceTowards(elapsedTime, mdx, mdz);
+
+	if (dist > 1e-4f)
+	{
+		float inv = 1.0f / dist;
+		float stepX = mdx * inv * moveSpeed * elapsedTime;
+		float stepZ = mdz * inv * moveSpeed * elapsedTime;
+
+		DirectX::XMFLOAT3 newPos = CollideAndSlide(pos, stepX, stepZ);
+
+		// Stuck detection: tried to move but barely did -> jammed against a wall.
+		float movedSq = (newPos.x - pos.x) * (newPos.x - pos.x) + (newPos.z - pos.z) * (newPos.z - pos.z);
+		float stepSq = stepX * stepX + stepZ * stepZ;
+		if (stepSq > 1e-8f && movedSq < stepSq * 0.09f) stuckTimer += elapsedTime;
+		else stuckTimer = 0.0f;
+
+		owner->SetPosition(newPos);
+
+		if (stuckTimer > stuckLimit)
+		{
+			stuckTimer = 0.0f;
+			path.clear();
+			repathTimer = 0.0f;  // force a fresh path next time
+			return true;         // give up -> caller stops "walking in place"
+		}
+	}
+	return false;
+}
+
+// Move on the XZ plane while sliding along walls (sphere sweep vs the stage).
+DirectX::XMFLOAT3 EnemyComponent::CollideAndSlide(const DirectX::XMFLOAT3& pos, float moveX, float moveZ)
+{
+	DirectX::XMFLOAT3 p = pos;
+	if (stageCollision.triangles.empty())
+	{
+		p.x += moveX; p.z += moveZ;
+		return p;
+	}
+
+	// Pass 0: move up to the first wall. Pass 1: slide along it.
+	for (int pass = 0; pass < 2; ++pass)
+	{
+		float len = sqrtf(moveX * moveX + moveZ * moveZ);
+		if (len < 1e-5f) break;
+
+		DirectX::XMFLOAT3 center = { p.x, p.y + collisionCenterY, p.z };
+		DirectX::XMFLOAT3 dir = { moveX / len, 0.0f, moveZ / len };
+		float dist = len + collisionRadius;
+		DirectX::XMFLOAT3 hitPos, hitNormal;
+
+		if (!stageCollision.SphereCast(center, dir, collisionRadius, dist, hitPos, hitNormal))
+		{
+			p.x += moveX; p.z += moveZ; // clear: full move
+			break;
+		}
+
+		// Move only up to just before the wall.
+		float allowed = dist - collisionRadius;
+		if (allowed < 0.0f) allowed = 0.0f;
+		p.x += dir.x * allowed;
+		p.z += dir.z * allowed;
+
+		// Project the leftover movement onto the wall (remove the normal part), then retry.
+		float leftover = len - allowed;
+		float lx = dir.x * leftover;
+		float lz = dir.z * leftover;
+		float nlen = sqrtf(hitNormal.x * hitNormal.x + hitNormal.z * hitNormal.z);
+		if (nlen < 1e-4f) break;
+		float nx = hitNormal.x / nlen, nz = hitNormal.z / nlen;
+		float dot = lx * nx + lz * nz;
+		moveX = lx - dot * nx;
+		moveZ = lz - dot * nz;
+	}
+	return p;
+}
+
+//今後PlayerとかEnemyの動きはOverWatchみたいな感じでゲームモードはCoDみたいなキル数対決みたいな感じにしたいんだけどそれを踏まえるとどうなる？今の感じだと作りたいゲームに対しておかしいAIの挙動みたいになりそう

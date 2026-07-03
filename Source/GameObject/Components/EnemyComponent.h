@@ -2,22 +2,22 @@
 
 #include <memory>
 #include <DirectXMath.h>
-#include "AI/BehaviorTree.h" 
 #include "GameObject/Component.h"
+#include "AI/BehaviorTree.h"
 #include "Physics/CollisionMesh.h"
+#include "AI/NavGrid.h"
+#include <vector>
 
 class ModelComponent;
 class AnimatorComponent;
 
-// ---------------------------------------------------------
-// 敵コンポーネント（AI＋被弾＋死亡）
-//   ・索敵 → 向く → 追跡 → 停止
-//   ・プレイヤーの射撃レイで被弾 → HP0 で死亡
-// ---------------------------------------------------------
+// Enemy AI: patrol -> perceive (sight/LOS) -> chase -> attack -> search.
+// Decision-making is driven by a BehaviorTree; this component is the "body":
+// movement, animation, hit sphere for the player's gun, and HP/death.
 class EnemyComponent : public Component
 {
 public:
-	EnemyComponent(std::shared_ptr<Actor> player);
+	explicit EnemyComponent(std::shared_ptr<Actor> player);
 	~EnemyComponent() override;
 
 	const char* GetName() const override { return "Enemy"; }
@@ -26,74 +26,79 @@ public:
 	void Update(float elapsedTime) override;
 	void OnGUI() override;
 
-	// 被弾（外部＝射撃側から呼ぶ）
+	// Damage taken from the player's gun.
 	void ApplyDamage(float dmg);
 
-	// 全敵に対するレイキャスト（最も近い命中を返す。無ければ nullptr）
+	// Ray vs all enemies (sphere). Returns the nearest hit enemy, or nullptr.
 	static EnemyComponent* Raycast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& dir, float maxDist, float& outDist);
 
 	void SaveSettings();
 	void LoadSettings();
 
-	// ---- AI action API（ビヘイビアツリーの末端ノードが呼ぶ） ----
-	void  SetWanderTarget();               // homeを中心にランダムな徘徊目標を設定
-	bool  MoveToTarget(float elapsedTime); // targetへ移動。到着したら true
+	// ---- Stage collision (for line-of-sight) ----
+	void SetStageCollision(const CollisionMesh& mesh);
+
+	// ---- AI action API (behavior-tree leaves call these) ----
+	void  SetWanderTarget();                 // pick a random patrol target around home
+	bool  MoveToTarget(float elapsedTime);   // move toward target; true when arrived
 	void  PlayWalk();
 	void  PlayIdle();
-	float NextIdleDuration();              // 待機時間（ランダム）
+	float NextIdleDuration();                // random idle wait time
 
-	// ---- Perception / chase (Step 3) ----
-	void SetStageCollision(const CollisionMesh& mesh); // 視線判定用のステージ当たりを設定
-	bool CanSeePlayer();                               // 距離＋視野角＋視線(壁)で判定
-	void ChaseUpdate(float elapsedTime);               // プレイヤーへ接近し射程で停止
-	void UpdatePerception(float elapsedTime);           // 毎フレーム1回、知覚を評価
-	bool IsPlayerVisible() const { return perceptVisible; }
-	bool IsSearching() const;                           // 見失い後の探索中か
-	void SearchUpdate(float elapsedTime);               // 最後に見た位置へ→見回す
-	bool CanAttack();                     // 射程内＆クールダウン明けなら true（判定用）
-	void BeginAttack();                   // 攻撃モーション開始
-	bool AttackUpdate(float elapsedTime); // 攻撃中の更新。1回分終わっ
+	void  UpdatePerception(float elapsedTime); // evaluate sight once per frame (cached)
+	bool  IsPlayerVisible() const { return perceptVisible; }
+	bool  IsSearching() const;                 // lost sight but still within search window
+	void  ChaseUpdate(float elapsedTime);      // approach the player, stop at stop distance
+	void  SearchUpdate(float elapsedTime);     // go to last known position, then look around
+
+	bool  CanAttack();                         // in range and off cooldown
+	void  BeginAttack();                       // start the attack motion
+	bool  AttackUpdate(float elapsedTime);     // advance attack; true when the motion finished
+
 private:
 	enum class State { Idle, Walk };
 
-	void PlayState(State s, bool force);
-	void BuildBehaviorTree();
-	void FaceTowards(float elapsedTime, float dirX, float dirZ);
+	void  PlayState(State s, bool force);
+	void  BuildBehaviorTree();
+	void  FaceTowards(float elapsedTime, float dirX, float dirZ);
+	bool  CanSeePlayer();                       // range + FOV + line-of-sight (updates debug fields)
+	void  DealDamageToPlayer();
+	void  Die();
+	bool  RayHitSelf(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& dir, float maxDist, float& outT);
+	void  Register();
+	void  Unregister();
 	static float RandomRange(float mn, float mx);
-	void Die();
-	bool RayHitSelf(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& dir, float maxDist, float& outT);
-	void Register();
-	void Unregister();
 	static float QuatToYaw(const DirectX::XMFLOAT4& q);
-	void DealDamageToPlayer(); // 命中時にプレイヤーへダメージ
+	bool MoveTowards(const DirectX::XMFLOAT3& worldTarget, float elapsedTime, float stopDist);
+	DirectX::XMFLOAT3 CollideAndSlide(const DirectX::XMFLOAT3& pos, float moveX, float moveZ);
 
-	// ---- 参照 ----
+	// ---- References ----
 	std::weak_ptr<Actor> playerRef;
 	ModelComponent* modelComp = nullptr;
 	AnimatorComponent* animator = nullptr;
 
-	// ---- アニメ index ----
+	// ---- Animation indices ----
 	int idleIndex = -1;
 	int walkIndex = -1;
 	int fallIndex = -1;
 	int attackIndex = -1;
 
-	// ---- 状態 ----
+	// ---- State ----
 	State state = State::Idle;
 	float currentYaw = 0.0f;
 
 	bool  dead = false;
 	float deathTimer = 0.0f;
-	float deathTime = 2.0f; // 死亡してから消えるまで(秒)
+	float deathTime = 2.0f;
 
-	// ---- ステータス ----
+	// ---- Stats ----
 	float hp = 100.0f, maxHp = 100.0f;
 
-	// ---- 当たり判定（球） ----
-	float sphereCenterY = 1.0f; // 足元から中心までの高さ
-	float sphereRadius = 1.0f; // 半径
+	// ---- Hit sphere (player's gun) ----
+	float sphereCenterY = 1.0f;
+	float sphereRadius = 1.0f;
 
-	// ---- AIパラメータ ----
+	// ---- Movement ----
 	float detectRange = 20.0f;
 	float stopDistance = 2.0f;
 	float moveSpeed = 2.5f;
@@ -104,35 +109,50 @@ private:
 	BehaviorTree tree;
 	DirectX::XMFLOAT3 homePos = { 0.0f, 0.0f, 0.0f };
 	DirectX::XMFLOAT3 target = { 0.0f, 0.0f, 0.0f };
-	float wanderRadius = 8.0f;  // 徘徊する範囲
-	float arriveRadius = 0.5f;  // 到着とみなす距離
-	float idleMin = 1.0f;       // 待機時間の最小
-	float idleMax = 3.0f;       // 待機時間の最大
+	float wanderRadius = 8.0f;
+	float arriveRadius = 0.5f;
+	float idleMin = 1.0f;
+	float idleMax = 3.0f;
 
-	// ---- Perception (Step 3) ----
-	CollisionMesh stageCollision;                         // ステージの当たり（視線判定に使用）
-	float fovDegrees = 90.0f;                             // 視野角（度）
-	float eyeHeight = 1.5f;                               // 目の高さ
-	DirectX::XMFLOAT3 lastKnownPos = { 0.0f, 0.0f, 0.0f }; // 最後に見た位置（Step4で使用）
+	// ---- Perception ----
+	CollisionMesh stageCollision;
+	float fovDegrees = 90.0f;
+	float eyeHeight = 1.5f;
+	DirectX::XMFLOAT3 lastKnownPos = { 0.0f, 0.0f, 0.0f };
+	bool  perceptVisible = false;
+	float searchTimer = 0.0f;
+	float searchDuration = 5.0f;
+	float searchTurnSpeed = 1.5f;
 
-	// ---- debug (perception) ----
+	// ---- Attack ----
+	float attackRange = 2.5f;
+	float attackInterval = 1.5f;   // cooldown between attacks
+	float attackHitTiming = 0.4f;  // normalized time in the anim when the hit lands
+	float attackTimer = 0.0f;      // cooldown countdown
+	float attackDamage = 10.0f;
+	bool  attacking = false;
+	bool  damageDealt = false;
+
+	// ---- Debug (perception) ----
 	float dbgDist = 0.0f;
 	bool  dbgInRange = false;
 	bool  dbgInFov = false;
 	bool  dbgLosClear = false;
 	bool  dbgCanSee = false;
-	bool  perceptVisible = false;   // 今フレーム、実際に見えているか
-	float searchTimer = 0.0f;       // 探索の残り時間
-	float searchDuration = 5.0f;    // 見失ってから探索する秒数
-	float searchTurnSpeed = 1.5f;   // 見回すときの回転速度[rad/s]
 
-	// ---- Attack (Step 5) ----
-	float attackRange = 2.5f;      // この距離以内で攻撃
-	float attackInterval = 1.5f;   // 攻撃の間隔（クールダウン）
-	float attackDuration = 0.8f;   // 攻撃モーションの長さ（クリップ長に合わせる）
-	float attackTimer = 0.0f;      // クールダウン残り
-	float attackAnimTimer = 0.0f;  // 現在の攻撃モーション残り
-	bool  attacking = false;
-	float attackDamage = 10.0f;  // 1発のダメージ量
-	bool  damageDealt = false;   // この攻撃で命中処理済みか
+	// ---- Navigation (Step 6) ----
+	NavGrid navGrid;
+	float navCellSize = 1.0f;
+	float navAgentHeight = 1.0f;
+	float collisionRadius = 0.4f;   // 移動衝突の半径
+	float collisionCenterY = 1.0f;  // 衝突球の中心の高さ（足元から）
+	float stuckTimer = 0.0f;
+	float stuckLimit = 0.5f;   // この秒数進めなければ諦める
+	std::vector<DirectX::XMFLOAT3> path;   // 現在の経路（ワールド座標）
+	int   pathIndex = 0;
+	float repathTimer = 0.0f;
+	float repathInterval = 0.3f;           // 経路の再計算間隔
+	float waypointRadius = 0.6f;           // このwaypointに到達したとみなす距離
+	DirectX::XMFLOAT3 lastPathTarget = { 0.0f, 0.0f, 0.0f };
+
 };

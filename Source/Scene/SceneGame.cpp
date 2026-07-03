@@ -109,10 +109,10 @@ SceneGame::SceneGame()
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
 	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
+	enemyModelComp->SetShaderId(ShaderId::Toon);          // トゥーン（不要なら削除）
+	enemyActor->AddComponent<AnimatorComponent>();        // Enemy より先に追加
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
 	enemyComp->SetStageCollision(collisionMesh);
-	enemyActor->AddComponent<AnimatorComponent>();           // ★追加：クロスフェード用
-	enemyActor->AddComponent<EnemyComponent>(playerActor);
 	enemyActor->SetPosition({ 10.0f, 2.1f, 4.0f });
 	enemyActor->SetScale({ 1.0f, 1.0f, 1.0f });
 

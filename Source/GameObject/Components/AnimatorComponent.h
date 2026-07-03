@@ -30,6 +30,11 @@ public:
 
 	int GetCurrentAnimIndexA() const { return currentAnimIndexA; }
 	int GetCurrentAnimIndexB() const { return currentAnimIndexB; }
+	// 再生の進捗（攻撃の命中タイミング同期などに使用）
+	float GetAnimationSeconds() const { return animationSeconds; }
+	float GetAnimationLength() const { return currentAnimLength; }
+	float GetNormalizedTime() const { return currentAnimLength > 0.0001f ? animationSeconds / currentAnimLength : 0.0f; }
+	bool  IsAnimationFinished() const { return !isLoop && animationSeconds >= currentAnimLength - 0.01f; }
 
 private:
 	void BlendNodePoses(std::vector<Model::NodePose>& outPoses, const std::vector<Model::NodePose>& posesA, const std::vector<Model::NodePose>& posesB, float weightB);

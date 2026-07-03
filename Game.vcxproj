@@ -130,6 +130,7 @@
     <ClInclude Include="Source\AI\BehaviorStatus.h" />
     <ClInclude Include="Source\AI\BehaviorTree.h" />
     <ClInclude Include="Source\AI\EnemyBehaviors.h" />
+    <ClInclude Include="Source\AI\NavGrid.h" />
     <ClInclude Include="Source\Camera\Camera.h" />
     <ClInclude Include="Source\Camera\FpsCameraController.h" />
     <ClInclude Include="Source\Camera\FreeCameraController.h" />
@@ -190,6 +191,7 @@
     <ClCompile Include="Source\AI\BehaviorNode.cpp" />
     <ClCompile Include="Source\AI\BehaviorTree.cpp" />
     <ClCompile Include="Source\AI\EnemyBehaviors.cpp" />
+    <ClCompile Include="Source\AI\NavGrid.cpp" />
     <ClCompile Include="Source\Camera\Camera.cpp" />
     <ClCompile Include="Source\Camera\FpsCameraController.cpp" />
     <ClCompile Include="Source\Camera\FreeCameraController.cpp" />
