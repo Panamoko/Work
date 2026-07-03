@@ -10,6 +10,7 @@
 #include "GameObject/Components/EnemyComponent.h"
 #include <imgui.h>
 #include <string>
+#include "GameObject/Components/HealthComponent.h"
 #pragma comment(lib, "d3dcompiler.lib")
 
 SceneGame::SceneGame()
@@ -68,6 +69,7 @@ SceneGame::SceneGame()
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
+	playerActor->AddComponent<HealthComponent>(100.0f); // プレイヤーHP
 
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
@@ -106,8 +108,9 @@ SceneGame::SceneGame()
 	// 敵（アニメ入りキャラ：Player3.glb）
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
-	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Mr.Incredible/Player3.glb");
-	enemyModelComp->SetShaderId(ShaderId::Toon);
+	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
+	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
+	enemyComp->SetStageCollision(collisionMesh);
 	enemyActor->AddComponent<AnimatorComponent>();           // ★追加：クロスフェード用
 	enemyActor->AddComponent<EnemyComponent>(playerActor);
 	enemyActor->SetPosition({ 10.0f, 2.1f, 4.0f });

@@ -55,6 +55,9 @@
     <Filter Include="Source\Graphics\ShaderClass">
       <UniqueIdentifier>{4a07357c-b7f3-4bf9-8976-b301b5e05acb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\AI">
+      <UniqueIdentifier>{48df98b4-0d93-4707-b48b-2ab8b98132ba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -228,6 +231,27 @@
     <ClInclude Include="Source\Core\WindowUtils.h">
       <Filter>Source\Core</Filter>
     </ClInclude>
+    <ClInclude Include="Source\AI\BehaviorStatus.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AI\BehaviorJudgment.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AI\BehaviorAction.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AI\BehaviorNode.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AI\BehaviorTree.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\AI\EnemyBehaviors.h">
+      <Filter>Source\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GameObject\Components\HealthComponent.h">
+      <Filter>Source\GameObject\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -373,6 +397,18 @@
     </ClCompile>
     <ClCompile Include="Source\Core\WindowUtils.cpp">
       <Filter>Source\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AI\BehaviorNode.cpp">
+      <Filter>Source\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AI\BehaviorTree.cpp">
+      <Filter>Source\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AI\EnemyBehaviors.cpp">
+      <Filter>Source\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\GameObject\Components\HealthComponent.cpp">
+      <Filter>Source\GameObject\Components</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
