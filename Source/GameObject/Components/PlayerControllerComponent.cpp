@@ -1,13 +1,12 @@
 ﻿#include <algorithm>
 #include <imgui.h>
 #include <fstream>
-#include <cmath> 
+#include <cmath>
 #include "GameObject/Components/PlayerControllerComponent.h"
-#include "Physics/SphereCast.h"
 #include "Graphics/Graphics.h"
 #include "Core/Input.h"
 #include "GameObject/Actor.h"
-#include "Core/WindowUtils.h" 
+#include "Core/WindowUtils.h"
 
 PlayerControllerComponent::PlayerControllerComponent(Camera* camera, FpsCameraController* cameraController, const CollisionMesh& collisionMesh)
 	: camera(camera), cameraController(cameraController), collisionMesh(collisionMesh) {
@@ -261,12 +260,6 @@ void PlayerControllerComponent::Update(float elapsedTime) {
 	DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, characterYaw, 0.0f));
 	GetActor()->SetRotation(rot);
 	GetActor()->SetScale({ playerScale, playerScale, playerScale });
-
-	DirectX::XMVECTOR vEyePos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), DirectX::XMLoadFloat3(&cameraOffsetPos));
-
-	DirectX::XMMATRIX R_Camera = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, characterYaw, 0.0f);
-	DirectX::XMVECTOR vTargetDirection = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Camera);
-	DirectX::XMVECTOR vTargetPos = DirectX::XMVectorAdd(vEyePos, vTargetDirection);
 
 	UpdateCameraFollow(vCurrentVelocity, elapsedTime);
 }
