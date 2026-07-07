@@ -12,7 +12,7 @@ namespace
 	const int DZ[8] = { 0, 0, 1, -1, 1, -1, 1, -1 };
 }
 
-void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
+void NavGrid::Build(const CollisionMesh& m, float cs, float ah, float refY, float floorTol)
 {
 	cells.clear();
 	cols = rows = 0;
@@ -20,9 +20,8 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
 	agentHeight = ah;
 	if (m.triangles.empty()) return;
 
-	// Stage bounds.
-	float maxX = -FLT_MAX, maxZ = -FLT_MAX, maxY = -FLT_MAX;
-	float minY = FLT_MAX;
+	// Stage XZ bounds.
+	float maxX = -FLT_MAX, maxZ = -FLT_MAX;
 	minX = minZ = FLT_MAX;
 	for (const auto& tri : m.triangles)
 		for (int i = 0; i < 3; ++i)
@@ -30,7 +29,6 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
 			const auto& p = tri.positions[i];
 			minX = std::min(minX, p.x); maxX = std::max(maxX, p.x);
 			minZ = std::min(minZ, p.z); maxZ = std::max(maxZ, p.z);
-			minY = std::min(minY, p.y); maxY = std::max(maxY, p.y);
 		}
 
 	// Keep the grid from getting huge (raise cell size if needed).
@@ -42,17 +40,19 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
 	if (cols <= 0 || rows <= 0) { cols = rows = 0; return; }
 	cells.assign((size_t)cols * rows, Cell{});
 
-	const float rayTop = maxY + 2.0f;
-	const float rayLen = (maxY - minY) + 6.0f;
+	// Cast DOWN from just above head-height *at ground level*, and accept the hit
+	// only if it lands near refY. This ignores prop tops (tires/crates) and
+	// catwalks above the ground, so the mesh follows the real floor.
+	const float castTop = refY + agentHeight + 1.0f;
+	const float rayLen = (agentHeight + 1.0f) + floorTol + 0.5f;
 
-	// Walkability: down-ray at each cell center; floor hit (upward normal) -> walkable.
 	for (int cz = 0; cz < rows; ++cz)
 		for (int cx = 0; cx < cols; ++cx)
 		{
-			DirectX::XMFLOAT3 origin = { minX + (cx + 0.5f) * cellSize, rayTop, minZ + (cz + 0.5f) * cellSize };
+			DirectX::XMFLOAT3 origin = { minX + (cx + 0.5f) * cellSize, castTop, minZ + (cz + 0.5f) * cellSize };
 			DirectX::XMFLOAT3 dir = { 0.0f, -1.0f, 0.0f };
 			float d = 0.0f; DirectX::XMFLOAT3 hp, hn;
-			if (m.RayCast(origin, dir, rayLen, d, hp, hn) && hn.y > 0.5f)
+			if (m.RayCast(origin, dir, rayLen, d, hp, hn) && hn.y > 0.5f && fabsf(hp.y - refY) <= floorTol)
 			{
 				Cell& c = cells[Index(cx, cz)];
 				c.walkable = true;
@@ -76,7 +76,6 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
 				const Cell& n = cells[Index(nx, nz)];
 				if (!n.walkable) continue;
 
-				// No diagonal corner cutting.
 				if (DX[k] != 0 && DZ[k] != 0)
 				{
 					if (!cells[Index(cx + DX[k], cz)].walkable) continue;
@@ -88,7 +87,7 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah)
 				float dist = std::sqrt(seg.x * seg.x + seg.y * seg.y + seg.z * seg.z);
 				float hitDist = 0.0f; DirectX::XMFLOAT3 hp, hn;
 				if (dist > 1e-4f && m.RayCast(a, seg, dist, hitDist, hp, hn) && hitDist < dist - 0.05f)
-					continue; // wall between
+					continue;
 
 				c.edges |= (unsigned char)(1 << k);
 			}
@@ -193,4 +192,36 @@ bool NavGrid::FindPath(const DirectX::XMFLOAT3& start, const DirectX::XMFLOAT3& 
 	std::reverse(rev.begin(), rev.end());
 	outPath = std::move(rev);
 	return !outPath.empty();
+}
+
+void NavGrid::CollectDebugCells(const DirectX::XMFLOAT3& center, float radius,
+	std::vector<DirectX::XMFLOAT3>& walkTris,
+	std::vector<DirectX::XMFLOAT3>& blockTris, float yLift) const
+{
+	if (cells.empty()) return;
+
+	int rcell = (int)std::ceil(radius / cellSize);
+	int cx0 = (int)std::floor((center.x - minX) / cellSize);
+	int cz0 = (int)std::floor((center.z - minZ) / cellSize);
+	float half = cellSize * 0.46f;
+
+	for (int cz = cz0 - rcell; cz <= cz0 + rcell; ++cz)
+		for (int cx = cx0 - rcell; cx <= cx0 + rcell; ++cx)
+		{
+			if (!InBounds(cx, cz)) continue;
+			const Cell& c = cells[Index(cx, cz)];
+
+			float wx = minX + (cx + 0.5f) * cellSize;
+			float wz = minZ + (cz + 0.5f) * cellSize;
+			float y = (c.walkable ? c.floorY : center.y) + yLift;
+
+			DirectX::XMFLOAT3 a = { wx - half, y, wz - half };
+			DirectX::XMFLOAT3 b = { wx + half, y, wz - half };
+			DirectX::XMFLOAT3 d = { wx - half, y, wz + half };
+			DirectX::XMFLOAT3 e = { wx + half, y, wz + half };
+
+			std::vector<DirectX::XMFLOAT3>& out = c.walkable ? walkTris : blockTris;
+			out.push_back(a); out.push_back(b); out.push_back(e);
+			out.push_back(a); out.push_back(e); out.push_back(d);
+		}
 }

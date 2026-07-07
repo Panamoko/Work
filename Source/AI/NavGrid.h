@@ -11,7 +11,7 @@ struct CollisionMesh;
 class NavGrid
 {
 public:
-	void Build(const CollisionMesh& mesh, float cellSize, float agentHeight);
+	void Build(const CollisionMesh& mesh, float cellSize, float agentHeight,float refY, float floorTol);
 	bool IsBuilt() const { return !cells.empty(); }
 
 	// A*: fills outPath with world-space waypoints (start cell -> goal cell).
@@ -19,6 +19,17 @@ public:
 		std::vector<DirectX::XMFLOAT3>& outPath) const;
 
 	bool IsWalkable(const DirectX::XMFLOAT3& world) const;
+
+	// ---- Debug visualization ----
+// Collect cell quads (2 tris = 6 verts each) near 'center' within 'radius'.
+// Walkable cells -> walkTris (green), blocked cells -> blockTris (red).
+	void CollectDebugCells(const DirectX::XMFLOAT3& center, float radius,
+		std::vector<DirectX::XMFLOAT3>& walkTris,
+		std::vector<DirectX::XMFLOAT3>& blockTris,
+		float yLift) const;
+
+	float GetCellSize() const { return cellSize; }
+	int   CellCount()   const { return (int)cells.size(); }
 
 private:
 	struct Cell { bool walkable = false; float floorY = 0.0f; unsigned char edges = 0; };

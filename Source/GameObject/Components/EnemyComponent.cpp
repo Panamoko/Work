@@ -12,6 +12,8 @@
 #include "AI/EnemyBehaviors.h"
 #include "Physics/CollisionMesh.h"
 #include "AI/NavGrid.h"
+#include "Graphics/Renderer/PrimitiveRenderer.h"
+
 
 // Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
@@ -51,7 +53,9 @@ void EnemyComponent::Start()
 			idleIndex = modelComp->GetModel()->GetAnimationIndex("IDLE");
 			walkIndex = modelComp->GetModel()->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
 			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // -1 if none (no death anim)
-			attackIndex = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT");
+			attackIndexL = modelComp->GetModel()->GetAnimationIndex("PUNCHLEFT");
+			attackIndexR = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT");
+			attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;   // initial
 		}
 	}
 
@@ -61,7 +65,10 @@ void EnemyComponent::Start()
 
 	if (owner) homePos = owner->GetPosition();
 	BuildBehaviorTree();
-	navGrid.Build(stageCollision, navCellSize, navAgentHeight); // ← 追加：ナビ格子を生成
+	if (owner) homePos = owner->GetPosition();
+	navRefY = homePos.y;   // enemy stands on the ground -> use its feet as reference
+	BuildBehaviorTree();
+	navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol);
 }
 
 void EnemyComponent::Update(float elapsedTime)
@@ -194,11 +201,19 @@ void EnemyComponent::OnGUI()
 		ImGui::Separator();
 		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 2.0f);
 		if (ImGui::Button("Rebuild Nav Grid"))
-			navGrid.Build(stageCollision, navCellSize, navAgentHeight); // その場で格子を作り直す
+			navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol); // その場で格子を作り直す
 
 		ImGui::SliderFloat("Collision Radius", &collisionRadius, 0.1f, 1.0f);
 		ImGui::SliderFloat("Collision Center Y", &collisionCenterY, 0.2f, 2.0f);
 		ImGui::SliderFloat("Waypoint Radius", &waypointRadius, 0.15f, 1.0f);
+		ImGui::SliderFloat("Waypoint Radius", &waypointRadius, 0.15f, 1.0f);
+		ImGui::Checkbox("Ground Snap", &groundSnap);
+		ImGui::SliderFloat("Ground Probe Up", &groundProbeUp, 0.2f, 3.0f);
+		ImGui::SliderFloat("Ground Probe Down", &groundProbeDown, 0.5f, 8.0f);
+		ImGui::SliderFloat("Ground Probe Down", &groundProbeDown, 0.5f, 8.0f);
+		ImGui::Checkbox("Avoid Obstacles", &avoidEnable);
+		ImGui::SliderFloat("Avoid Probe Dist", &avoidProbeDist, 0.5f, 5.0f);
+		ImGui::SliderFloat("Avoid Align Weight", &avoidAlignWeight, 0.0f, 4.0f);
 	}
 
 	if (ImGui::CollapsingHeader("Attack"))
@@ -214,6 +229,20 @@ void EnemyComponent::OnGUI()
 		ImGui::SliderFloat("Center Y", &sphereCenterY, 0.0f, 3.0f);
 		ImGui::SliderFloat("Radius", &sphereRadius, 0.2f, 3.0f);
 		if (ImGui::Button("Damage 34")) ApplyDamage(34.0f);
+	}
+
+	if (ImGui::CollapsingHeader("NavMesh Debug"))
+	{
+		ImGui::Checkbox("Show NavMesh", &showNav);
+		ImGui::SliderFloat("Debug Radius", &navDebugRadius, 3.0f, 60.0f);
+		ImGui::Text("Active Cell Size: %.2f  (cells: %d)", navGrid.GetCellSize(), navGrid.CellCount());
+		ImGui::Separator();
+		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 4.0f);
+		ImGui::SliderFloat("Agent Height", &navAgentHeight, 0.3f, 3.0f);
+		ImGui::SliderFloat("Ground Ref Y", &navRefY, -20.0f, 20.0f);
+		ImGui::SliderFloat("Floor Tolerance", &navFloorTol, 0.05f, 2.0f);
+		if (ImGui::Button("Rebuild NavMesh"))
+			navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol);
 	}
 
 	ImGui::Separator();
@@ -473,6 +502,11 @@ bool EnemyComponent::CanAttack()
 
 void EnemyComponent::BeginAttack()
 {
+	// alternate PUNCHLEFT / PUNCHRIGHT each swing
+	nextPunchRight = !nextPunchRight;
+	attackIndex = nextPunchRight ? attackIndexR : attackIndexL;
+	if (attackIndex < 0) attackIndex = (attackIndexR >= 0 ? attackIndexR : attackIndexL);
+
 	if (animator && attackIndex >= 0) animator->Play(attackIndex, blendTime, false);
 	attacking = true;
 	damageDealt = false;
@@ -544,7 +578,7 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 		return true;
 	}
 
-	// Recompute the path on a timer, or when the target moved a lot.
+	// Recompute the A* path on a timer, or when the target moved a lot.
 	float tdx = worldTarget.x - lastPathTarget.x;
 	float tdz = worldTarget.z - lastPathTarget.z;
 	bool targetMoved = (tdx * tdx + tdz * tdz) > (2.0f * 2.0f);
@@ -558,14 +592,7 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 			path.clear();
 	}
 
-	// Grid built but no route -> unreachable. Give up instead of beelining into a wall.
-	if (navGrid.IsBuilt() && path.empty())
-	{
-		stuckTimer = 0.0f;
-		return true;
-	}
-
-	// Steer toward the next waypoint (or straight to target if no path).
+	// Pick the current steering target (next waypoint, or straight at the goal).
 	DirectX::XMFLOAT3 wp = worldTarget;
 	if (!path.empty())
 	{
@@ -582,31 +609,92 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 	float mdx = wp.x - pos.x;
 	float mdz = wp.z - pos.z;
 	float dist = sqrtf(mdx * mdx + mdz * mdz);
-	FaceTowards(elapsedTime, mdx, mdz);
+	if (dist <= 1e-4f) return false;
 
-	if (dist > 1e-4f)
+	// Desired heading (unit).
+	float dirX = mdx / dist;
+	float dirZ = mdz / dist;
+
+	// --- Obstacle avoidance: probe several headings and pick the best open one ---
+	if (avoidEnable && !stageCollision.triangles.empty())
 	{
-		float inv = 1.0f / dist;
-		float stepX = mdx * inv * moveSpeed * elapsedTime;
-		float stepZ = mdz * inv * moveSpeed * elapsedTime;
+		DirectX::XMFLOAT3 eye = { pos.x, pos.y + collisionCenterY, pos.z };
 
-		DirectX::XMFLOAT3 newPos = CollideAndSlide(pos, stepX, stepZ);
+		auto clearDistance = [&](float ux, float uz) -> float
+			{
+				DirectX::XMFLOAT3 d = { ux, 0.0f, uz };
+				float hd = 0.0f; DirectX::XMFLOAT3 hp, hn;
+				if (stageCollision.RayCast(eye, d, avoidProbeDist, hd, hp, hn))
+					return hd;
+				return avoidProbeDist;
+			};
 
-		// Stuck detection: tried to move but barely did -> jammed against a wall.
-		float movedSq = (newPos.x - pos.x) * (newPos.x - pos.x) + (newPos.z - pos.z) * (newPos.z - pos.z);
-		float stepSq = stepX * stepX + stepZ * stepZ;
-		if (stepSq > 1e-8f && movedSq < stepSq * 0.09f) stuckTimer += elapsedTime;
-		else stuckTimer = 0.0f;
-
-		owner->SetPosition(newPos);
-
-		if (stuckTimer > stuckLimit)
+		float straightClear = clearDistance(dirX, dirZ);
+		if (straightClear < avoidProbeDist - 0.05f)
 		{
-			stuckTimer = 0.0f;
-			path.clear();
-			repathTimer = 0.0f;  // force a fresh path next time
-			return true;         // give up -> caller stops "walking in place"
+			const int HALF = 4; // 2*HALF+1 samples over -90..+90 deg
+			const float spread = DirectX::XM_PIDIV2;
+			float bestScore = -FLT_MAX, bestX = dirX, bestZ = dirZ;
+			for (int k = -HALF; k <= HALF; ++k)
+			{
+				float ang = (spread / HALF) * (float)k;
+				float ca = cosf(ang), sa = sinf(ang);
+				float rx = dirX * ca - dirZ * sa;
+				float rz = dirX * sa + dirZ * ca;
+
+				float clear = clearDistance(rx, rz);
+				float align = rx * dirX + rz * dirZ;
+				float score = clear + align * avoidAlignWeight;
+				if (score > bestScore)
+				{
+					bestScore = score;
+					bestX = rx; bestZ = rz;
+				}
+			}
+			dirX = bestX; dirZ = bestZ;
 		}
+	}
+
+	// --- Smooth the heading so turning is not choppy ---
+	{
+		float t = steerSmooth * elapsedTime;
+		if (t > 1.0f) t = 1.0f;
+		moveDirX += (dirX - moveDirX) * t;
+		moveDirZ += (dirZ - moveDirZ) * t;
+		float ml = sqrtf(moveDirX * moveDirX + moveDirZ * moveDirZ);
+		if (ml > 1e-4f) { moveDirX /= ml; moveDirZ /= ml; }
+	}
+
+	FaceTowards(elapsedTime, moveDirX, moveDirZ);
+
+	float stepX = moveDirX * moveSpeed * elapsedTime;
+	float stepZ = moveDirZ * moveSpeed * elapsedTime;
+
+	DirectX::XMFLOAT3 newPos = CollideAndSlide(pos, stepX, stepZ);
+
+	// Ground snap: drop a ray straight down and sit on the floor.
+	if (groundSnap && !stageCollision.triangles.empty())
+	{
+		DirectX::XMFLOAT3 rayOrigin = { newPos.x, newPos.y + groundProbeUp, newPos.z };
+		DirectX::XMFLOAT3 rayDir = { 0.0f, -1.0f, 0.0f };
+		float gd = 0.0f; DirectX::XMFLOAT3 gp, gn;
+		if (stageCollision.RayCast(rayOrigin, rayDir, groundProbeUp + groundProbeDown, gd, gp, gn) && gn.y > 0.4f)
+			newPos.y = gp.y;
+	}
+
+	// Stuck detection.
+	float movedSq = (newPos.x - pos.x) * (newPos.x - pos.x) + (newPos.z - pos.z) * (newPos.z - pos.z);
+	float stepSq = stepX * stepX + stepZ * stepZ;
+	if (stepSq > 1e-8f && movedSq < stepSq * 0.09f) stuckTimer += elapsedTime;
+	else stuckTimer = 0.0f;
+
+	owner->SetPosition(newPos);
+
+	if (stuckTimer > stuckLimit)
+	{
+		stuckTimer = 0.0f;
+		path.clear();
+		repathTimer = 0.0f;
 	}
 	return false;
 }
@@ -658,4 +746,23 @@ DirectX::XMFLOAT3 EnemyComponent::CollideAndSlide(const DirectX::XMFLOAT3& pos, 
 	return p;
 }
 
-//今後PlayerとかEnemyの動きはOverWatchみたいな感じでゲームモードはCoDみたいなキル数対決みたいな感じにしたいんだけどそれを踏まえるとどうなる？今の感じだと作りたいゲームに対しておかしいAIの挙動みたいになりそう
+void EnemyComponent::DebugDrawNav(PrimitiveRenderer* prim)
+{
+	if (!showNav || !prim || !navGrid.IsBuilt()) return;
+
+	// Center the overlay on the player so you can inspect wherever you look.
+	std::shared_ptr<Actor> player = playerRef.lock();
+	std::shared_ptr<Actor> owner = GetActor();
+	DirectX::XMFLOAT3 c =
+		player ? player->GetPosition() :
+		owner ? owner->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
+
+	std::vector<DirectX::XMFLOAT3> walk, block;
+	navGrid.CollectDebugCells(c, navDebugRadius, walk, block, 0.06f);
+
+	const DirectX::XMFLOAT4 green = { 0.10f, 0.90f, 0.30f, 0.35f };
+	const DirectX::XMFLOAT4 red = { 0.90f, 0.15f, 0.15f, 0.30f };
+	for (const DirectX::XMFLOAT3& v : walk)  prim->AddVertex(v, green);
+	for (const DirectX::XMFLOAT3& v : block) prim->AddVertex(v, red);
+}
+

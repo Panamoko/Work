@@ -113,7 +113,7 @@ SceneGame::SceneGame()
 	enemyActor->AddComponent<AnimatorComponent>();        // Enemy ‚æ‚èæ‚É’Ç‰Á
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
 	enemyComp->SetStageCollision(collisionMesh);
-	enemyActor->SetPosition({ 10.0f, 2.1f, 4.0f });
+	enemyActor->SetPosition({ 15.0f, 5.1f, 5.0f });
 	enemyActor->SetScale({ 1.0f, 1.0f, 1.0f });
 
 	skybox.Initialize(device);
@@ -174,6 +174,20 @@ void SceneGame::Render(float elapsedTime)
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(bulletHoleTex.Get());
 	Graphics::Instance().GetPrimitiveRenderer()->Render(rc.deviceContext, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
+	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
+
+	// --- NavMesh debug overlay (green = walkable, red = blocked) ---
+	if (enemyActor)
+	{
+		if (auto ec = enemyActor->GetComponent<EnemyComponent>())
+		{
+			ec->DebugDrawNav(Graphics::Instance().GetPrimitiveRenderer());
+			Graphics::Instance().GetPrimitiveRenderer()->Render(
+				rc.deviceContext, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		}
+	}
+
+	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
 	ID3D11RenderTargetView* rtv = nullptr;

@@ -10,6 +10,7 @@
 
 class ModelComponent;
 class AnimatorComponent;
+class PrimitiveRenderer;
 
 // Enemy AI: patrol -> perceive (sight/LOS) -> chase -> attack -> search.
 // Decision-making is driven by a BehaviorTree; this component is the "body":
@@ -31,6 +32,8 @@ public:
 
 	// Ray vs all enemies (sphere). Returns the nearest hit enemy, or nullptr.
 	static EnemyComponent* Raycast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& dir, float maxDist, float& outDist);
+	// Draw the nav grid as a translucent overlay (green=walkable, red=blocked).
+	void DebugDrawNav(PrimitiveRenderer* prim);
 
 	void SaveSettings();
 	void LoadSettings();
@@ -81,7 +84,10 @@ private:
 	int idleIndex = -1;
 	int walkIndex = -1;
 	int fallIndex = -1;
-	int attackIndex = -1;
+	int attackIndex = -1;   // currently playing punch (points at L or R)
+	int attackIndexL = -1;  // PUNCHLEFT
+	int attackIndexR = -1;  // PUNCHRIGHT
+	bool nextPunchRight = false; // toggles each attack
 
 	// ---- State ----
 	State state = State::Idle;
@@ -154,5 +160,21 @@ private:
 	float repathInterval = 0.3f;           // åoòHÇÃçƒåvéZä‘äu
 	float waypointRadius = 0.6f;           // Ç±ÇÃwaypointÇ…ìûíBÇµÇΩÇ∆Ç›Ç»Ç∑ãóó£
 	DirectX::XMFLOAT3 lastPathTarget = { 0.0f, 0.0f, 0.0f };
-
+	// ---- Ground snap (walk on the floor, UE/OW-like) ----
+	bool  groundSnap = true;
+	float groundProbeUp = 1.5f;    // start the down-ray this high above the enemy
+	float groundProbeDown = 4.0f;  // search this far below for the floor
+	// ---- Obstacle avoidance (whisker probes vs the collision mesh) ----
+	bool  avoidEnable = true;
+	float avoidProbeDist = 2.0f;    // how far ahead to feel for walls
+	float avoidAlignWeight = 1.5f;  // bias toward heading straight at the target
+	// ---- Steering smoothing (reduce choppy turning) ----
+	float steerSmooth = 8.0f;   // higher = snappier, lower = smoother
+	float moveDirX = 0.0f;      // current smoothed heading
+	float moveDirZ = 1.0f;
+	// ---- NavMesh debug ----
+	bool  showNav = false;
+	float navDebugRadius = 20.0f;
+	float navRefY = 0.0f;       // ground height used to build the nav mesh
+	float navFloorTol = 0.35f;  // how far above/below refY still counts as floor
 };
