@@ -8,9 +8,10 @@
 #include "GameObject/Components/ViewModelComponent.h"
 #include "GameObject/Components/CrosshairComponent.h"
 #include "GameObject/Components/EnemyComponent.h"
+#include "GameObject/Components/HealthComponent.h"
 #include <imgui.h>
 #include <string>
-#include "GameObject/Components/HealthComponent.h"
+#include <vector>
 #pragma comment(lib, "d3dcompiler.lib")
 
 SceneGame::SceneGame()
@@ -65,11 +66,12 @@ SceneGame::SceneGame()
 		}
 	}
 	collisionMesh.BuildSpatialGrid();
+	stageCollision = collisionMesh; // keep a copy for the shared nav mesh
 
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
-	playerActor->AddComponent<HealthComponent>(100.0f); // プレイヤーHP
+	playerActor->AddComponent<HealthComponent>(100.0f); // player HP
 
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
@@ -104,17 +106,20 @@ SceneGame::SceneGame()
 		}
 	}
 
-
-	// 敵（アニメ入りキャラ：Player3.glb）
+	// Enemy (animated character: Enemy3.glb)
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
 	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
-	enemyModelComp->SetShaderId(ShaderId::Toon);          // トゥーン（不要なら削除）
-	enemyActor->AddComponent<AnimatorComponent>();        // Enemy より先に追加
+	enemyModelComp->SetShaderId(ShaderId::Toon);
+	enemyActor->AddComponent<AnimatorComponent>();
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
 	enemyComp->SetStageCollision(collisionMesh);
 	enemyActor->SetPosition({ 15.0f, 5.1f, 5.0f });
 	enemyActor->SetScale({ 1.0f, 1.0f, 1.0f });
+
+	// Build the shared nav mesh once (seed = player, on the main floor), then share it.
+	BuildNavGrid();
+	enemyComp->SetNavGrid(&navGrid);
 
 	skybox.Initialize(device);
 }
@@ -142,7 +147,7 @@ void SceneGame::Render(float elapsedTime)
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	// 背景（スカイ）を最初に描く
+	// Background (sky) first.
 	skybox.Draw(camera);
 
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();
@@ -174,20 +179,10 @@ void SceneGame::Render(float elapsedTime)
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(bulletHoleTex.Get());
 	Graphics::Instance().GetPrimitiveRenderer()->Render(rc.deviceContext, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
-	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
 
-	// --- NavMesh debug overlay (green = walkable, red = blocked) ---
-	if (enemyActor)
-	{
-		if (auto ec = enemyActor->GetComponent<EnemyComponent>())
-		{
-			ec->DebugDrawNav(Graphics::Instance().GetPrimitiveRenderer());
-			Graphics::Instance().GetPrimitiveRenderer()->Render(
-				rc.deviceContext, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		}
-	}
+	// NavMesh debug overlay (green = reachable ground, orange = isolated)
+	DrawNavMeshDebug(view, proj);
 
-	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
 	ID3D11RenderTargetView* rtv = nullptr;
@@ -206,8 +201,56 @@ void SceneGame::Render(float elapsedTime)
 	}
 }
 
+void SceneGame::BuildNavGrid()
+{
+	DirectX::XMFLOAT3 seed = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
+	navGrid.Build(stageCollision, navCellSize, navAgentHeight, navMaxStep, seed);
+}
+
+void SceneGame::DrawNavMeshDebug(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
+{
+	if (!showNav || !navGrid.IsBuilt()) return;
+
+	DirectX::XMFLOAT3 c = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
+	std::vector<DirectX::XMFLOAT3> reach, iso;
+	navGrid.CollectDebugCells(c, navDebugRadius, reach, iso, 0.12f);
+
+	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
+	const DirectX::XMFLOAT4 green = { 0.15f, 1.00f, 0.35f, 0.70f };
+	const DirectX::XMFLOAT4 orange = { 1.00f, 0.60f, 0.10f, 0.55f };
+	for (const DirectX::XMFLOAT3& v : reach) prim->AddVertex(v, green);
+	for (const DirectX::XMFLOAT3& v : iso)   prim->AddVertex(v, orange);
+
+	// Draw on top (no depth test) so the overlay is never buried in the floor.
+	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
+	RenderState* rs = Graphics::Instance().GetRenderState();
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
+
+	prim->SetTexture(nullptr);
+	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
+}
+
 void SceneGame::DrawGUI()
 {
+	// ---- NavMesh (shared, built from the stage) ----
+	ImGui::SetNextWindowPos(ImVec2(370, 340), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(300, 220), ImGuiCond_FirstUseEver);
+	ImGui::Begin("NavMesh");
+	ImGui::Text("Built : %s", navGrid.IsBuilt() ? "YES" : "no");
+	ImGui::Text("Cells : %d   Reachable : %d", navGrid.CellCount(), navGrid.ReachableCount());
+	ImGui::Text("Active Cell Size : %.2f", navGrid.GetCellSize());
+	ImGui::Checkbox("Show NavMesh", &showNav);
+	ImGui::SliderFloat("Debug Radius", &navDebugRadius, 3.0f, 80.0f);
+	ImGui::Separator();
+	ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 4.0f);
+	ImGui::SliderFloat("Agent Height", &navAgentHeight, 0.3f, 3.0f);
+	ImGui::SliderFloat("Max Step", &navMaxStep, 0.1f, 2.0f);
+	if (ImGui::Button("Rebuild NavMesh")) BuildNavGrid();
+	ImGui::End();
+
+	// ---- Render Settings ----
 	ImGui::SetNextWindowPos(ImVec2(20, 340), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(340, 460), ImGuiCond_FirstUseEver);
 
@@ -215,7 +258,6 @@ void SceneGame::DrawGUI()
 
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
 
-	// One-click "look" that sets sky + post + shadow together (unified art direction).
 	auto applyLook = [&](
 		float zx, float zy, float zz, float hx, float hy, float hz, float gx, float gy, float gz,
 		float hExp, float bands,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include <wrl.h>
 #include <d3d11.h>
 #include <DirectXMath.h>
@@ -8,6 +9,8 @@
 #include "Camera/Camera.h"
 #include "Camera/FpsCameraController.h"
 #include "Scene/Skybox.h"
+#include "Physics/CollisionMesh.h"
+#include "AI/NavGrid.h"
 
 class SceneGame : public Scene
 {
@@ -20,6 +23,8 @@ public:
 	void DrawGUI() override;
 
 private:
+	void BuildNavGrid();
+	void DrawNavMeshDebug(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj);
 
 	Camera camera;
 	FpsCameraController cameraController;
@@ -29,7 +34,7 @@ private:
 	std::shared_ptr<class Actor> viewModelActor;
 	std::shared_ptr<class Actor> helmetActor;
 	std::shared_ptr<class Actor> pbrSphereActor;
-	std::shared_ptr<class Actor> enemyActor;   // Åöí«â¡ÅFìG
+	std::shared_ptr<class Actor> enemyActor;
 
 	std::shared_ptr<class Actor> selectedActor = nullptr;
 
@@ -40,4 +45,13 @@ private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> bulletHoleTex;
 
 	Skybox skybox;
+
+	// ---- Shared navigation (one nav mesh per stage) ----
+	CollisionMesh stageCollision;
+	NavGrid navGrid;
+	float navCellSize = 1.0f;
+	float navAgentHeight = 1.0f;
+	float navMaxStep = 0.4f;   // biggest floor height difference the agent can cross
+	bool  showNav = false;
+	float navDebugRadius = 25.0f;
 };

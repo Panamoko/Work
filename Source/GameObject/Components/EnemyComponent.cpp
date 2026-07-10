@@ -1,6 +1,7 @@
 #include <imgui.h>
 #include <fstream>
 #include <cmath>
+#include <cfloat>
 #include <vector>
 #include <algorithm>
 #include <random>
@@ -12,8 +13,6 @@
 #include "AI/EnemyBehaviors.h"
 #include "Physics/CollisionMesh.h"
 #include "AI/NavGrid.h"
-#include "Graphics/Renderer/PrimitiveRenderer.h"
-
 
 // Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
@@ -52,7 +51,7 @@ void EnemyComponent::Start()
 		{
 			idleIndex = modelComp->GetModel()->GetAnimationIndex("IDLE");
 			walkIndex = modelComp->GetModel()->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
-			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // -1 if none (no death anim)
+			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // -1 if none
 			attackIndexL = modelComp->GetModel()->GetAnimationIndex("PUNCHLEFT");
 			attackIndexR = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT");
 			attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;   // initial
@@ -65,10 +64,7 @@ void EnemyComponent::Start()
 
 	if (owner) homePos = owner->GetPosition();
 	BuildBehaviorTree();
-	if (owner) homePos = owner->GetPosition();
-	navRefY = homePos.y;   // enemy stands on the ground -> use its feet as reference
-	BuildBehaviorTree();
-	navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol);
+	// Nav mesh is built and owned by the stage; it is injected via SetNavGrid().
 }
 
 void EnemyComponent::Update(float elapsedTime)
@@ -194,26 +190,21 @@ void EnemyComponent::OnGUI()
 
 	if (ImGui::CollapsingHeader("Navigation"))
 	{
-		ImGui::Text("Grid built : %s", navGrid.IsBuilt() ? "YES" : "no");
+		ImGui::Text("Grid built : %s", (navGrid && navGrid->IsBuilt()) ? "YES" : "no");
 		ImGui::Text("Path nodes : %d", (int)path.size());
 		ImGui::SliderFloat("Repath Interval", &repathInterval, 0.1f, 1.0f);
-
-		ImGui::Separator();
-		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 2.0f);
-		if (ImGui::Button("Rebuild Nav Grid"))
-			navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol); // その場で格子を作り直す
-
 		ImGui::SliderFloat("Collision Radius", &collisionRadius, 0.1f, 1.0f);
 		ImGui::SliderFloat("Collision Center Y", &collisionCenterY, 0.2f, 2.0f);
 		ImGui::SliderFloat("Waypoint Radius", &waypointRadius, 0.15f, 1.0f);
-		ImGui::SliderFloat("Waypoint Radius", &waypointRadius, 0.15f, 1.0f);
+		ImGui::Separator();
 		ImGui::Checkbox("Ground Snap", &groundSnap);
 		ImGui::SliderFloat("Ground Probe Up", &groundProbeUp, 0.2f, 3.0f);
-		ImGui::SliderFloat("Ground Probe Down", &groundProbeDown, 0.5f, 8.0f);
 		ImGui::SliderFloat("Ground Probe Down", &groundProbeDown, 0.5f, 8.0f);
 		ImGui::Checkbox("Avoid Obstacles", &avoidEnable);
 		ImGui::SliderFloat("Avoid Probe Dist", &avoidProbeDist, 0.5f, 5.0f);
 		ImGui::SliderFloat("Avoid Align Weight", &avoidAlignWeight, 0.0f, 4.0f);
+		ImGui::SliderFloat("Steer Smooth", &steerSmooth, 1.0f, 20.0f);
+		ImGui::TextDisabled("NavMesh build/debug is in the 'NavMesh' window");
 	}
 
 	if (ImGui::CollapsingHeader("Attack"))
@@ -229,20 +220,6 @@ void EnemyComponent::OnGUI()
 		ImGui::SliderFloat("Center Y", &sphereCenterY, 0.0f, 3.0f);
 		ImGui::SliderFloat("Radius", &sphereRadius, 0.2f, 3.0f);
 		if (ImGui::Button("Damage 34")) ApplyDamage(34.0f);
-	}
-
-	if (ImGui::CollapsingHeader("NavMesh Debug"))
-	{
-		ImGui::Checkbox("Show NavMesh", &showNav);
-		ImGui::SliderFloat("Debug Radius", &navDebugRadius, 3.0f, 60.0f);
-		ImGui::Text("Active Cell Size: %.2f  (cells: %d)", navGrid.GetCellSize(), navGrid.CellCount());
-		ImGui::Separator();
-		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 4.0f);
-		ImGui::SliderFloat("Agent Height", &navAgentHeight, 0.3f, 3.0f);
-		ImGui::SliderFloat("Ground Ref Y", &navRefY, -20.0f, 20.0f);
-		ImGui::SliderFloat("Floor Tolerance", &navFloorTol, 0.05f, 2.0f);
-		if (ImGui::Button("Rebuild NavMesh"))
-			navGrid.Build(stageCollision, navCellSize, navAgentHeight, navRefY, navFloorTol);
 	}
 
 	ImGui::Separator();
@@ -338,12 +315,6 @@ void EnemyComponent::FaceTowards(float elapsedTime, float dirX, float dirZ)
 // ---- Behavior tree ----
 void EnemyComponent::BuildBehaviorTree()
 {
-	// Root(Priority)
-	//  |- Combat (0, visible)   - Priority
-	//  |    |- Attack (0, in range & off cooldown)
-	//  |    \- Chase  (1)       - approach
-	//  |- Search (1, searching) - go to last known pos, look around
-	//  \- Patrol (2, looping)   - wander -> idle
 	tree.AddNode("", "Root", 0, SelectRule::Priority, nullptr, nullptr);
 
 	tree.AddNode("Root", "Combat", 0, SelectRule::Priority,
@@ -369,7 +340,7 @@ void EnemyComponent::SetWanderTarget()
 		float angle = RandomRange(0.0f, DirectX::XM_2PI);
 		float r = RandomRange(0.0f, wanderRadius);
 		DirectX::XMFLOAT3 t = { homePos.x + cosf(angle) * r, homePos.y, homePos.z + sinf(angle) * r };
-		if (!navGrid.IsBuilt() || navGrid.IsWalkable(t)) { target = t; return; }
+		if (!navGrid || !navGrid->IsBuilt() || navGrid->IsWalkable(t)) { target = t; return; }
 	}
 	target = homePos; // fallback
 }
@@ -455,7 +426,6 @@ void EnemyComponent::ChaseUpdate(float elapsedTime)
 	DirectX::XMFLOAT3 plPos = player->GetPosition();
 	if (MoveTowards(plPos, elapsedTime, stopDistance))
 	{
-		// 射程に到達：プレイヤーを向いて待機
 		DirectX::XMFLOAT3 pos = owner->GetPosition();
 		FaceTowards(elapsedTime, plPos.x - pos.x, plPos.z - pos.z);
 		PlayIdle();
@@ -477,7 +447,6 @@ void EnemyComponent::SearchUpdate(float elapsedTime)
 		return;
 	}
 
-	// 到着：その場で見回す
 	currentYaw += searchTurnSpeed * elapsedTime;
 	DirectX::XMFLOAT4 rot;
 	DirectX::XMStoreFloat4(&rot, DirectX::XMQuaternionRotationRollPitchYaw(0.0f, currentYaw, 0.0f));
@@ -523,17 +492,14 @@ bool EnemyComponent::AttackUpdate(float elapsedTime)
 		FaceTowards(elapsedTime, b.x - a.x, b.z - a.z);
 	}
 
-	// Progress through the actual attack animation (0..1).
 	float t = (animator && attackIndex >= 0) ? animator->GetNormalizedTime() : 1.0f;
 
-	// Land the hit once, at the configured moment of the swing.
 	if (!damageDealt && t >= attackHitTiming)
 	{
 		DealDamageToPlayer();
 		damageDealt = true;
 	}
 
-	// Finish when the animation has played out.
 	bool finished = (animator && attackIndex >= 0) ? animator->IsAnimationFinished() : true;
 	if (finished)
 	{
@@ -559,7 +525,7 @@ void EnemyComponent::DealDamageToPlayer()
 		health->ApplyDamage(attackDamage);
 }
 
-// Move toward worldTarget along the nav path. Returns true when within
+// Move toward worldTarget along the shared nav path. Returns true when within
 // 'stopDist' of the final target. Falls back to a straight line if no path.
 bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float elapsedTime, float stopDist)
 {
@@ -568,7 +534,6 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 
 	DirectX::XMFLOAT3 pos = owner->GetPosition();
 
-	// Reached the final target?
 	float fdx = worldTarget.x - pos.x;
 	float fdz = worldTarget.z - pos.z;
 	if (fdx * fdx + fdz * fdz <= stopDist * stopDist)
@@ -578,7 +543,6 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 		return true;
 	}
 
-	// Recompute the A* path on a timer, or when the target moved a lot.
 	float tdx = worldTarget.x - lastPathTarget.x;
 	float tdz = worldTarget.z - lastPathTarget.z;
 	bool targetMoved = (tdx * tdx + tdz * tdz) > (2.0f * 2.0f);
@@ -588,11 +552,10 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 		repathTimer = repathInterval;
 		lastPathTarget = worldTarget;
 		pathIndex = 0;
-		if (!navGrid.IsBuilt() || !navGrid.FindPath(pos, worldTarget, path))
+		if (!navGrid || !navGrid->IsBuilt() || !navGrid->FindPath(pos, worldTarget, path))
 			path.clear();
 	}
 
-	// Pick the current steering target (next waypoint, or straight at the goal).
 	DirectX::XMFLOAT3 wp = worldTarget;
 	if (!path.empty())
 	{
@@ -611,7 +574,6 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 	float dist = sqrtf(mdx * mdx + mdz * mdz);
 	if (dist <= 1e-4f) return false;
 
-	// Desired heading (unit).
 	float dirX = mdx / dist;
 	float dirZ = mdz / dist;
 
@@ -632,7 +594,7 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 		float straightClear = clearDistance(dirX, dirZ);
 		if (straightClear < avoidProbeDist - 0.05f)
 		{
-			const int HALF = 4; // 2*HALF+1 samples over -90..+90 deg
+			const int HALF = 4;
 			const float spread = DirectX::XM_PIDIV2;
 			float bestScore = -FLT_MAX, bestX = dirX, bestZ = dirZ;
 			for (int k = -HALF; k <= HALF; ++k)
@@ -672,7 +634,6 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 
 	DirectX::XMFLOAT3 newPos = CollideAndSlide(pos, stepX, stepZ);
 
-	// Ground snap: drop a ray straight down and sit on the floor.
 	if (groundSnap && !stageCollision.triangles.empty())
 	{
 		DirectX::XMFLOAT3 rayOrigin = { newPos.x, newPos.y + groundProbeUp, newPos.z };
@@ -682,7 +643,6 @@ bool EnemyComponent::MoveTowards(const DirectX::XMFLOAT3& worldTarget, float ela
 			newPos.y = gp.y;
 	}
 
-	// Stuck detection.
 	float movedSq = (newPos.x - pos.x) * (newPos.x - pos.x) + (newPos.z - pos.z) * (newPos.z - pos.z);
 	float stepSq = stepX * stepX + stepZ * stepZ;
 	if (stepSq > 1e-8f && movedSq < stepSq * 0.09f) stuckTimer += elapsedTime;
@@ -709,7 +669,6 @@ DirectX::XMFLOAT3 EnemyComponent::CollideAndSlide(const DirectX::XMFLOAT3& pos, 
 		return p;
 	}
 
-	// Pass 0: move up to the first wall. Pass 1: slide along it.
 	for (int pass = 0; pass < 2; ++pass)
 	{
 		float len = sqrtf(moveX * moveX + moveZ * moveZ);
@@ -722,17 +681,15 @@ DirectX::XMFLOAT3 EnemyComponent::CollideAndSlide(const DirectX::XMFLOAT3& pos, 
 
 		if (!stageCollision.SphereCast(center, dir, collisionRadius, dist, hitPos, hitNormal))
 		{
-			p.x += moveX; p.z += moveZ; // clear: full move
+			p.x += moveX; p.z += moveZ;
 			break;
 		}
 
-		// Move only up to just before the wall.
 		float allowed = dist - collisionRadius;
 		if (allowed < 0.0f) allowed = 0.0f;
 		p.x += dir.x * allowed;
 		p.z += dir.z * allowed;
 
-		// Project the leftover movement onto the wall (remove the normal part), then retry.
 		float leftover = len - allowed;
 		float lx = dir.x * leftover;
 		float lz = dir.z * leftover;
@@ -745,24 +702,3 @@ DirectX::XMFLOAT3 EnemyComponent::CollideAndSlide(const DirectX::XMFLOAT3& pos, 
 	}
 	return p;
 }
-
-void EnemyComponent::DebugDrawNav(PrimitiveRenderer* prim)
-{
-	if (!showNav || !prim || !navGrid.IsBuilt()) return;
-
-	// Center the overlay on the player so you can inspect wherever you look.
-	std::shared_ptr<Actor> player = playerRef.lock();
-	std::shared_ptr<Actor> owner = GetActor();
-	DirectX::XMFLOAT3 c =
-		player ? player->GetPosition() :
-		owner ? owner->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
-
-	std::vector<DirectX::XMFLOAT3> walk, block;
-	navGrid.CollectDebugCells(c, navDebugRadius, walk, block, 0.06f);
-
-	const DirectX::XMFLOAT4 green = { 0.10f, 0.90f, 0.30f, 0.35f };
-	const DirectX::XMFLOAT4 red = { 0.90f, 0.15f, 0.15f, 0.30f };
-	for (const DirectX::XMFLOAT3& v : walk)  prim->AddVertex(v, green);
-	for (const DirectX::XMFLOAT3& v : block) prim->AddVertex(v, red);
-}
-

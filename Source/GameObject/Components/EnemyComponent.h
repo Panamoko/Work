@@ -5,16 +5,16 @@
 #include "GameObject/Component.h"
 #include "AI/BehaviorTree.h"
 #include "Physics/CollisionMesh.h"
-#include "AI/NavGrid.h"
 #include <vector>
 
 class ModelComponent;
 class AnimatorComponent;
-class PrimitiveRenderer;
+class NavGrid;
 
 // Enemy AI: patrol -> perceive (sight/LOS) -> chase -> attack -> search.
 // Decision-making is driven by a BehaviorTree; this component is the "body":
 // movement, animation, hit sphere for the player's gun, and HP/death.
+// The nav mesh is owned by the stage (SceneGame) and shared via SetNavGrid().
 class EnemyComponent : public Component
 {
 public:
@@ -32,14 +32,13 @@ public:
 
 	// Ray vs all enemies (sphere). Returns the nearest hit enemy, or nullptr.
 	static EnemyComponent* Raycast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& dir, float maxDist, float& outDist);
-	// Draw the nav grid as a translucent overlay (green=walkable, red=blocked).
-	void DebugDrawNav(PrimitiveRenderer* prim);
 
 	void SaveSettings();
 	void LoadSettings();
 
-	// ---- Stage collision (for line-of-sight) ----
+	// ---- Shared resources injected by the scene ----
 	void SetStageCollision(const CollisionMesh& mesh);
+	void SetNavGrid(NavGrid* grid) { navGrid = grid; }
 
 	// ---- AI action API (behavior-tree leaves call these) ----
 	void  SetWanderTarget();                 // pick a random patrol target around home
@@ -146,35 +145,31 @@ private:
 	bool  dbgLosClear = false;
 	bool  dbgCanSee = false;
 
-	// ---- Navigation (Step 6) ----
-	NavGrid navGrid;
-	float navCellSize = 1.0f;
-	float navAgentHeight = 1.0f;
-	float collisionRadius = 0.4f;   // 移動衝突の半径
-	float collisionCenterY = 1.0f;  // 衝突球の中心の高さ（足元から）
+	// ---- Navigation (nav mesh is shared; owned by the stage) ----
+	NavGrid* navGrid = nullptr;
+	float collisionRadius = 0.4f;   // movement collision radius
+	float collisionCenterY = 1.0f;  // height of the collision sphere center (waist)
 	float stuckTimer = 0.0f;
-	float stuckLimit = 0.5f;   // この秒数進めなければ諦める
-	std::vector<DirectX::XMFLOAT3> path;   // 現在の経路（ワールド座標）
+	float stuckLimit = 0.5f;        // seconds jammed before giving up this tick
+	std::vector<DirectX::XMFLOAT3> path;   // current path (world space)
 	int   pathIndex = 0;
 	float repathTimer = 0.0f;
-	float repathInterval = 0.3f;           // 経路の再計算間隔
-	float waypointRadius = 0.6f;           // このwaypointに到達したとみなす距離
+	float repathInterval = 0.3f;    // path recompute interval
+	float waypointRadius = 0.6f;    // distance to count a waypoint as reached
 	DirectX::XMFLOAT3 lastPathTarget = { 0.0f, 0.0f, 0.0f };
+
 	// ---- Ground snap (walk on the floor, UE/OW-like) ----
 	bool  groundSnap = true;
-	float groundProbeUp = 1.5f;    // start the down-ray this high above the enemy
-	float groundProbeDown = 4.0f;  // search this far below for the floor
+	float groundProbeUp = 1.5f;
+	float groundProbeDown = 4.0f;
+
 	// ---- Obstacle avoidance (whisker probes vs the collision mesh) ----
 	bool  avoidEnable = true;
-	float avoidProbeDist = 2.0f;    // how far ahead to feel for walls
-	float avoidAlignWeight = 1.5f;  // bias toward heading straight at the target
+	float avoidProbeDist = 2.0f;
+	float avoidAlignWeight = 1.5f;
+
 	// ---- Steering smoothing (reduce choppy turning) ----
-	float steerSmooth = 8.0f;   // higher = snappier, lower = smoother
-	float moveDirX = 0.0f;      // current smoothed heading
+	float steerSmooth = 8.0f;
+	float moveDirX = 0.0f;
 	float moveDirZ = 1.0f;
-	// ---- NavMesh debug ----
-	bool  showNav = false;
-	float navDebugRadius = 20.0f;
-	float navRefY = 0.0f;       // ground height used to build the nav mesh
-	float navFloorTol = 0.35f;  // how far above/below refY still counts as floor
 };
