@@ -10,7 +10,7 @@ const LONG SCREEN_HEIGHT = 720;
 
 LRESULT CALLBACK fnWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	Framework *f = reinterpret_cast<Framework*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+	Framework* f = reinterpret_cast<Framework*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
 	return f ? f->HandleMessage(hwnd, msg, wparam, lparam) : DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
@@ -35,10 +35,16 @@ INT WINAPI wWinMain(HINSTANCE instance, HINSTANCE prev_instance, LPWSTR cmd_line
 	wcex.hIconSm = 0;
 	RegisterClassEx(&wcex);
 
+	// Resizable + maximizable window.
 	RECT rc = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	HWND hWnd = CreateWindow(_T("Game"), _T(""), WS_OVERLAPPEDWINDOW ^ WS_MAXIMIZEBOX ^ WS_THICKFRAME | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
-	ShowWindow(hWnd, cmd_show);
+	HWND hWnd = CreateWindow(_T("Game"), _T(""), WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
+
+	// Show maximized so the editor toolbar / panels are fully visible.
+	// (USERDATA is not set yet, so the WM_SIZE from this does not call Graphics::Resize;
+	//  Graphics then initializes at the maximized client size.)
+	ShowWindow(hWnd, SW_MAXIMIZE);
 
 	Framework f(hWnd);
 	SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&f));

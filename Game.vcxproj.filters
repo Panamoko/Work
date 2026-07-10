@@ -255,6 +255,9 @@
     <ClInclude Include="Source\AI\NavGrid.h">
       <Filter>Source\AI</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scene\EditorCamera.h">
+      <Filter>Source\Scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">

@@ -136,8 +136,10 @@ void Graphics::Resize(UINT width, UINT height)
 	renderTargetView.Reset();
 	depthStencilView.Reset();
 
+	// Do not assert-halt on a transient ResizeBuffers failure (e.g. during a
+	// fullscreen/maximize transition). Skip this resize; the next one recovers.
 	HRESULT hr = swapchain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	if (FAILED(hr)) return;
 
 	screenWidth = static_cast<float>(width);
 	screenHeight = static_cast<float>(height);
@@ -145,9 +147,9 @@ void Graphics::Resize(UINT width, UINT height)
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
 	hr = swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D),
 		reinterpret_cast<void**>(backBuffer.GetAddressOf()));
-	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	if (FAILED(hr)) return;
 	hr = device->CreateRenderTargetView(backBuffer.Get(), nullptr, renderTargetView.GetAddressOf());
-	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	if (FAILED(hr)) return;
 
 	D3D11_TEXTURE2D_DESC depthDesc = {};
 	depthDesc.Width = width;
@@ -161,9 +163,9 @@ void Graphics::Resize(UINT width, UINT height)
 
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> depthBuffer;
 	hr = device->CreateTexture2D(&depthDesc, nullptr, depthBuffer.GetAddressOf());
-	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	if (FAILED(hr)) return;
 	hr = device->CreateDepthStencilView(depthBuffer.Get(), nullptr, depthStencilView.GetAddressOf());
-	_ASSERT_EXPR(SUCCEEDED(hr), HRTrace(hr));
+	if (FAILED(hr)) return;
 
 	viewport.Width = static_cast<float>(width);
 	viewport.Height = static_cast<float>(height);

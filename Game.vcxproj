@@ -171,6 +171,7 @@
     <ClInclude Include="Source\Physics\CollisionMesh.h" />
     <ClInclude Include="Source\Physics\SphereCast.h" />
     <ClInclude Include="Source\Physics\TransformUtils.h" />
+    <ClInclude Include="Source\Scene\EditorCamera.h" />
     <ClInclude Include="Source\Scene\Scene.h" />
     <ClInclude Include="Source\Scene\SceneGame.h" />
     <ClInclude Include="Source\Scene\Skybox.h" />

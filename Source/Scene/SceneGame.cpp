@@ -9,10 +9,58 @@
 #include "GameObject/Components/CrosshairComponent.h"
 #include "GameObject/Components/EnemyComponent.h"
 #include "GameObject/Components/HealthComponent.h"
+#include "Core/Input.h"
 #include <imgui.h>
 #include <string>
 #include <vector>
+#include <map>
+#include <fstream>
+#include <filesystem>
+#include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <cfloat>
+#include <windows.h>
 #pragma comment(lib, "d3dcompiler.lib")
+
+namespace
+{
+	DirectX::XMFLOAT3 AxisDir(int i)
+	{
+		if (i == 0) return { 1.0f, 0.0f, 0.0f };
+		if (i == 1) return { 0.0f, 1.0f, 0.0f };
+		return { 0.0f, 0.0f, 1.0f };
+	}
+	float Dot3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+	float Dist3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
+	{
+		DirectX::XMFLOAT3 d = { a.x - b.x, a.y - b.y, a.z - b.z };
+		return sqrtf(Dot3(d, d));
+	}
+	float LineLineS(const DirectX::XMFLOAT3& O, const DirectX::XMFLOAT3& A,
+		const DirectX::XMFLOAT3& P, const DirectX::XMFLOAT3& D)
+	{
+		DirectX::XMFLOAT3 r = { O.x - P.x, O.y - P.y, O.z - P.z };
+		float b = Dot3(A, D), c = Dot3(D, D), d = Dot3(A, r), e = Dot3(D, r);
+		float denom = c - b * b; // a = A.A = 1
+		if (fabsf(denom) < 1e-6f) return 0.0f;
+		return (b * e - c * d) / denom;
+	}
+	float RaySegDist(const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD,
+		const DirectX::XMFLOAT3& O, const DirectX::XMFLOAT3& A, float len)
+	{
+		float s = LineLineS(O, A, rO, rD);
+		if (s < 0.0f) s = 0.0f;
+		if (s > len) s = len;
+		DirectX::XMFLOAT3 pt = { O.x + A.x * s, O.y + A.y * s, O.z + A.z * s };
+		DirectX::XMFLOAT3 toP = { pt.x - rO.x, pt.y - rO.y, pt.z - rO.z };
+		float t = Dot3(toP, rD);
+		if (t < 0.0f) t = 0.0f;
+		DirectX::XMFLOAT3 cp = { rO.x + rD.x * t, rO.y + rD.y * t, rO.z + rD.z * t };
+		DirectX::XMFLOAT3 dv = { pt.x - cp.x, pt.y - cp.y, pt.z - cp.z };
+		return sqrtf(Dot3(dv, dv));
+	}
+}
 
 SceneGame::SceneGame()
 {
@@ -66,12 +114,13 @@ SceneGame::SceneGame()
 		}
 	}
 	collisionMesh.BuildSpatialGrid();
-	stageCollision = collisionMesh; // keep a copy for the shared nav mesh
+	stageCollision = collisionMesh;
+	Actor::SetEditorGround(&stageCollision);
 
 	playerActor = ActorManager::Instance().Create();
 	playerActor->SetName("Player");
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
-	playerActor->AddComponent<HealthComponent>(100.0f); // player HP
+	playerActor->AddComponent<HealthComponent>(100.0f);
 
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
@@ -106,7 +155,6 @@ SceneGame::SceneGame()
 		}
 	}
 
-	// Enemy (animated character: Enemy3.glb)
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
 	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
@@ -117,11 +165,13 @@ SceneGame::SceneGame()
 	enemyActor->SetPosition({ 15.0f, 5.1f, 5.0f });
 	enemyActor->SetScale({ 1.0f, 1.0f, 1.0f });
 
-	// Build the shared nav mesh once (seed = player, on the main floor), then share it.
 	BuildNavGrid();
 	enemyComp->SetNavGrid(&navGrid);
 
 	skybox.Initialize(device);
+
+	editorCam.SyncFromCamera(camera);
+	ScanAssets();
 }
 
 SceneGame::~SceneGame()
@@ -132,12 +182,479 @@ SceneGame::~SceneGame()
 	ActorManager::Instance().Remove(helmetActor);
 	ActorManager::Instance().Remove(pbrSphereActor);
 	ActorManager::Instance().Remove(enemyActor);
+	for (std::shared_ptr<class Actor>& a : spawnedActors)
+		if (a) ActorManager::Instance().Remove(a);
+	for (auto& kv : tiles)
+		if (kv.second.actor) ActorManager::Instance().Remove(kv.second.actor);
 }
 
 void SceneGame::Update(float elapsedTime)
 {
-	ActorManager::Instance().Update(elapsedTime);
-	ActorManager::Instance().UpdateTransform();
+	if (mode == EditorMode::Play)
+	{
+		ActorManager::Instance().Update(elapsedTime);
+		ActorManager::Instance().UpdateTransform();
+	}
+	else // Edit
+	{
+		ActorManager::Instance().SyncPending();
+		editorCam.Update(camera, elapsedTime);
+
+		if (paintMode)
+		{
+			if (!ImGui::GetIO().WantCaptureMouse)
+			{
+				Mouse& m = Input::Instance().GetMouse();
+				if (m.GetButtonDown() & Mouse::BTN_LEFT)
+				{
+					if (eraseMode) EraseTileAtMouse();
+					else           PaintTileAtMouse();
+				}
+			}
+		}
+		else
+		{
+			UpdateGizmo();
+		}
+
+		ActorManager::Instance().UpdateTransform();
+		ActorManager::Instance().EditorSync();
+	}
+}
+
+// ---- Editor / Play mode ----
+void SceneGame::StartPlay()
+{
+	SnapshotTransforms();
+	mode = EditorMode::Play;
+}
+
+void SceneGame::StopPlay()
+{
+	mode = EditorMode::Edit;
+	RestoreTransforms();
+	editorCam.SyncFromCamera(camera);
+}
+
+void SceneGame::SnapshotTransforms()
+{
+	snapshots.clear();
+	std::shared_ptr<class Actor> targets[] = { playerActor, enemyActor, helmetActor, pbrSphereActor };
+	for (std::shared_ptr<class Actor>& a : targets)
+		if (a) snapshots.push_back({ a, a->GetPosition(), a->GetRotation(), a->GetScale() });
+	for (std::shared_ptr<class Actor>& a : spawnedActors)
+		if (a) snapshots.push_back({ a, a->GetPosition(), a->GetRotation(), a->GetScale() });
+}
+
+void SceneGame::RestoreTransforms()
+{
+	for (ActorSnapshot& s : snapshots)
+	{
+		if (!s.actor) continue;
+		s.actor->SetPosition(s.pos);
+		s.actor->SetRotation(s.rot);
+		s.actor->SetScale(s.scale);
+	}
+}
+
+// ---- Content drawer ----
+void SceneGame::ScanAssets()
+{
+	assetPaths.clear();
+	namespace fs = std::filesystem;
+	const char* root = "Data/Model";
+	std::error_code ec;
+	if (!fs::exists(root, ec)) return;
+
+	for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+	{
+		if (!it->is_regular_file()) continue;
+		std::string ext = it->path().extension().string();
+		for (char& ch : ext) ch = (char)tolower((unsigned char)ch);
+		if (ext == ".glb" || ext == ".gltf")
+		{
+			std::string p = it->path().string();
+			for (char& ch : p) if (ch == '\\') ch = '/';
+			assetPaths.push_back(p);
+		}
+	}
+	std::sort(assetPaths.begin(), assetPaths.end());
+}
+
+void SceneGame::SpawnAsset(const std::string& path)
+{
+	DirectX::XMFLOAT3 eye = camera.GetEye();
+	DirectX::XMFLOAT3 fwd = camera.GetFront();
+	DirectX::XMFLOAT3 pos = { eye.x + fwd.x * 6.0f, eye.y + fwd.y * 6.0f, eye.z + fwd.z * 6.0f };
+
+	if (!stageCollision.triangles.empty())
+	{
+		DirectX::XMFLOAT3 o = { pos.x, pos.y + 20.0f, pos.z };
+		DirectX::XMFLOAT3 down = { 0.0f, -1.0f, 0.0f };
+		float d = 0.0f; DirectX::XMFLOAT3 hp, hn;
+		if (stageCollision.RayCast(o, down, 100.0f, d, hp, hn))
+			pos.y = hp.y;
+	}
+
+	std::shared_ptr<class Actor> a = ActorManager::Instance().Create();
+	std::string name = std::filesystem::path(path).stem().string();
+	a->SetName(name.c_str());
+	auto mc = a->AddComponent<ModelComponent>(path.c_str());
+	mc->SetShaderId(ShaderId::Toon);
+	a->SetPosition(pos);
+	spawnedActors.push_back(a);
+}
+
+// ---- Scene save / load ----
+void SceneGame::SaveScene()
+{
+	std::ofstream ofs("Scene.txt");
+	if (!ofs) return;
+
+	for (std::shared_ptr<class Actor>& a : spawnedActors)
+	{
+		if (!a) continue;
+		auto mc = a->GetComponent<ModelComponent>();
+		if (!mc) continue;
+		const std::string& path = mc->GetModelPath();
+		if (path.empty()) continue;
+
+		const DirectX::XMFLOAT3& p = a->GetPosition();
+		const DirectX::XMFLOAT4& r = a->GetRotation();
+		const DirectX::XMFLOAT3& s = a->GetScale();
+		ofs << p.x << " " << p.y << " " << p.z << " "
+			<< r.x << " " << r.y << " " << r.z << " " << r.w << " "
+			<< s.x << " " << s.y << " " << s.z << " "
+			<< path << "\n";
+	}
+}
+
+void SceneGame::LoadScene()
+{
+	std::ifstream ifs("Scene.txt");
+	if (!ifs) return;
+
+	ClearScene();
+
+	DirectX::XMFLOAT3 p, s;
+	DirectX::XMFLOAT4 r;
+	while (ifs >> p.x >> p.y >> p.z >> r.x >> r.y >> r.z >> r.w >> s.x >> s.y >> s.z)
+	{
+		std::string path;
+		std::getline(ifs, path);
+		size_t st = path.find_first_not_of(" \t");
+		if (st == std::string::npos) continue;
+		path = path.substr(st);
+		if (path.empty()) continue;
+
+		std::shared_ptr<class Actor> a = ActorManager::Instance().Create();
+		std::string name = std::filesystem::path(path).stem().string();
+		a->SetName(name.c_str());
+		auto mc = a->AddComponent<ModelComponent>(path.c_str());
+		mc->SetShaderId(ShaderId::Toon);
+		a->SetPosition(p);
+		a->SetRotation(r);
+		a->SetScale(s);
+		spawnedActors.push_back(a);
+	}
+}
+
+void SceneGame::ClearScene()
+{
+	for (std::shared_ptr<class Actor>& a : spawnedActors)
+		if (a) ActorManager::Instance().Remove(a);
+	spawnedActors.clear();
+}
+
+// ---- Tilemap ----
+bool SceneGame::ScreenRay(DirectX::XMFLOAT3& outOrigin, DirectX::XMFLOAT3& outDir) const
+{
+	float W = Graphics::Instance().GetScreenWidth();
+	float H = Graphics::Instance().GetScreenHeight();
+	if (W <= 0.0f || H <= 0.0f) return false;
+
+	Mouse& mouse = Input::Instance().GetMouse();
+	float mx = static_cast<float>(mouse.GetPositionX());
+	float my = static_cast<float>(mouse.GetPositionY());
+
+	using namespace DirectX;
+	XMMATRIX view = XMLoadFloat4x4(&camera.GetView());
+	XMMATRIX proj = XMLoadFloat4x4(&camera.GetProjection());
+	XMMATRIX invVP = XMMatrixInverse(nullptr, XMMatrixMultiply(view, proj));
+
+	float ndcx = (2.0f * mx / W) - 1.0f;
+	float ndcy = 1.0f - (2.0f * my / H);
+	XMVECTOR pNear = XMVector3TransformCoord(XMVectorSet(ndcx, ndcy, 0.0f, 1.0f), invVP);
+	XMVECTOR pFar = XMVector3TransformCoord(XMVectorSet(ndcx, ndcy, 1.0f, 1.0f), invVP);
+	XMVECTOR dirv = XMVector3Normalize(XMVectorSubtract(pFar, pNear));
+
+	XMStoreFloat3(&outOrigin, pNear);
+	XMStoreFloat3(&outDir, dirv);
+	return true;
+}
+
+bool SceneGame::ScreenRayToPlane(float planeY, DirectX::XMFLOAT3& outHit) const
+{
+	DirectX::XMFLOAT3 o, d;
+	if (!ScreenRay(o, d)) return false;
+	if (fabsf(d.y) < 1e-5f) return false;
+	float t = (planeY - o.y) / d.y;
+	if (t < 0.0f) return false;
+	outHit = { o.x + d.x * t, planeY, o.z + d.z * t };
+	return true;
+}
+
+void SceneGame::PaintTileAtMouse()
+{
+	if (activeTilePath.empty() || tileSize <= 0.0001f) return;
+
+	DirectX::XMFLOAT3 hit;
+	if (!ScreenRayToPlane(paintY, hit)) return;
+
+	int cx = static_cast<int>(roundf(hit.x / tileSize));
+	int cz = static_cast<int>(roundf(hit.z / tileSize));
+	std::pair<int, int> key(cx, cz);
+	if (tiles.find(key) != tiles.end()) return;
+
+	std::shared_ptr<class Actor> a = ActorManager::Instance().Create();
+	std::string name = std::filesystem::path(activeTilePath).stem().string();
+	a->SetName(name.c_str());
+	auto mc = a->AddComponent<ModelComponent>(activeTilePath.c_str());
+	mc->SetShaderId(ShaderId::Toon);
+	a->SetPosition({ cx * tileSize, paintY, cz * tileSize });
+
+	TileEntry e; e.actor = a; e.path = activeTilePath;
+	tiles[key] = e;
+}
+
+void SceneGame::EraseTileAtMouse()
+{
+	if (tileSize <= 0.0001f) return;
+	DirectX::XMFLOAT3 hit;
+	if (!ScreenRayToPlane(paintY, hit)) return;
+
+	int cx = static_cast<int>(roundf(hit.x / tileSize));
+	int cz = static_cast<int>(roundf(hit.z / tileSize));
+	auto it = tiles.find(std::pair<int, int>(cx, cz));
+	if (it == tiles.end()) return;
+	if (it->second.actor) ActorManager::Instance().Remove(it->second.actor);
+	tiles.erase(it);
+}
+
+void SceneGame::SaveTilemap()
+{
+	std::ofstream ofs("Tilemap.txt");
+	if (!ofs) return;
+	ofs << tileSize << " " << paintY << "\n";
+	for (auto& kv : tiles)
+		ofs << kv.first.first << " " << kv.first.second << " " << kv.second.path << "\n";
+}
+
+void SceneGame::LoadTilemap()
+{
+	std::ifstream ifs("Tilemap.txt");
+	if (!ifs) return;
+
+	ClearTilemap();
+	ifs >> tileSize >> paintY;
+
+	int cx, cz;
+	while (ifs >> cx >> cz)
+	{
+		std::string path;
+		std::getline(ifs, path);
+		size_t s = path.find_first_not_of(" \t");
+		if (s == std::string::npos) continue;
+		path = path.substr(s);
+		if (path.empty()) continue;
+
+		std::shared_ptr<class Actor> a = ActorManager::Instance().Create();
+		std::string name = std::filesystem::path(path).stem().string();
+		a->SetName(name.c_str());
+		auto mc = a->AddComponent<ModelComponent>(path.c_str());
+		mc->SetShaderId(ShaderId::Toon);
+		a->SetPosition({ cx * tileSize, paintY, cz * tileSize });
+
+		TileEntry e; e.actor = a; e.path = path;
+		tiles[std::pair<int, int>(cx, cz)] = e;
+	}
+}
+
+void SceneGame::ClearTilemap()
+{
+	for (auto& kv : tiles)
+		if (kv.second.actor) ActorManager::Instance().Remove(kv.second.actor);
+	tiles.clear();
+}
+
+// ---- Selection + gizmo ----
+std::shared_ptr<class Actor> SceneGame::PickActor(const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD)
+{
+	std::shared_ptr<class Actor> best;
+	float bestT = FLT_MAX;
+
+	for (const std::shared_ptr<class Actor>& a : ActorManager::Instance().GetActors())
+	{
+		if (!a) continue;
+		const char* n = a->GetName();
+		if (!strcmp(n, "Stage") || !strcmp(n, "Player") || !strcmp(n, "ViewModel")) continue;
+
+		float dist;
+		if (RayActorAABB(a, rO, rD, dist) && dist < bestT)
+		{
+			bestT = dist;
+			best = a;
+		}
+	}
+	return best;
+}
+
+void SceneGame::UpdateGizmo()
+{
+	Mouse& mouse = Input::Instance().GetMouse();
+	bool lmb = (mouse.GetButton() & Mouse::BTN_LEFT) != 0;
+	bool lmbDown = (mouse.GetButtonDown() & Mouse::BTN_LEFT) != 0;
+	bool rmb = (mouse.GetButton() & Mouse::BTN_RIGHT) != 0;
+
+	// Switch mode with W/E/R (only when not flying / not typing).
+	if (!rmb && !ImGui::GetIO().WantCaptureKeyboard)
+	{
+		if (GetAsyncKeyState('W') & 0x8000) gizmoMode = 0;
+		if (GetAsyncKeyState('E') & 0x8000) gizmoMode = 1;
+		if (GetAsyncKeyState('R') & 0x8000) gizmoMode = 2;
+	}
+
+	if (!lmb) gizmoDragging = false;
+
+	if (gizmoDragging)
+	{
+		std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
+		if (!sel) { gizmoDragging = false; return; }
+		DirectX::XMFLOAT3 A = AxisDir(gizmoAxis);
+		int mx = mouse.GetPositionX();
+
+		if (gizmoMode == 0) // translate
+		{
+			DirectX::XMFLOAT3 rO, rD;
+			if (!ScreenRay(rO, rD)) return;
+			float s = LineLineS(gizmoDragOrigin, A, rO, rD);
+			float delta = s - gizmoDragStartS;
+			sel->SetPosition({ gizmoDragOrigin.x + A.x * delta,
+							   gizmoDragOrigin.y + A.y * delta,
+							   gizmoDragOrigin.z + A.z * delta });
+		}
+		else if (gizmoMode == 1) // rotate
+		{
+			float ang = (mx - gizmoStartMouseX) * 0.01f;
+			DirectX::XMVECTOR base = DirectX::XMLoadFloat4(&gizmoStartRot);
+			DirectX::XMVECTOR dq = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(A.x, A.y, A.z, 0.0f), ang);
+			DirectX::XMVECTOR q = DirectX::XMQuaternionNormalize(DirectX::XMQuaternionMultiply(base, dq));
+			DirectX::XMFLOAT4 r; DirectX::XMStoreFloat4(&r, q);
+			sel->SetRotation(r);
+		}
+		else // scale
+		{
+			float delta = (mx - gizmoStartMouseX) * 0.01f;
+			DirectX::XMFLOAT3 ns = gizmoStartScale;
+			ns.x += A.x * delta; ns.y += A.y * delta; ns.z += A.z * delta;
+			if (ns.x < 0.05f) ns.x = 0.05f;
+			if (ns.y < 0.05f) ns.y = 0.05f;
+			if (ns.z < 0.05f) ns.z = 0.05f;
+			sel->SetScale(ns);
+		}
+		return;
+	}
+
+	if (!lmbDown || ImGui::GetIO().WantCaptureMouse) return;
+
+	DirectX::XMFLOAT3 rO, rD;
+	if (!ScreenRay(rO, rD)) return;
+
+	std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
+	if (sel)
+	{
+		DirectX::XMFLOAT3 O = sel->GetPosition();
+		float len = (std::max)(0.5f, Dist3(camera.GetEye(), O) * 0.15f);
+		float thresh = len * 0.2f;
+		int axis = -1;
+		float bestDist = thresh;
+		for (int i = 0; i < 3; ++i)
+		{
+			float dist = RaySegDist(rO, rD, O, AxisDir(i), len);
+			if (dist < bestDist) { bestDist = dist; axis = i; }
+		}
+		if (axis >= 0)
+		{
+			gizmoAxis = axis;
+			gizmoDragOrigin = O;
+			gizmoDragStartS = LineLineS(O, AxisDir(axis), rO, rD);
+			gizmoStartRot = sel->GetRotation();
+			gizmoStartScale = sel->GetScale();
+			gizmoStartMouseX = mouse.GetPositionX();
+			gizmoDragging = true;
+			return;
+		}
+	}
+
+	ActorManager::Instance().SetSelected(PickActor(rO, rD));
+}
+
+void SceneGame::DrawGizmo(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
+{
+	if (mode != EditorMode::Edit || paintMode) return;
+	std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
+	if (!sel) return;
+
+	DirectX::XMFLOAT3 O = sel->GetPosition();
+	float len = (std::max)(0.5f, Dist3(camera.GetEye(), O) * 0.15f);
+
+	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
+	auto addAxis = [&](const DirectX::XMFLOAT3& dir, const DirectX::XMFLOAT4& col)
+		{
+			prim->AddVertex(O, col);
+			prim->AddVertex({ O.x + dir.x * len, O.y + dir.y * len, O.z + dir.z * len }, col);
+		};
+
+	const DirectX::XMFLOAT4 hi = { 1.0f, 1.0f, 0.0f, 1.0f };
+	addAxis({ 1,0,0 }, gizmoAxis == 0 ? hi : DirectX::XMFLOAT4{ 1.0f, 0.25f, 0.25f, 1.0f });
+	addAxis({ 0,1,0 }, gizmoAxis == 1 ? hi : DirectX::XMFLOAT4{ 0.25f, 1.0f, 0.25f, 1.0f });
+	addAxis({ 0,0,1 }, gizmoAxis == 2 ? hi : DirectX::XMFLOAT4{ 0.3f, 0.5f, 1.0f, 1.0f });
+
+	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
+	RenderState* rs = Graphics::Instance().GetRenderState();
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
+	prim->SetTexture(nullptr);
+	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
+}
+
+// ---- Navigation ----
+void SceneGame::BuildNavGrid()
+{
+	DirectX::XMFLOAT3 seed = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
+	navGrid.Build(stageCollision, navCellSize, navAgentHeight, navMaxStep, seed);
+}
+
+void SceneGame::DrawNavMeshDebug(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
+{
+	if (!showNav || !navGrid.IsBuilt()) return;
+
+	DirectX::XMFLOAT3 c = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
+	std::vector<DirectX::XMFLOAT3> reach, iso;
+	navGrid.CollectDebugCells(c, navDebugRadius, reach, iso, 0.12f);
+
+	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
+	const DirectX::XMFLOAT4 green = { 0.15f, 1.00f, 0.35f, 0.70f };
+	const DirectX::XMFLOAT4 orange = { 1.00f, 0.60f, 0.10f, 0.55f };
+	for (const DirectX::XMFLOAT3& v : reach) prim->AddVertex(v, green);
+	for (const DirectX::XMFLOAT3& v : iso)   prim->AddVertex(v, orange);
+
+	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
+	RenderState* rs = Graphics::Instance().GetRenderState();
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
+	prim->SetTexture(nullptr);
+	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
 }
 
 void SceneGame::Render(float elapsedTime)
@@ -147,7 +664,6 @@ void SceneGame::Render(float elapsedTime)
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	// Background (sky) first.
 	skybox.Draw(camera);
 
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();
@@ -180,8 +696,9 @@ void SceneGame::Render(float elapsedTime)
 	Graphics::Instance().GetPrimitiveRenderer()->Render(rc.deviceContext, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	Graphics::Instance().GetPrimitiveRenderer()->SetTexture(nullptr);
 
-	// NavMesh debug overlay (green = reachable ground, orange = isolated)
 	DrawNavMeshDebug(view, proj);
+	DrawSelectionOutline(view, proj);
+	DrawGizmo(view, proj);
 
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
@@ -194,69 +711,79 @@ void SceneGame::Render(float elapsedTime)
 	}
 	if (rtv) rtv->Release();
 
-	if (vmModelComp) {
+	if (vmModelComp && mode == EditorMode::Play) {
 		vmModelComp->SetVisible(true);
 		vmModelComp->Draw();
 		Graphics::Instance().GetModelRenderer()->Render(rc);
 	}
 }
 
-void SceneGame::BuildNavGrid()
-{
-	DirectX::XMFLOAT3 seed = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
-	navGrid.Build(stageCollision, navCellSize, navAgentHeight, navMaxStep, seed);
-}
-
-void SceneGame::DrawNavMeshDebug(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
-{
-	if (!showNav || !navGrid.IsBuilt()) return;
-
-	DirectX::XMFLOAT3 c = playerActor ? playerActor->GetPosition() : DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f };
-	std::vector<DirectX::XMFLOAT3> reach, iso;
-	navGrid.CollectDebugCells(c, navDebugRadius, reach, iso, 0.12f);
-
-	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
-	const DirectX::XMFLOAT4 green = { 0.15f, 1.00f, 0.35f, 0.70f };
-	const DirectX::XMFLOAT4 orange = { 1.00f, 0.60f, 0.10f, 0.55f };
-	for (const DirectX::XMFLOAT3& v : reach) prim->AddVertex(v, green);
-	for (const DirectX::XMFLOAT3& v : iso)   prim->AddVertex(v, orange);
-
-	// Draw on top (no depth test) so the overlay is never buried in the floor.
-	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
-	RenderState* rs = Graphics::Instance().GetRenderState();
-	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
-
-	prim->SetTexture(nullptr);
-	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
-}
-
 void SceneGame::DrawGUI()
 {
-	// ---- NavMesh (shared, built from the stage) ----
-	ImGui::SetNextWindowPos(ImVec2(370, 340), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(300, 220), ImGuiCond_FirstUseEver);
-	ImGui::Begin("NavMesh");
-	ImGui::Text("Built : %s", navGrid.IsBuilt() ? "YES" : "no");
-	ImGui::Text("Cells : %d   Reachable : %d", navGrid.CellCount(), navGrid.ReachableCount());
-	ImGui::Text("Active Cell Size : %.2f", navGrid.GetCellSize());
-	ImGui::Checkbox("Show NavMesh", &showNav);
-	ImGui::SliderFloat("Debug Radius", &navDebugRadius, 3.0f, 80.0f);
-	ImGui::Separator();
-	ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 4.0f);
-	ImGui::SliderFloat("Agent Height", &navAgentHeight, 0.3f, 3.0f);
-	ImGui::SliderFloat("Max Step", &navMaxStep, 0.1f, 2.0f);
-	if (ImGui::Button("Rebuild NavMesh")) BuildNavGrid();
+	ImGuiIO& io = ImGui::GetIO();
+	const float topH = 38.0f, leftW = 300.0f, rightW = 340.0f, bottomH = 240.0f;
+	const float hierH = (io.DisplaySize.y - topH) * 0.55f;
+
+	// ---- Top toolbar ----
+	ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x, topH), ImGuiCond_Always);
+	ImGui::Begin("##Toolbar", nullptr,
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+	if (mode == EditorMode::Edit)
+	{
+		if (ImGui::Button("  Play  ")) StartPlay();
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "EDIT");
+		ImGui::SameLine();
+		ImGui::TextDisabled("(hold RMB + WASD / E / Q to fly, Shift = fast)");
+		ImGui::SameLine();
+		const char* mm = (gizmoMode == 0) ? "Move (W)" : (gizmoMode == 1) ? "Rotate (E)" : "Scale (R)";
+		ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "| Gizmo: %s", mm);
+	}
+	else
+	{
+		if (ImGui::Button("  Stop  ")) StopPlay();
+		ImGui::SameLine();
+		ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "PLAY");
+	}
 	ImGui::End();
 
-	// ---- Render Settings ----
-	ImGui::SetNextWindowPos(ImVec2(20, 340), ImGuiCond_FirstUseEver);
-	ImGui::SetNextWindowSize(ImVec2(340, 460), ImGuiCond_FirstUseEver);
-
-	ImGui::Begin("Render Settings");
+	// ---- Settings panel (left, lower) ----
+	ImGui::SetNextWindowPos(ImVec2(0.0f, topH + hierH), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(leftW, io.DisplaySize.y - topH - hierH), ImGuiCond_Always);
+	ImGui::Begin("Settings", nullptr,
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
+
+	if (ImGui::CollapsingHeader("Tilemap", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Checkbox("Paint Mode", &paintMode);
+		ImGui::SameLine();
+		ImGui::Checkbox("Erase", &eraseMode);
+		ImGui::SliderFloat("Tile Size", &tileSize, 0.5f, 8.0f);
+		ImGui::SliderFloat("Paint Height Y", &paintY, -10.0f, 20.0f);
+		std::string act = activeTilePath.empty() ? "(none)" : std::filesystem::path(activeTilePath).filename().string();
+		ImGui::Text("Active tile: %s", act.c_str());
+		ImGui::TextDisabled(paintMode ? "Click in the viewport to place tiles" : "Enable Paint Mode, then pick a tile below");
+		ImGui::Text("Placed tiles: %d", (int)tiles.size());
+		if (ImGui::Button("Save Tiles")) SaveTilemap();
+		ImGui::SameLine();
+		if (ImGui::Button("Load Tiles")) LoadTilemap();
+		ImGui::SameLine();
+		if (ImGui::Button("Clear Tiles")) ClearTilemap();
+	}
+
+	if (ImGui::CollapsingHeader("Scene (placed objects)", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		ImGui::Text("Placed objects: %d", (int)spawnedActors.size());
+		if (ImGui::Button("Save Scene")) SaveScene();
+		ImGui::SameLine();
+		if (ImGui::Button("Load Scene")) LoadScene();
+		ImGui::SameLine();
+		if (ImGui::Button("Clear Scene")) ClearScene();
+	}
 
 	auto applyLook = [&](
 		float zx, float zy, float zz, float hx, float hy, float hz, float gx, float gy, float gz,
@@ -280,11 +807,10 @@ void SceneGame::DrawGUI()
 			g.postVignette = vig;
 			g.postVignetteRadius = vigR;
 			g.postTint[0] = tr; g.postTint[1] = tg; g.postTint[2] = tb;
-
 			renderer->shadowStrength = shadow;
 		};
 
-	if (ImGui::CollapsingHeader("Art Style (Presets)", ImGuiTreeNodeFlags_DefaultOpen))
+	if (ImGui::CollapsingHeader("Art Style (Presets)"))
 	{
 		if (ImGui::Button("Anime Bright"))
 			applyLook(0.35f, 0.62f, 0.95f, 0.85f, 0.93f, 1.00f, 0.45f, 0.50f, 0.55f,
@@ -293,7 +819,6 @@ void SceneGame::DrawGUI()
 		if (ImGui::Button("Cinematic Dusk"))
 			applyLook(0.25f, 0.30f, 0.55f, 0.95f, 0.60f, 0.40f, 0.20f, 0.18f, 0.20f,
 				0.70f, 0.0f, 1.10f, 1.15f, 1.10f, 0.90f, 0.80f, 0.45f, 0.50f, 1.05f, 0.95f, 0.85f, 0.30f);
-
 		if (ImGui::Button("Cool Stylized"))
 			applyLook(0.20f, 0.40f, 0.70f, 0.70f, 0.85f, 0.95f, 0.25f, 0.30f, 0.35f,
 				0.60f, 4.0f, 1.00f, 1.10f, 1.00f, 1.20f, 0.50f, 0.30f, 0.60f, 0.92f, 0.97f, 1.05f, 0.40f);
@@ -339,5 +864,154 @@ void SceneGame::DrawGUI()
 		ImGui::SliderFloat("Toon Bands (0=off)", &skybox.bands, 0.0f, 16.0f, "%.0f");
 	}
 
+	if (ImGui::CollapsingHeader("NavMesh"))
+	{
+		ImGui::Text("Built : %s", navGrid.IsBuilt() ? "YES" : "no");
+		ImGui::Text("Cells : %d   Reachable : %d", navGrid.CellCount(), navGrid.ReachableCount());
+		ImGui::Checkbox("Show NavMesh", &showNav);
+		ImGui::SliderFloat("Debug Radius", &navDebugRadius, 3.0f, 80.0f);
+		ImGui::SliderFloat("Nav Cell Size", &navCellSize, 0.3f, 4.0f);
+		ImGui::SliderFloat("Max Step", &navMaxStep, 0.1f, 2.0f);
+		if (ImGui::Button("Rebuild NavMesh")) BuildNavGrid();
+	}
+
 	ImGui::End();
+
+	// ---- Content Drawer (bottom center) ----
+	ImGui::SetNextWindowPos(ImVec2(leftW, io.DisplaySize.y - bottomH), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x - leftW - rightW, bottomH), ImGuiCond_Always);
+	ImGui::Begin("Content Drawer", nullptr,
+		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+	if (ImGui::Button("Rescan")) ScanAssets();
+	ImGui::SameLine();
+	ImGui::Text("%d assets", (int)assetPaths.size());
+	ImGui::SameLine();
+	static char assetFilter[128] = "";
+	ImGui::PushItemWidth(240.0f);
+	ImGui::InputTextWithHint("##assetfilter", "Search...", assetFilter, sizeof(assetFilter));
+	ImGui::PopItemWidth();
+	ImGui::TextDisabled(paintMode ? "Click a tile to set it ACTIVE, then paint in the viewport"
+		: "Click an asset to place it in front of the camera");
+	ImGui::Separator();
+	ImGui::BeginChild("assetlist");
+	for (const std::string& p : assetPaths)
+	{
+		std::string name = std::filesystem::path(p).filename().string();
+		if (assetFilter[0] != '\0' && name.find(assetFilter) == std::string::npos) continue;
+		bool isActive = (p == activeTilePath);
+		if (ImGui::Selectable(name.c_str(), isActive))
+		{
+			if (paintMode) activeTilePath = p;
+			else SpawnAsset(p);
+		}
+	}
+	ImGui::EndChild();
+	ImGui::End();
+}
+
+bool SceneGame::GetActorAABB(const std::shared_ptr<class Actor>& actor, DirectX::XMFLOAT3& outMin, DirectX::XMFLOAT3& outMax)
+{
+	if (!actor) return false;
+	auto mc = actor->GetComponent<ModelComponent>();
+	if (!mc) return false;
+	Model* model = mc->GetModel().get();
+	if (!model) return false;
+
+	auto it = aabbCache.find(model);
+	if (it == aabbCache.end())
+	{
+		DirectX::XMFLOAT3 mn = { FLT_MAX, FLT_MAX, FLT_MAX };
+		DirectX::XMFLOAT3 mx = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		for (const Model::Mesh& mesh : model->GetMeshes())
+		{
+			DirectX::XMMATRIX nodeW = DirectX::XMLoadFloat4x4(&mesh.node->worldTransform);
+			for (const Model::Vertex& v : mesh.vertices)
+			{
+				DirectX::XMVECTOR p = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&v.position), nodeW);
+				DirectX::XMFLOAT3 wp; DirectX::XMStoreFloat3(&wp, p);
+				mn.x = (std::min)(mn.x, wp.x); mn.y = (std::min)(mn.y, wp.y); mn.z = (std::min)(mn.z, wp.z);
+				mx.x = (std::max)(mx.x, wp.x); mx.y = (std::max)(mx.y, wp.y); mx.z = (std::max)(mx.z, wp.z);
+			}
+		}
+		if (mn.x > mx.x) { mn = { -0.5f,-0.5f,-0.5f }; mx = { 0.5f,0.5f,0.5f }; } // fallback
+		aabbCache[model] = { mn, mx };
+		it = aabbCache.find(model);
+	}
+	outMin = it->second.first;
+	outMax = it->second.second;
+	return true;
+}
+
+bool SceneGame::RayActorAABB(const std::shared_ptr<class Actor>& actor, const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD, float& outDist)
+{
+	DirectX::XMFLOAT3 mn, mx;
+	if (!GetActorAABB(actor, mn, mx)) return false;
+
+	using namespace DirectX;
+	XMMATRIX W = XMLoadFloat4x4(&actor->GetTransform());
+	XMMATRIX invW = XMMatrixInverse(nullptr, W);
+	XMFLOAT3 o, d;
+	XMStoreFloat3(&o, XMVector3TransformCoord(XMLoadFloat3(&rO), invW));
+	XMStoreFloat3(&d, XMVector3TransformNormal(XMLoadFloat3(&rD), invW));
+
+	float tmin = -FLT_MAX, tmax = FLT_MAX;
+	for (int i = 0; i < 3; ++i)
+	{
+		float O = (&o.x)[i], D = (&d.x)[i], Mn = (&mn.x)[i], Mx = (&mx.x)[i];
+		if (fabsf(D) < 1e-8f) { if (O < Mn || O > Mx) return false; }
+		else
+		{
+			float t1 = (Mn - O) / D, t2 = (Mx - O) / D;
+			if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
+			if (t1 > tmin) tmin = t1;
+			if (t2 < tmax) tmax = t2;
+		}
+	}
+	if (tmax < tmin || tmax < 0.0f) return false;
+
+	float t = (tmin >= 0.0f) ? tmin : tmax;
+	XMFLOAT3 localHit = { o.x + d.x * t, o.y + d.y * t, o.z + d.z * t };
+	XMFLOAT3 worldHit;
+	XMStoreFloat3(&worldHit, XMVector3TransformCoord(XMLoadFloat3(&localHit), W));
+	outDist = Dist3(worldHit, rO);
+	return true;
+}
+
+void SceneGame::DrawSelectionOutline(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
+{
+	if (mode != EditorMode::Edit) return;
+	std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
+	if (!sel) return;
+
+	DirectX::XMFLOAT3 mn, mx;
+	if (!GetActorAABB(sel, mn, mx)) return;
+
+	using namespace DirectX;
+	XMMATRIX W = XMLoadFloat4x4(&sel->GetTransform());
+	XMFLOAT3 pts[8] = {
+		{ mn.x,mn.y,mn.z }, { mx.x,mn.y,mn.z }, { mx.x,mn.y,mx.z }, { mn.x,mn.y,mx.z },
+		{ mn.x,mx.y,mn.z }, { mx.x,mx.y,mn.z }, { mx.x,mx.y,mx.z }, { mn.x,mx.y,mx.z }
+	};
+	XMFLOAT3 c[8];
+	for (int i = 0; i < 8; ++i)
+		XMStoreFloat3(&c[i], XMVector3TransformCoord(XMLoadFloat3(&pts[i]), W));
+
+	const int edges[12][2] = {
+		{0,1},{1,2},{2,3},{3,0}, {4,5},{5,6},{6,7},{7,4}, {0,4},{1,5},{2,6},{3,7}
+	};
+
+	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
+	const XMFLOAT4 col = { 1.0f, 0.6f, 0.0f, 1.0f }; // orange highlight
+	for (int e = 0; e < 12; ++e)
+	{
+		prim->AddVertex(c[edges[e][0]], col);
+		prim->AddVertex(c[edges[e][1]], col);
+	}
+
+	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
+	RenderState* rs = Graphics::Instance().GetRenderState();
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
+	prim->SetTexture(nullptr);
+	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
 }
