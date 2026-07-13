@@ -11,6 +11,7 @@
 #include "GameObject/Components/HealthComponent.h"
 #include "Core/Input.h"
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -25,40 +26,11 @@
 
 namespace
 {
-	DirectX::XMFLOAT3 AxisDir(int i)
-	{
-		if (i == 0) return { 1.0f, 0.0f, 0.0f };
-		if (i == 1) return { 0.0f, 1.0f, 0.0f };
-		return { 0.0f, 0.0f, 1.0f };
-	}
 	float Dot3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 	float Dist3(const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
 	{
 		DirectX::XMFLOAT3 d = { a.x - b.x, a.y - b.y, a.z - b.z };
 		return sqrtf(Dot3(d, d));
-	}
-	float LineLineS(const DirectX::XMFLOAT3& O, const DirectX::XMFLOAT3& A,
-		const DirectX::XMFLOAT3& P, const DirectX::XMFLOAT3& D)
-	{
-		DirectX::XMFLOAT3 r = { O.x - P.x, O.y - P.y, O.z - P.z };
-		float b = Dot3(A, D), c = Dot3(D, D), d = Dot3(A, r), e = Dot3(D, r);
-		float denom = c - b * b; // a = A.A = 1
-		if (fabsf(denom) < 1e-6f) return 0.0f;
-		return (b * e - c * d) / denom;
-	}
-	float RaySegDist(const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD,
-		const DirectX::XMFLOAT3& O, const DirectX::XMFLOAT3& A, float len)
-	{
-		float s = LineLineS(O, A, rO, rD);
-		if (s < 0.0f) s = 0.0f;
-		if (s > len) s = len;
-		DirectX::XMFLOAT3 pt = { O.x + A.x * s, O.y + A.y * s, O.z + A.z * s };
-		DirectX::XMFLOAT3 toP = { pt.x - rO.x, pt.y - rO.y, pt.z - rO.z };
-		float t = Dot3(toP, rD);
-		if (t < 0.0f) t = 0.0f;
-		DirectX::XMFLOAT3 cp = { rO.x + rD.x * t, rO.y + rD.y * t, rO.z + rD.z * t };
-		DirectX::XMFLOAT3 dv = { pt.x - cp.x, pt.y - cp.y, pt.z - cp.z };
-		return sqrtf(Dot3(dv, dv));
 	}
 }
 
@@ -378,8 +350,22 @@ bool SceneGame::ScreenRay(DirectX::XMFLOAT3& outOrigin, DirectX::XMFLOAT3& outDi
 	float my = static_cast<float>(mouse.GetPositionY());
 
 	using namespace DirectX;
-	XMMATRIX view = XMLoadFloat4x4(&camera.GetView());
-	XMMATRIX proj = XMLoadFloat4x4(&camera.GetProjection());
+
+	// Build view / projection EXACTLY like Render() so the ray matches the pixels.
+	XMVECTOR Rv = XMLoadFloat3(&camera.GetRight());
+	XMVECTOR Uv = XMLoadFloat3(&camera.GetUp());
+	XMVECTOR Fv = XMLoadFloat3(&camera.GetFront());
+	XMVECTOR Ev = XMLoadFloat3(&camera.GetEye());
+	XMMATRIX camWorld;
+	camWorld.r[0] = XMVectorSetW(Rv, 0.0f);
+	camWorld.r[1] = XMVectorSetW(Uv, 0.0f);
+	camWorld.r[2] = XMVectorSetW(Fv, 0.0f);
+	camWorld.r[3] = XMVectorSetW(Ev, 1.0f);
+	XMMATRIX view = XMMatrixInverse(nullptr, camWorld);
+
+	float aspect = W / H;
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60), aspect, 0.05f, 1000.0f);
+
 	XMMATRIX invVP = XMMatrixInverse(nullptr, XMMatrixMultiply(view, proj));
 
 	float ndcx = (2.0f * mx / W) - 1.0f;
@@ -487,7 +473,7 @@ void SceneGame::ClearTilemap()
 	tiles.clear();
 }
 
-// ---- Selection + gizmo ----
+// ---- Selection ----
 std::shared_ptr<class Actor> SceneGame::PickActor(const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD)
 {
 	std::shared_ptr<class Actor> best;
@@ -512,120 +498,76 @@ std::shared_ptr<class Actor> SceneGame::PickActor(const DirectX::XMFLOAT3& rO, c
 void SceneGame::UpdateGizmo()
 {
 	Mouse& mouse = Input::Instance().GetMouse();
-	bool lmb = (mouse.GetButton() & Mouse::BTN_LEFT) != 0;
-	bool lmbDown = (mouse.GetButtonDown() & Mouse::BTN_LEFT) != 0;
 	bool rmb = (mouse.GetButton() & Mouse::BTN_RIGHT) != 0;
 
-	// Switch mode with W/E/R (only when not flying / not typing).
+	// W/E/R switch gizmo operation (only when not flying / not typing).
 	if (!rmb && !ImGui::GetIO().WantCaptureKeyboard)
 	{
-		if (GetAsyncKeyState('W') & 0x8000) gizmoMode = 0;
-		if (GetAsyncKeyState('E') & 0x8000) gizmoMode = 1;
-		if (GetAsyncKeyState('R') & 0x8000) gizmoMode = 2;
+		if (GetAsyncKeyState('W') & 0x8000) gizmoMode = 0; // move
+		if (GetAsyncKeyState('E') & 0x8000) gizmoMode = 1; // rotate
+		if (GetAsyncKeyState('R') & 0x8000) gizmoMode = 2; // scale
 	}
 
-	if (!lmb) gizmoDragging = false;
-
-	if (gizmoDragging)
+	// Left click selects an actor (ignored while an ImGuizmo handle is in use).
+	bool lmbDown = (mouse.GetButtonDown() & Mouse::BTN_LEFT) != 0;
+	if (lmbDown && !ImGui::GetIO().WantCaptureMouse && !ImGuizmo::IsUsing())
 	{
-		std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
-		if (!sel) { gizmoDragging = false; return; }
-		DirectX::XMFLOAT3 A = AxisDir(gizmoAxis);
-		int mx = mouse.GetPositionX();
-
-		if (gizmoMode == 0) // translate
+		DirectX::XMFLOAT3 rO, rD;
+		if (ScreenRay(rO, rD))
 		{
-			DirectX::XMFLOAT3 rO, rD;
-			if (!ScreenRay(rO, rD)) return;
-			float s = LineLineS(gizmoDragOrigin, A, rO, rD);
-			float delta = s - gizmoDragStartS;
-			sel->SetPosition({ gizmoDragOrigin.x + A.x * delta,
-							   gizmoDragOrigin.y + A.y * delta,
-							   gizmoDragOrigin.z + A.z * delta });
-		}
-		else if (gizmoMode == 1) // rotate
-		{
-			float ang = (mx - gizmoStartMouseX) * 0.01f;
-			DirectX::XMVECTOR base = DirectX::XMLoadFloat4(&gizmoStartRot);
-			DirectX::XMVECTOR dq = DirectX::XMQuaternionRotationAxis(DirectX::XMVectorSet(A.x, A.y, A.z, 0.0f), ang);
-			DirectX::XMVECTOR q = DirectX::XMQuaternionNormalize(DirectX::XMQuaternionMultiply(base, dq));
-			DirectX::XMFLOAT4 r; DirectX::XMStoreFloat4(&r, q);
-			sel->SetRotation(r);
-		}
-		else // scale
-		{
-			float delta = (mx - gizmoStartMouseX) * 0.01f;
-			DirectX::XMFLOAT3 ns = gizmoStartScale;
-			ns.x += A.x * delta; ns.y += A.y * delta; ns.z += A.z * delta;
-			if (ns.x < 0.05f) ns.x = 0.05f;
-			if (ns.y < 0.05f) ns.y = 0.05f;
-			if (ns.z < 0.05f) ns.z = 0.05f;
-			sel->SetScale(ns);
-		}
-		return;
-	}
-
-	if (!lmbDown || ImGui::GetIO().WantCaptureMouse) return;
-
-	DirectX::XMFLOAT3 rO, rD;
-	if (!ScreenRay(rO, rD)) return;
-
-	std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
-	if (sel)
-	{
-		DirectX::XMFLOAT3 O = sel->GetPosition();
-		float len = (std::max)(0.5f, Dist3(camera.GetEye(), O) * 0.15f);
-		float thresh = len * 0.2f;
-		int axis = -1;
-		float bestDist = thresh;
-		for (int i = 0; i < 3; ++i)
-		{
-			float dist = RaySegDist(rO, rD, O, AxisDir(i), len);
-			if (dist < bestDist) { bestDist = dist; axis = i; }
-		}
-		if (axis >= 0)
-		{
-			gizmoAxis = axis;
-			gizmoDragOrigin = O;
-			gizmoDragStartS = LineLineS(O, AxisDir(axis), rO, rD);
-			gizmoStartRot = sel->GetRotation();
-			gizmoStartScale = sel->GetScale();
-			gizmoStartMouseX = mouse.GetPositionX();
-			gizmoDragging = true;
-			return;
+			std::shared_ptr<class Actor> picked = PickActor(rO, rD);
+			if (picked) ActorManager::Instance().SetSelected(picked); // keep selection on empty click
 		}
 	}
-
-	ActorManager::Instance().SetSelected(PickActor(rO, rD));
 }
 
-void SceneGame::DrawGizmo(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj)
+void SceneGame::DrawImGuizmo()
 {
-	if (mode != EditorMode::Edit || paintMode) return;
+	if (mode != EditorMode::Edit) return;
 	std::shared_ptr<class Actor> sel = ActorManager::Instance().GetSelectedActor();
 	if (!sel) return;
 
-	DirectX::XMFLOAT3 O = sel->GetPosition();
-	float len = (std::max)(0.5f, Dist3(camera.GetEye(), O) * 0.15f);
+	using namespace DirectX;
 
-	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
-	auto addAxis = [&](const DirectX::XMFLOAT3& dir, const DirectX::XMFLOAT4& col)
+	// Build view / projection like Render().
+	XMVECTOR R = XMLoadFloat3(&camera.GetRight());
+	XMVECTOR U = XMLoadFloat3(&camera.GetUp());
+	XMVECTOR F = XMLoadFloat3(&camera.GetFront());
+	XMVECTOR E = XMLoadFloat3(&camera.GetEye());
+	XMMATRIX camWorld;
+	camWorld.r[0] = XMVectorSetW(R, 0.0f); camWorld.r[1] = XMVectorSetW(U, 0.0f);
+	camWorld.r[2] = XMVectorSetW(F, 0.0f); camWorld.r[3] = XMVectorSetW(E, 1.0f);
+	XMMATRIX viewM = XMMatrixInverse(nullptr, camWorld);
+
+	float aspect = Graphics::Instance().GetScreenWidth() / Graphics::Instance().GetScreenHeight();
+	XMMATRIX projM = XMMatrixPerspectiveFovLH(XMConvertToRadians(60), aspect, 0.05f, 1000.0f);
+
+	XMFLOAT4X4 view, proj, model;
+	XMStoreFloat4x4(&view, viewM);
+	XMStoreFloat4x4(&proj, projM);
+	model = sel->GetTransform();
+
+	ImGuizmo::OPERATION op =
+		(gizmoMode == 0) ? ImGuizmo::TRANSLATE :
+		(gizmoMode == 1) ? ImGuizmo::ROTATE : ImGuizmo::SCALE;
+	ImGuizmo::MODE gmode = (gizmoMode == 2) ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+
+	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+
+	if (ImGuizmo::Manipulate(&view._11, &proj._11, op, gmode, &model._11))
+	{
+		XMVECTOR s, q, t;
+		if (XMMatrixDecompose(&s, &q, &t, XMLoadFloat4x4(&model)))
 		{
-			prim->AddVertex(O, col);
-			prim->AddVertex({ O.x + dir.x * len, O.y + dir.y * len, O.z + dir.z * len }, col);
-		};
-
-	const DirectX::XMFLOAT4 hi = { 1.0f, 1.0f, 0.0f, 1.0f };
-	addAxis({ 1,0,0 }, gizmoAxis == 0 ? hi : DirectX::XMFLOAT4{ 1.0f, 0.25f, 0.25f, 1.0f });
-	addAxis({ 0,1,0 }, gizmoAxis == 1 ? hi : DirectX::XMFLOAT4{ 0.25f, 1.0f, 0.25f, 1.0f });
-	addAxis({ 0,0,1 }, gizmoAxis == 2 ? hi : DirectX::XMFLOAT4{ 0.3f, 0.5f, 1.0f, 1.0f });
-
-	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
-	RenderState* rs = Graphics::Instance().GetRenderState();
-	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::NoTestNoWrite), 0);
-	prim->SetTexture(nullptr);
-	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
-	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
+			XMFLOAT3 pos, scl; XMFLOAT4 rot;
+			XMStoreFloat3(&pos, t);
+			XMStoreFloat3(&scl, s);
+			XMStoreFloat4(&rot, q);
+			sel->SetPosition(pos);
+			sel->SetRotation(rot);
+			sel->SetScale(scl);
+		}
+	}
 }
 
 // ---- Navigation ----
@@ -698,7 +640,6 @@ void SceneGame::Render(float elapsedTime)
 
 	DrawNavMeshDebug(view, proj);
 	DrawSelectionOutline(view, proj);
-	DrawGizmo(view, proj);
 
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
 
@@ -907,6 +848,9 @@ void SceneGame::DrawGUI()
 	}
 	ImGui::EndChild();
 	ImGui::End();
+
+	// ---- ImGuizmo (move / rotate / scale the selected actor) ----
+	DrawImGuizmo();
 }
 
 bool SceneGame::GetActorAABB(const std::shared_ptr<class Actor>& actor, DirectX::XMFLOAT3& outMin, DirectX::XMFLOAT3& outMax)
@@ -933,7 +877,7 @@ bool SceneGame::GetActorAABB(const std::shared_ptr<class Actor>& actor, DirectX:
 				mx.x = (std::max)(mx.x, wp.x); mx.y = (std::max)(mx.y, wp.y); mx.z = (std::max)(mx.z, wp.z);
 			}
 		}
-		if (mn.x > mx.x) { mn = { -0.5f,-0.5f,-0.5f }; mx = { 0.5f,0.5f,0.5f }; } // fallback
+		if (mn.x > mx.x) { mn = { -0.5f,-0.5f,-0.5f }; mx = { 0.5f,0.5f,0.5f }; }
 		aabbCache[model] = { mn, mx };
 		it = aabbCache.find(model);
 	}
@@ -1001,7 +945,7 @@ void SceneGame::DrawSelectionOutline(const DirectX::XMFLOAT4X4& view, const Dire
 	};
 
 	PrimitiveRenderer* prim = Graphics::Instance().GetPrimitiveRenderer();
-	const XMFLOAT4 col = { 1.0f, 0.6f, 0.0f, 1.0f }; // orange highlight
+	const XMFLOAT4 col = { 1.0f, 0.6f, 0.0f, 1.0f };
 	for (int e = 0; e < 12; ++e)
 	{
 		prim->AddVertex(c[edges[e][0]], col);
