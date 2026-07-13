@@ -236,21 +236,23 @@ void SceneGame::ScanAssets()
 	namespace fs = std::filesystem;
 	const char* root = "Data/Model";
 	std::error_code ec;
-	if (!fs::exists(root, ec)) return;
-
-	for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+	if (fs::exists(root, ec))
 	{
-		if (!it->is_regular_file()) continue;
-		std::string ext = it->path().extension().string();
-		for (char& ch : ext) ch = (char)tolower((unsigned char)ch);
-		if (ext == ".glb" || ext == ".gltf")
+		for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
 		{
-			std::string p = it->path().string();
-			for (char& ch : p) if (ch == '\\') ch = '/';
-			assetPaths.push_back(p);
+			if (!it->is_regular_file()) continue;
+			std::string ext = it->path().extension().string();
+			for (char& ch : ext) ch = (char)tolower((unsigned char)ch);
+			if (ext == ".glb" || ext == ".gltf")
+			{
+				std::string p = it->path().string();
+				for (char& ch : p) if (ch == '\\') ch = '/';
+				assetPaths.push_back(p);
+			}
 		}
 	}
 	std::sort(assetPaths.begin(), assetPaths.end());
+	BuildAssetTree();
 }
 
 void SceneGame::SpawnAsset(const std::string& path)
@@ -274,6 +276,15 @@ void SceneGame::SpawnAsset(const std::string& path)
 	auto mc = a->AddComponent<ModelComponent>(path.c_str());
 	mc->SetShaderId(ShaderId::Toon);
 	a->SetPosition(pos);
+
+	if (spawnType == 1) // Enemy: attach AI
+	{
+		a->AddComponent<AnimatorComponent>();
+		auto ec = a->AddComponent<EnemyComponent>(playerActor);
+		ec->SetStageCollision(stageCollision);
+		ec->SetNavGrid(&navGrid);
+	}
+
 	spawnedActors.push_back(a);
 }
 
@@ -291,10 +302,13 @@ void SceneGame::SaveScene()
 		const std::string& path = mc->GetModelPath();
 		if (path.empty()) continue;
 
+		int type = a->GetComponent<EnemyComponent>() ? 1 : 0;
+
 		const DirectX::XMFLOAT3& p = a->GetPosition();
 		const DirectX::XMFLOAT4& r = a->GetRotation();
 		const DirectX::XMFLOAT3& s = a->GetScale();
-		ofs << p.x << " " << p.y << " " << p.z << " "
+		ofs << type << " "
+			<< p.x << " " << p.y << " " << p.z << " "
 			<< r.x << " " << r.y << " " << r.z << " " << r.w << " "
 			<< s.x << " " << s.y << " " << s.z << " "
 			<< path << "\n";
@@ -308,9 +322,10 @@ void SceneGame::LoadScene()
 
 	ClearScene();
 
+	int type;
 	DirectX::XMFLOAT3 p, s;
 	DirectX::XMFLOAT4 r;
-	while (ifs >> p.x >> p.y >> p.z >> r.x >> r.y >> r.z >> r.w >> s.x >> s.y >> s.z)
+	while (ifs >> type >> p.x >> p.y >> p.z >> r.x >> r.y >> r.z >> r.w >> s.x >> s.y >> s.z)
 	{
 		std::string path;
 		std::getline(ifs, path);
@@ -327,6 +342,15 @@ void SceneGame::LoadScene()
 		a->SetPosition(p);
 		a->SetRotation(r);
 		a->SetScale(s);
+
+		if (type == 1)
+		{
+			a->AddComponent<AnimatorComponent>();
+			auto ec = a->AddComponent<EnemyComponent>(playerActor);
+			ec->SetStageCollision(stageCollision);
+			ec->SetNavGrid(&navGrid);
+		}
+
 		spawnedActors.push_back(a);
 	}
 }
@@ -827,25 +851,19 @@ void SceneGame::DrawGUI()
 	ImGui::SameLine();
 	ImGui::Text("%d assets", (int)assetPaths.size());
 	ImGui::SameLine();
+	ImGui::PushItemWidth(120.0f);
+	const char* spawnTypes[] = { "Prop", "Enemy" };
+	ImGui::Combo("Spawn as", &spawnType, spawnTypes, 2);
+	ImGui::PopItemWidth();
 	static char assetFilter[128] = "";
-	ImGui::PushItemWidth(240.0f);
+	ImGui::PushItemWidth(-1);
 	ImGui::InputTextWithHint("##assetfilter", "Search...", assetFilter, sizeof(assetFilter));
 	ImGui::PopItemWidth();
 	ImGui::TextDisabled(paintMode ? "Click a tile to set it ACTIVE, then paint in the viewport"
-		: "Click an asset to place it in front of the camera");
+		: "Click a model to place it (Spawn as: Prop / Enemy)");
 	ImGui::Separator();
 	ImGui::BeginChild("assetlist");
-	for (const std::string& p : assetPaths)
-	{
-		std::string name = std::filesystem::path(p).filename().string();
-		if (assetFilter[0] != '\0' && name.find(assetFilter) == std::string::npos) continue;
-		bool isActive = (p == activeTilePath);
-		if (ImGui::Selectable(name.c_str(), isActive))
-		{
-			if (paintMode) activeTilePath = p;
-			else SpawnAsset(p);
-		}
-	}
+	DrawAssetNode(assetTree, assetFilter);
 	ImGui::EndChild();
 	ImGui::End();
 
@@ -958,4 +976,55 @@ void SceneGame::DrawSelectionOutline(const DirectX::XMFLOAT4X4& view, const Dire
 	prim->SetTexture(nullptr);
 	prim->Render(dc, view, proj, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 	dc->OMSetDepthStencilState(rs->GetDepthStencilState(DepthState::TestAndWrite), 0);
+}
+
+void SceneGame::BuildAssetTree()
+{
+	assetTree = AssetNode{};
+	const std::string prefix = "Data/Model/";
+	for (const std::string& full : assetPaths)
+	{
+		std::string rel = full;
+		if (rel.rfind(prefix, 0) == 0) rel = rel.substr(prefix.size());
+
+		AssetNode* node = &assetTree;
+		size_t start = 0;
+		while (true)
+		{
+			size_t slash = rel.find('/', start);
+			if (slash == std::string::npos)
+			{
+				node->files.push_back(full);
+				break;
+			}
+			std::string folder = rel.substr(start, slash - start);
+			node = &node->folders[folder];
+			start = slash + 1;
+		}
+	}
+}
+
+void SceneGame::DrawAssetNode(const AssetNode& node, const char* filter)
+{
+	// Folders first.
+	for (const auto& kv : node.folders)
+	{
+		if (ImGui::TreeNodeEx(kv.first.c_str(), ImGuiTreeNodeFlags_SpanAvailWidth))
+		{
+			DrawAssetNode(kv.second, filter);
+			ImGui::TreePop();
+		}
+	}
+	// Files.
+	for (const std::string& p : node.files)
+	{
+		std::string fn = std::filesystem::path(p).filename().string();
+		if (filter && filter[0] != '\0' && fn.find(filter) == std::string::npos) continue;
+		bool active = (p == activeTilePath);
+		if (ImGui::Selectable(fn.c_str(), active))
+		{
+			if (paintMode) activeTilePath = p;
+			else SpawnAsset(p);
+		}
+	}
 }

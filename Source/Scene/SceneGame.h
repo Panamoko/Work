@@ -28,12 +28,22 @@ public:
 
 private:
 	enum class EditorMode { Edit, Play };
+
+	// Content drawer folder tree
+	struct AssetNode
+	{
+		std::map<std::string, AssetNode> folders;
+		std::vector<std::string> files; // full paths
+	};
+
 	void StartPlay();
 	void StopPlay();
 	void SnapshotTransforms();
 	void RestoreTransforms();
 
 	void ScanAssets();
+	void BuildAssetTree();
+	void DrawAssetNode(const AssetNode& node, const char* filter);
 	void SpawnAsset(const std::string& path);
 
 	void SaveScene();
@@ -48,12 +58,11 @@ private:
 	void LoadTilemap();
 	void ClearTilemap();
 
-	// Selection + gizmo (ImGuizmo)
 	bool GetActorAABB(const std::shared_ptr<class Actor>& actor, DirectX::XMFLOAT3& outMin, DirectX::XMFLOAT3& outMax);
 	bool RayActorAABB(const std::shared_ptr<class Actor>& actor, const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD, float& outDist);
 	std::shared_ptr<class Actor> PickActor(const DirectX::XMFLOAT3& rO, const DirectX::XMFLOAT3& rD);
-	void UpdateGizmo();                 // W/E/R switch + click-select
-	void DrawImGuizmo();                // ImGuizmo manipulate (called from DrawGUI)
+	void UpdateGizmo();
+	void DrawImGuizmo();
 	void DrawSelectionOutline(const DirectX::XMFLOAT4X4& view, const DirectX::XMFLOAT4X4& proj);
 
 	void BuildNavGrid();
@@ -64,11 +73,8 @@ private:
 	EditorCamera editorCam;
 
 	EditorMode mode = EditorMode::Edit;
+	int gizmoMode = 0; // 0 = translate, 1 = rotate, 2 = scale
 
-	// Gizmo operation: 0 = translate, 1 = rotate, 2 = scale
-	int gizmoMode = 0;
-
-	// Local-space AABB cache (per model) for picking / outline
 	std::map<class Model*, std::pair<DirectX::XMFLOAT3, DirectX::XMFLOAT3>> aabbCache;
 
 	struct ActorSnapshot
@@ -80,9 +86,13 @@ private:
 	};
 	std::vector<ActorSnapshot> snapshots;
 
+	// Content drawer
 	std::vector<std::string> assetPaths;
+	AssetNode assetTree;
+	int spawnType = 0; // 0 = Prop, 1 = Enemy
 	std::vector<std::shared_ptr<class Actor>> spawnedActors;
 
+	// Tilemap
 	bool  paintMode = false;
 	bool  eraseMode = false;
 	std::string activeTilePath;
