@@ -24,6 +24,7 @@ public:
 
 	std::shared_ptr<Model> GetModel() const { return model; }
 	const std::string& GetModelPath() const { return modelFilename; }
+	void SetModel(const char* filename);          // reload with a different model
 	void SetShaderId(ShaderId id) { shaderId = id; }
 	void SetVisible(bool visible) { isVisible = visible; }
 	bool IsVisible() const { return isVisible; }

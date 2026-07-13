@@ -31,7 +31,7 @@ public:
 	bool IsGrounded() const { return isGrounded; }
 
 	bool RayCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float maxDistance, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal);
-
+	void SetMoveSpeeds(float walk, float run) { manualMoveSpeed = walk; runMoveSpeed = run; }
 private:
 	
 	bool CapsuleCast(const DirectX::XMFLOAT3& originFoot, const DirectX::XMFLOAT3& originHead, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal);

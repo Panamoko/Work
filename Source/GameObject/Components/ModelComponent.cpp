@@ -6,11 +6,25 @@
 
 ModelComponent::ModelComponent(const char* filename)
 {
-	modelFilename = filename; // remember the path for scene save/load
+	modelFilename = filename;
 
-	// Flyweight load through the resource manager.
 	model = ResourceManager::Instance().LoadModel(filename);
 
+	if (model != nullptr)
+	{
+		model->GetNodePoses(nodePoses);
+		LoadMaterialSettings();
+	}
+}
+
+void ModelComponent::SetModel(const char* filename)
+{
+	modelFilename = filename;
+	animationIndex = -1;
+	animationSeconds = 0.0f;
+	nodePoses.clear();
+
+	model = ResourceManager::Instance().LoadModel(filename);
 	if (model != nullptr)
 	{
 		model->GetNodePoses(nodePoses);
@@ -34,7 +48,6 @@ void ModelComponent::Update(float elapsedTime)
 {
 	if (model != nullptr)
 	{
-		// Advance animation.
 		if (animationIndex >= 0)
 		{
 			const Model::Animation& anim = model->GetAnimations().at(animationIndex);
@@ -49,7 +62,6 @@ void ModelComponent::Update(float elapsedTime)
 			}
 		}
 
-		// Push actor transform to the model.
 		std::shared_ptr<Actor> owner = GetActor();
 		if (owner != nullptr)
 		{
@@ -58,7 +70,6 @@ void ModelComponent::Update(float elapsedTime)
 	}
 }
 
-// Editor-only: refresh the model world transform without advancing animation.
 void ModelComponent::OnEditorSync()
 {
 	if (model == nullptr) return;
@@ -115,7 +126,7 @@ void ModelComponent::LoadMaterialSettings()
 	ifs >> count;
 
 	auto& materials = model->GetMaterials();
-	if (count != materials.size()) return; // guard against a changed material count
+	if (count != materials.size()) return;
 
 	for (size_t i = 0; i < count; ++i)
 	{

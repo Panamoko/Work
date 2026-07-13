@@ -94,6 +94,10 @@ SceneGame::SceneGame()
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
 	playerActor->AddComponent<HealthComponent>(100.0f);
 
+	// Full-body player model (Voxel). Swap in Settings > Player.
+	auto playerModelComp = playerActor->AddComponent<ModelComponent>("Data/Model/GLB format/character-a.glb");
+	playerModelComp->SetShaderId(ShaderId::Toon);
+
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
 	auto viewModelComp = viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/Pistol.glb");
@@ -750,6 +754,65 @@ void SceneGame::DrawGUI()
 		if (ImGui::Button("Clear Scene")) ClearScene();
 	}
 
+	if (ImGui::CollapsingHeader("Player"))
+	{
+		auto pc = playerActor ? playerActor->GetComponent<PlayerControllerComponent>() : nullptr;
+		auto bodyMc = playerActor ? playerActor->GetComponent<ModelComponent>() : nullptr;
+		auto vmMc = viewModelActor ? viewModelActor->GetComponent<ModelComponent>() : nullptr;
+
+		ImGui::TextDisabled("Movement preset");
+		if (pc)
+		{
+			if (ImGui::Button("Light"))  pc->SetMoveSpeeds(5.0f, 10.0f);
+			ImGui::SameLine();
+			if (ImGui::Button("Normal")) pc->SetMoveSpeeds(4.0f, 8.0f);
+			ImGui::SameLine();
+			if (ImGui::Button("Heavy"))  pc->SetMoveSpeeds(3.0f, 5.5f);
+		}
+
+		ImGui::Separator();
+		ImGui::TextDisabled("Player body model  (name contains 'character')");
+		if (bodyMc)
+		{
+			std::string cur = std::filesystem::path(bodyMc->GetModelPath()).filename().string();
+			ImGui::Text("Current: %s", cur.c_str());
+		}
+		ImGui::BeginChild("bodylist", ImVec2(0, 100));
+		for (const std::string& p : assetPaths)
+		{
+			std::string fn = std::filesystem::path(p).filename().string();
+			std::string fnLow = fn;
+			for (char& ch : fnLow) ch = (char)tolower((unsigned char)ch);
+			if (fnLow.find("character") == std::string::npos) continue;
+			if (ImGui::Selectable(fn.c_str()))
+			{
+				if (bodyMc) bodyMc->SetModel(p.c_str());
+			}
+		}
+		ImGui::EndChild();
+
+		ImGui::Separator();
+		ImGui::TextDisabled("Weapon (first-person)  (Data/Model/Weapon/*)");
+		if (vmMc)
+		{
+			std::string cur = std::filesystem::path(vmMc->GetModelPath()).filename().string();
+			ImGui::Text("Current: %s", cur.c_str());
+		}
+		ImGui::BeginChild("weaponlist", ImVec2(0, 90));
+		for (const std::string& p : assetPaths)
+		{
+			std::string low = p;
+			for (char& ch : low) ch = (char)tolower((unsigned char)ch);
+			if (low.find("/weapon/") == std::string::npos) continue;
+			std::string fn = std::filesystem::path(p).filename().string();
+			if (ImGui::Selectable(fn.c_str()))
+			{
+				if (vmMc) vmMc->SetModel(p.c_str());
+			}
+		}
+		ImGui::EndChild();
+	}
+
 	auto applyLook = [&](
 		float zx, float zy, float zz, float hx, float hy, float hz, float gx, float gy, float gz,
 		float hExp, float bands,
@@ -867,7 +930,7 @@ void SceneGame::DrawGUI()
 	ImGui::EndChild();
 	ImGui::End();
 
-	// ---- ImGuizmo (move / rotate / scale the selected actor) ----
+	// ---- ImGuizmo ----
 	DrawImGuizmo();
 }
 
