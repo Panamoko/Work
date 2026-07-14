@@ -1,11 +1,11 @@
-#pragma once
+ï»¿#pragma once
 
 #include <vector>
 #include <string>
 #include <DirectXMath.h>
 #include "GameObject/Component.h"
 
-// š’Ç‰ÁFRuni‘–‚éjƒXƒe[ƒg‚ğ’Ç‰Á
+// ï¿½ï¿½ï¿½Ç‰ï¿½ï¿½FRunï¿½iï¿½ï¿½ï¿½ï¿½jï¿½Xï¿½eï¿½[ï¿½gï¿½ï¿½Ç‰ï¿½
 enum class WeaponState { Idle, Walk, Run, Jump, Reload, Fire };
 
 struct VfxEffect {
@@ -37,11 +37,18 @@ public:
 	void SaveSettings();
 	void LoadSettings();
 
+	// The weapon is attached to a bone of this player body model.
+	void SetAttachTarget(ModelComponent* playerModel) { attachModel = playerModel; }
+
 private:
 	Camera* camera = nullptr;
 	PlayerControllerComponent* playerController = nullptr;
 	ModelComponent* cachedModelComponent = nullptr;
 	AnimatorComponent* animator = nullptr;
+
+	// ---- Bone attachment ----
+	ModelComponent* attachModel = nullptr;     // player body model to read bones from
+	char attachBoneName[64] = "";              // empty = auto-find (hand/wrist/arm), else exact node name
 
 	WeaponState currentWeaponState = WeaponState::Idle;
 	float actionTimer = 0.0f;

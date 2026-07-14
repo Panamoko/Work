@@ -30,17 +30,20 @@ public:
 	PlayerState GetCurrentState() const { return currentState; }
 	bool IsGrounded() const { return isGrounded; }
 
+	// Weapon attach: let the ViewModel read the player body's bones.
+	ModelComponent* GetModelComponent() const { return cachedModelComponent; }
+
 	bool RayCast(const DirectX::XMFLOAT3& origin, const DirectX::XMFLOAT3& direction, float maxDistance, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal);
 	void SetMoveSpeeds(float walk, float run) { manualMoveSpeed = walk; runMoveSpeed = run; }
 private:
-	
+
 	bool CapsuleCast(const DirectX::XMFLOAT3& originFoot, const DirectX::XMFLOAT3& originHead, const DirectX::XMFLOAT3& direction, float radius, float& distance, DirectX::XMFLOAT3& hitPosition, DirectX::XMFLOAT3& hitNormal);
 
 	void MoveAndSlide(const DirectX::XMFLOAT3& move, bool vertical);
 	bool CheckGrounded();
 
-	void UpdateAnimation(Model* characterModel, bool stateChanged, const DirectX::XMFLOAT3& manualVec);  
-	void UpdateCameraFollow(DirectX::FXMVECTOR currentVelocity, float elapsedTime);                      
+	void UpdateAnimation(Model* characterModel, bool stateChanged, const DirectX::XMFLOAT3& manualVec);
+	void UpdateCameraFollow(DirectX::FXMVECTOR currentVelocity, float elapsedTime);
 
 	ModelComponent* cachedModelComponent = nullptr;
 	AnimatorComponent* animator = nullptr;

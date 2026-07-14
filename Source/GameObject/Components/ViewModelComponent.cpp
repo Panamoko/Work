@@ -1,5 +1,7 @@
 ﻿#include <imgui.h>
 #include <fstream>
+#include <cctype>
+#include <string>
 #include "GameObject/Components/ViewModelComponent.h"
 #include "GameObject/Actor.h"
 #include "GameObject/Components/ModelComponent.h"
@@ -10,6 +12,23 @@
 #include "Core/Input.h" 
 #include "GameObject/Components/EnemyComponent.h"
 
+// Find a hand/wrist/arm node to hang the weapon on. Returns -1 if none.
+static int FindAttachNode(Model* m)
+{
+	const char* keys[] = { "hand", "wrist", "arm" };
+	const std::vector<Model::Node>& nodes = m->GetNodes();
+	for (const char* k : keys)
+	{
+		for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
+		{
+			std::string low = nodes[i].name;
+			for (char& ch : low) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+			if (low.find(k) != std::string::npos) return i;
+		}
+	}
+	return -1;
+}
+
 ViewModelComponent::ViewModelComponent(Camera* camera, PlayerControllerComponent* playerCtrl)
 	: camera(camera), playerController(playerCtrl) {
 }
@@ -18,6 +37,9 @@ void ViewModelComponent::Start()
 {
 	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
 	animator = GetActor()->GetComponent<AnimatorComponent>().get();
+
+	// Player body was Start()ed first (created earlier), so its model is ready.
+	if (playerController) attachModel = playerController->GetModelComponent();
 
 	LoadSettings();
 
@@ -36,6 +58,7 @@ void ViewModelComponent::SaveSettings()
 		ofs << offsetScale.x << " " << offsetScale.y << " " << offsetScale.z << "\n";
 		ofs << muzzleOffset.x << " " << muzzleOffset.y << " " << muzzleOffset.z << "\n";
 		ofs << showDebugMuzzle << "\n";
+		ofs << (attachBoneName[0] ? attachBoneName : "none") << "\n";
 	}
 }
 
@@ -48,6 +71,10 @@ void ViewModelComponent::LoadSettings()
 		ifs >> offsetScale.x >> offsetScale.y >> offsetScale.z;
 		ifs >> muzzleOffset.x >> muzzleOffset.y >> muzzleOffset.z;
 		ifs >> showDebugMuzzle;
+		std::string bone;
+		if (ifs >> bone && bone != "none") {
+			strncpy_s(attachBoneName, bone.c_str(), _TRUNCATE);
+		}
 	}
 }
 
@@ -55,20 +82,38 @@ void ViewModelComponent::Update(float elapsedTime)
 {
 	if (!camera) return;
 
-	DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(offsetScale.x, offsetScale.y, offsetScale.z);
-	DirectX::XMMATRIX mOffsetRot = DirectX::XMMatrixRotationRollPitchYaw(offsetRot.x, offsetRot.y, offsetRot.z);
-	DirectX::XMMATRIX mOffsetPos = DirectX::XMMatrixTranslation(offsetPos.x, offsetPos.y, offsetPos.z);
-
+	// Camera basis (used for muzzle + aiming, kept for both FPS and TPS).
 	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera->GetRight());
 	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera->GetUp());
 	DirectX::XMVECTOR F = DirectX::XMLoadFloat3(&camera->GetFront());
 	DirectX::XMVECTOR E = DirectX::XMLoadFloat3(&camera->GetEye());
 
-	DirectX::XMMATRIX mCamWorld;
-	mCamWorld.r[0] = DirectX::XMVectorSetW(R, 0.0f); mCamWorld.r[1] = DirectX::XMVectorSetW(U, 0.0f);
-	mCamWorld.r[2] = DirectX::XMVectorSetW(F, 0.0f); mCamWorld.r[3] = DirectX::XMVectorSetW(E, 1.0f);
+	// ---- Weapon placement: attach to a player bone (world space) ----
+	DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(offsetScale.x, offsetScale.y, offsetScale.z);
+	DirectX::XMMATRIX mOffsetRot = DirectX::XMMatrixRotationRollPitchYaw(offsetRot.x, offsetRot.y, offsetRot.z);
+	DirectX::XMMATRIX mOffsetPos = DirectX::XMMatrixTranslation(offsetPos.x, offsetPos.y, offsetPos.z);
+	DirectX::XMMATRIX mLocal = mScale * mOffsetRot * mOffsetPos;
 
-	DirectX::XMMATRIX mFinal = mScale * mOffsetRot * mOffsetPos * mCamWorld;
+	DirectX::XMMATRIX mAttach;
+	Model* pm = attachModel ? attachModel->GetModel().get() : nullptr;
+	if (pm && !pm->GetNodes().empty())
+	{
+		int ni = -1;
+		if (attachBoneName[0] != '\0') ni = pm->GetNodeIndex(attachBoneName);
+		if (ni < 0) ni = FindAttachNode(pm);
+		if (ni < 0) ni = 0; // fallback: model root (= player world transform)
+		mAttach = DirectX::XMLoadFloat4x4(&pm->GetNodes()[ni].worldTransform);
+	}
+	else
+	{
+		// No player body: fall back to camera-relative placement.
+		DirectX::XMMATRIX mCamWorld;
+		mCamWorld.r[0] = DirectX::XMVectorSetW(R, 0.0f); mCamWorld.r[1] = DirectX::XMVectorSetW(U, 0.0f);
+		mCamWorld.r[2] = DirectX::XMVectorSetW(F, 0.0f); mCamWorld.r[3] = DirectX::XMVectorSetW(E, 1.0f);
+		mAttach = mCamWorld;
+	}
+
+	DirectX::XMMATRIX mFinal = mLocal * mAttach;
 
 	DirectX::XMVECTOR scaleVec, rotQuatVec, transVec;
 	DirectX::XMMatrixDecompose(&scaleVec, &rotQuatVec, &transVec, mFinal);
@@ -82,6 +127,15 @@ void ViewModelComponent::Update(float elapsedTime)
 	GetActor()->SetRotation(wRot);
 	GetActor()->SetScale(wScale);
 
+	// Zero-lag: push the fresh world matrix straight into the weapon model
+	// (the model's own Update ran earlier this frame with a stale transform).
+	if (cachedModelComponent && cachedModelComponent->GetModel())
+	{
+		DirectX::XMFLOAT4X4 wm; DirectX::XMStoreFloat4x4(&wm, mFinal);
+		cachedModelComponent->GetModel()->UpdateTransform(wm);
+	}
+
+	// ---- Muzzle (camera-based aiming) ----
 	DirectX::XMVECTOR muzzlePosVec = E;
 	muzzlePosVec = DirectX::XMVectorAdd(muzzlePosVec, DirectX::XMVectorScale(R, muzzleOffset.x));
 	muzzlePosVec = DirectX::XMVectorAdd(muzzlePosVec, DirectX::XMVectorScale(U, muzzleOffset.y));
@@ -125,9 +179,6 @@ void ViewModelComponent::Update(float elapsedTime)
 		}
 		else if (playerController) {
 			PlayerState pState = playerController->GetCurrentState();
-			// =======================================================
-			// ★追加：PlayerControllerから「Run」状態を受け取り、武器も「Run」にする
-			// =======================================================
 			if (pState == PlayerState::Run) nextState = WeaponState::Run;
 			else if (pState == PlayerState::Walk) nextState = WeaponState::Walk;
 			else if (pState == PlayerState::Jump || pState == PlayerState::Fall) nextState = WeaponState::Jump;
@@ -139,34 +190,25 @@ void ViewModelComponent::Update(float elapsedTime)
 		currentWeaponState = nextState;
 		int animIdx = -1; float fadeTime = 0.1f; bool loop = true;
 
-		// アニメーション再生速度（Walkを倍速にして走りに見せるための初期化）
 		animator->SetAnimSpeed(1.0f);
 
 		switch (currentWeaponState) {
 		case WeaponState::Idle: animIdx = model->GetAnimationIndex("Pistol_IDLE"); break;
 		case WeaponState::Walk: animIdx = model->GetAnimationIndex("Pistol_WALK"); fadeTime = 0.2f; break;
-
-			// =======================================================
-			// ★追加：走るアニメーションの再生処理（フォールバック付き）
-			// =======================================================
 		case WeaponState::Run:
 			animIdx = model->GetAnimationIndex("Pistol_RUN");
 			fadeTime = 0.2f;
-			// もしモデルの中に「Pistol_RUN」という名前のアニメが用意されていなければ、
-			// クラッシュさせずに「Pistol_WALK」を1.5倍速で再生して誤魔化す安全装置！
 			if (animIdx < 0) {
 				animIdx = model->GetAnimationIndex("Pistol_WALK");
 				animator->SetAnimSpeed(1.5f);
 			}
 			break;
-
 		case WeaponState::Jump: animIdx = model->GetAnimationIndex("Pistol_JUMP_START"); loop = false; break;
 		case WeaponState::Reload:
 			currentAmmo = maxAmmo;
 			animIdx = model->GetAnimationIndex("Pistol_RELOAD"); loop = false;
 			if (animIdx >= 0) actionTimer = model->GetAnimations().at(animIdx).secondsLength;
 			break;
-
 		case WeaponState::Fire:
 			currentAmmo--;
 			animIdx = model->GetAnimationIndex("Pistol_FIRE");
@@ -180,19 +222,15 @@ void ViewModelComponent::Update(float elapsedTime)
 				DirectX::XMFLOAT3 origin = camera->GetEye();
 				DirectX::XMFLOAT3 dir = camera->GetFront();
 
-				// 壁（ステージ）へのレイ
 				DirectX::XMFLOAT3 hitPos, hitNorm; float wallDist = 0.0f;
 				bool wallHit = playerController->RayCast(origin, dir, 1000.0f, wallDist, hitPos, hitNorm);
 
-				// 敵へのレイ
 				float enemyDist = 0.0f;
 				EnemyComponent* enemy = EnemyComponent::Raycast(origin, dir, 1000.0f, enemyDist);
 
-				// マズルフラッシュは常に出す
 				vfxList.push_back({ currentMuzzlePos, {0,0,0}, {0,0,0}, {1.0f, 0.8f, 0.2f, 1.0f}, 0.05f, 0.05f, 0 });
 
 				if (enemy && (!wallHit || enemyDist < wallDist)) {
-					// 敵に命中：ダメージ＋トレーサー（弾痕は出さない）
 					enemy->ApplyDamage(34.0f);
 					hitMarkerTimer = 1.0f;
 
@@ -201,7 +239,6 @@ void ViewModelComponent::Update(float elapsedTime)
 					vfxList.push_back({ currentMuzzlePos, {0,0,0}, enemyHitPos, {1.0f, 0.3f, 0.2f, 0.9f}, 0.15f, 0.15f, 1 });
 				}
 				else if (wallHit) {
-					// 壁に命中：従来通り（トレーサー＋弾痕デカール）
 					lastHitPos = hitPos; hitMarkerTimer = 1.0f;
 					vfxList.push_back({ currentMuzzlePos, {0,0,0}, hitPos, {1.0f, 0.9f, 0.0f, 0.8f}, 0.15f, 0.15f, 1 });
 					DirectX::XMVECTOR decalPos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&hitPos), DirectX::XMVectorScale(DirectX::XMLoadFloat3(&hitNorm), 0.01f));
@@ -226,8 +263,8 @@ void ViewModelComponent::Update(float elapsedTime)
 		}
 		else if (effect.type == 1) {
 			DirectX::XMVECTOR S = DirectX::XMLoadFloat3(&effect.position);
-			DirectX::XMVECTOR E = DirectX::XMLoadFloat3(&effect.endPosition);
-			DirectX::XMVECTOR Dir = DirectX::XMVectorSubtract(E, S);
+			DirectX::XMVECTOR Ev = DirectX::XMLoadFloat3(&effect.endPosition);
+			DirectX::XMVECTOR Dir = DirectX::XMVectorSubtract(Ev, S);
 			float length = DirectX::XMVectorGetX(DirectX::XMVector3Length(Dir));
 			if (length > 0.001f) {
 				Dir = DirectX::XMVector3Normalize(Dir);
@@ -312,7 +349,14 @@ void ViewModelComponent::OnGUI()
 		}
 	}
 
-	ImGui::TextColored(ImVec4(1, 0.5f, 1, 1), u8"▼ FPS腕モデル補正設定 (ViewModel)");
+	ImGui::TextColored(ImVec4(1, 0.5f, 1, 1), u8"▼ 武器アタッチ設定 (ViewModel)");
+	ImGui::InputText(u8"アタッチ先ボーン名(空=自動)", attachBoneName, sizeof(attachBoneName));
+	if (attachModel && attachModel->GetModel())
+	{
+		int ni = (attachBoneName[0] != '\0') ? attachModel->GetModel()->GetNodeIndex(attachBoneName) : FindAttachNode(attachModel->GetModel().get());
+		if (ni >= 0) ImGui::Text(u8"検出ボーン: [%d] %s", ni, attachModel->GetModel()->GetNodes()[ni].name.c_str());
+		else ImGui::TextDisabled(u8"ボーン未検出 -> ルートに接続");
+	}
 	if (ImGui::Button(u8"【 補正設定を保存する 】")) SaveSettings();
 	ImGui::Separator();
 
@@ -323,12 +367,12 @@ void ViewModelComponent::OnGUI()
 	ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"▼ 銃口(マズル) 位置設定");
 	ImGui::Checkbox(u8"銃口の目印(緑の球＋レーザー)を表示する", &showDebugMuzzle);
 	ImGui::DragFloat3(u8"銃口オフセット(X,Y,Z)", &muzzleOffset.x, 0.01f);
-	ImGui::Text(u8"※カメラから何メートル離れているか");
 	ImGui::Separator();
 
-	ImGui::DragFloat3(u8"強制スケール", &offsetScale.x, 0.001f, 0.0001f, 10.0f, "%.4f");
-	ImGui::DragFloat3(u8"強制位置オフセット", &offsetPos.x, 0.01f);
-	ImGui::DragFloat3(u8"強制回転オフセット", &offsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
+	ImGui::TextColored(ImVec4(1, 0.7f, 0.3f, 1), u8"▼ ボーンからのオフセット (位置調整)");
+	ImGui::DragFloat3(u8"スケール", &offsetScale.x, 0.01f, 0.0001f, 100.0f, "%.4f");
+	ImGui::DragFloat3(u8"位置オフセット", &offsetPos.x, 0.01f);
+	ImGui::DragFloat3(u8"回転オフセット", &offsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
 
 	ImGui::Separator();
 	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"▼ アニメーション解析・テスト");

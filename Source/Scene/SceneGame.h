@@ -40,6 +40,7 @@ private:
 	void StopPlay();
 	void SnapshotTransforms();
 	void RestoreTransforms();
+	void ApplyCameraView(); // FPS/TPS camera + head-mesh visibility
 
 	void ScanAssets();
 	void BuildAssetTree();
@@ -74,6 +75,12 @@ private:
 
 	EditorMode mode = EditorMode::Edit;
 	int gizmoMode = 0; // 0 = translate, 1 = rotate, 2 = scale
+
+	// ---- Play camera view (F5 toggles) ----
+	int   cameraView = 0;      // 0 = FPS, 1 = TPS
+	bool  prevF5 = false;
+	float tpsDistance = 4.5f;
+	float tpsHeight = 1.6f;
 
 	std::map<class Model*, std::pair<DirectX::XMFLOAT3, DirectX::XMFLOAT3>> aabbCache;
 

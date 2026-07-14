@@ -94,13 +94,13 @@ SceneGame::SceneGame()
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
 	playerActor->AddComponent<HealthComponent>(100.0f);
 
-	// Full-body player model (Voxel). Swap in Settings > Player.
+	// Full-body player model (Voxel). Hidden during Play so the FPS camera can see.
 	auto playerModelComp = playerActor->AddComponent<ModelComponent>("Data/Model/GLB format/character-a.glb");
 	playerModelComp->SetShaderId(ShaderId::Toon);
 
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
-	auto viewModelComp = viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/Pistol.glb");
+	auto viewModelComp = viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/ShootGun.glb");
 	viewModelComp->SetShaderId(ShaderId::Toon);
 	viewModelActor->AddComponent<AnimatorComponent>();
 
@@ -131,9 +131,11 @@ SceneGame::SceneGame()
 		}
 	}
 
+	// Enemy: use a Voxel character (same folder as the player). Anim names differ
+	// from the enemy AI's expected names, so it will not animate yet (see notes).
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
-	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
+	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/GLB format/character-b.glb");
 	enemyModelComp->SetShaderId(ShaderId::Toon);
 	enemyActor->AddComponent<AnimatorComponent>();
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
@@ -170,6 +172,13 @@ void SceneGame::Update(float elapsedTime)
 	{
 		ActorManager::Instance().Update(elapsedTime);
 		ActorManager::Instance().UpdateTransform();
+
+		// F5 toggles FPS <-> TPS (Minecraft-style).
+		bool f5 = (GetAsyncKeyState(VK_F5) & 0x8000) != 0;
+		if (f5 && !prevF5) cameraView ^= 1;
+		prevF5 = f5;
+
+		ApplyCameraView();
 	}
 	else // Edit
 	{
@@ -203,12 +212,22 @@ void SceneGame::StartPlay()
 {
 	SnapshotTransforms();
 	mode = EditorMode::Play;
+	cameraView = 0; // start in FPS
+	prevF5 = (GetAsyncKeyState(VK_F5) & 0x8000) != 0;
+	ApplyCameraView();
 }
+
 
 void SceneGame::StopPlay()
 {
 	mode = EditorMode::Edit;
 	RestoreTransforms();
+
+	// Restore the head when returning to Edit.
+	if (playerActor)
+		if (auto m = playerActor->GetComponent<ModelComponent>())
+			m->SetHideHead(false);
+
 	editorCam.SyncFromCamera(camera);
 }
 
@@ -636,8 +655,10 @@ void SceneGame::Render(float elapsedTime)
 
 	skybox.Draw(camera);
 
+	// The weapon is now a normal bone-attached world actor: show it in Play,
+	// hide it in Edit (it is not positioned there).
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();
-	if (vmModelComp) vmModelComp->SetVisible(false);
+	if (vmModelComp) vmModelComp->SetVisible(mode == EditorMode::Play);
 
 	ActorManager::Instance().Render(rc);
 
@@ -670,21 +691,6 @@ void SceneGame::Render(float elapsedTime)
 	DrawSelectionOutline(view, proj);
 
 	rc.deviceContext->OMSetBlendState(rc.renderState->GetBlendState(BlendState::Opaque), nullptr, 0xFFFFFFFF);
-
-	ID3D11RenderTargetView* rtv = nullptr;
-	ID3D11DepthStencilView* dsv = nullptr;
-	rc.deviceContext->OMGetRenderTargets(1, &rtv, &dsv);
-	if (dsv) {
-		rc.deviceContext->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
-		dsv->Release();
-	}
-	if (rtv) rtv->Release();
-
-	if (vmModelComp && mode == EditorMode::Play) {
-		vmModelComp->SetVisible(true);
-		vmModelComp->Draw();
-		Graphics::Instance().GetModelRenderer()->Render(rc);
-	}
 }
 
 void SceneGame::DrawGUI()
@@ -1089,5 +1095,27 @@ void SceneGame::DrawAssetNode(const AssetNode& node, const char* filter)
 			if (paintMode) activeTilePath = p;
 			else SpawnAsset(p);
 		}
+	}
+}
+
+void SceneGame::ApplyCameraView()
+{
+	// Head mesh: hidden in FPS, shown in TPS.
+	if (playerActor)
+		if (auto m = playerActor->GetComponent<ModelComponent>())
+			m->SetHideHead(cameraView == 0);
+
+	// TPS: pull the camera back along its view direction, keeping the same look.
+	if (cameraView == 1 && playerActor)
+	{
+		DirectX::XMFLOAT3 f = camera.GetFront();
+		DirectX::XMFLOAT3 p = playerActor->GetPosition();
+		DirectX::XMFLOAT3 focus = { p.x, p.y + tpsHeight, p.z };
+		DirectX::XMFLOAT3 eye = {
+			focus.x - f.x * tpsDistance,
+			focus.y - f.y * tpsDistance,
+			focus.z - f.z * tpsDistance
+		};
+		camera.SetLookAt(eye, focus, { 0.0f, 1.0f, 0.0f });
 	}
 }

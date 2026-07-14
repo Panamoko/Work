@@ -29,6 +29,11 @@ public:
 	void SetVisible(bool visible) { isVisible = visible; }
 	bool IsVisible() const { return isVisible; }
 
+	// FPS: collapse the head node so only the head mesh disappears
+	// (body/arms stay visible). No effect on models without a head node.
+	void SetHideHead(bool hide) { hideHead = hide; }
+	bool IsHeadHidden() const { return hideHead; }
+
 	void PlayAnimation(const char* animName);
 	void SetAnimationSpeed(float speed) { animSpeed = speed; }
 	float GetAnimationSpeed() const { return animSpeed; }
@@ -37,6 +42,8 @@ public:
 	void LoadMaterialSettings();
 
 private:
+	void CacheHeadNode(); // find a node whose name contains "head"
+
 	std::shared_ptr<Model>			model;
 	std::string						modelFilename;
 	ShaderId						shaderId = ShaderId::Toon;
@@ -47,4 +54,13 @@ private:
 	float							animSpeed = 1.0f;
 
 	bool							isVisible = true;
+
+	// ---- Head hide (first-person) ----
+	int								headNodeIndex = -1;
+	DirectX::XMFLOAT3				headBaseScale = { 1.0f, 1.0f, 1.0f };
+	bool							hideHead = false;
+	bool							headWasHidden = false;
+
+	// ---- Inspector model-swap ----
+	char							pathBuf[256] = { 0 };
 };
