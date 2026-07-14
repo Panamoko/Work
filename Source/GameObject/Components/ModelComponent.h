@@ -5,10 +5,9 @@
 #include <string>
 #include "GameObject/Component.h"
 #include "Graphics/Model/Model.h"
+#include "Graphics/Model/ModelPose.h"
 #include "Graphics/Model/ModelRenderer.h"
 
-// 3D model component: binds a .glb/.gltf model to an actor and manages
-// drawing and animation.
 class ModelComponent : public Component
 {
 public:
@@ -20,19 +19,25 @@ public:
 	void Update(float elapsedTime) override;
 	void Draw() override;
 	void OnGUI() override;
-	void OnEditorSync() override; // push owner transform to the model in Edit mode
+	void OnEditorSync() override;
 
 	std::shared_ptr<Model> GetModel() const { return model; }
 	const std::string& GetModelPath() const { return modelFilename; }
-	void SetModel(const char* filename);          // reload with a different model
+	const std::vector<Model::Node>& GetPoseNodes() const { return pose.GetNodes(); }
+
+	void SetModel(const char* filename);
 	void SetShaderId(ShaderId id) { shaderId = id; }
 	void SetVisible(bool visible) { isVisible = visible; }
 	bool IsVisible() const { return isVisible; }
 
-	// FPS: collapse the head node so only the head mesh disappears
-	// (body/arms stay visible). No effect on models without a head node.
 	void SetHideHead(bool hide) { hideHead = hide; }
 	bool IsHeadHidden() const { return hideHead; }
+
+	// Directly set this instance's world transform (e.g. a bone-attached weapon).
+	// Call after the AnimatorComponent has submitted its pose this frame.
+	void ApplyWorldTransform(const DirectX::XMFLOAT4X4& world) { if (pose.IsValid()) pose.UpdateTransform(world); }
+
+	void SubmitAnimatorPose(const std::vector<Model::NodePose>& poses);
 
 	void PlayAnimation(const char* animName);
 	void SetAnimationSpeed(float speed) { animSpeed = speed; }
@@ -42,25 +47,23 @@ public:
 	void LoadMaterialSettings();
 
 private:
-	void CacheHeadNode(); // find a node whose name contains "head"
+	void CacheHeadNode();
 
-	std::shared_ptr<Model>			model;
-	std::string						modelFilename;
-	ShaderId						shaderId = ShaderId::Toon;
+	std::shared_ptr<Model>	model;
+	ModelPose				pose;
+	std::string				modelFilename;
+	ShaderId				shaderId = ShaderId::Toon;
 
-	std::vector<Model::NodePose>	nodePoses;
-	int								animationIndex = -1;
-	float							animationSeconds = 0.0f;
-	float							animSpeed = 1.0f;
+	int		animationIndex = -1;
+	float	animationSeconds = 0.0f;
+	float	animSpeed = 1.0f;
+	bool	animatorDrove = false;
 
-	bool							isVisible = true;
+	bool	isVisible = true;
 
-	// ---- Head hide (first-person) ----
-	int								headNodeIndex = -1;
-	DirectX::XMFLOAT3				headBaseScale = { 1.0f, 1.0f, 1.0f };
-	bool							hideHead = false;
-	bool							headWasHidden = false;
+	int					headNodeIndex = -1;
+	DirectX::XMFLOAT3	headBaseScale = { 1.0f, 1.0f, 1.0f };
+	bool				hideHead = false;
 
-	// ---- Inspector model-swap ----
-	char							pathBuf[256] = { 0 };
+	char	pathBuf[256] = { 0 };
 };

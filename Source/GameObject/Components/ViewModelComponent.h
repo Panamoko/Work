@@ -5,7 +5,6 @@
 #include <DirectXMath.h>
 #include "GameObject/Component.h"
 
-// ���ǉ��FRun�i����j�X�e�[�g��ǉ�
 enum class WeaponState { Idle, Walk, Run, Jump, Reload, Fire };
 
 struct VfxEffect {
@@ -37,18 +36,17 @@ public:
 	void SaveSettings();
 	void LoadSettings();
 
-	// The weapon is attached to a bone of this player body model.
-	void SetAttachTarget(ModelComponent* playerModel) { attachModel = playerModel; }
-
 private:
+	void SwapWeapon(const char* path);   // load a new weapon model + re-idle
+
 	Camera* camera = nullptr;
 	PlayerControllerComponent* playerController = nullptr;
 	ModelComponent* cachedModelComponent = nullptr;
 	AnimatorComponent* animator = nullptr;
 
-	// ---- Bone attachment ----
-	ModelComponent* attachModel = nullptr;     // player body model to read bones from
-	char attachBoneName[64] = "";              // empty = auto-find (hand/wrist/arm), else exact node name
+	// ---- Bone attachment (read player body pose) ----
+	ModelComponent* attachModel = nullptr;
+	char attachBoneName[64] = "";        // empty = auto-find hand/wrist/arm
 
 	WeaponState currentWeaponState = WeaponState::Idle;
 	float actionTimer = 0.0f;
@@ -56,7 +54,7 @@ private:
 	int maxAmmo = 12;
 	int currentAmmo = 12;
 
-	DirectX::XMFLOAT3 offsetPos = { 0.1f, -0.2f, 0.3f };
+	DirectX::XMFLOAT3 offsetPos = { 0.15f, 0.0f, 0.1f };
 	DirectX::XMFLOAT3 offsetRot = { 0.0f, 0.0f, 0.0f };
 	DirectX::XMFLOAT3 offsetScale = { 1.0f, 1.0f, 1.0f };
 

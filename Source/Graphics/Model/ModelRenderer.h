@@ -24,7 +24,11 @@ public:
 	ModelRenderer(ID3D11Device* device);
 	~ModelRenderer() {}
 
+	// Legacy: draw using the model's own (shared) node transforms.
 	void Draw(ShaderId shaderId, std::shared_ptr<Model> model);
+	// Instanced: draw using a per-instance ModelPose node array.
+	void Draw(ShaderId shaderId, std::shared_ptr<Model> model, const std::vector<Model::Node>* poseNodes);
+
 	void Render(const RenderContext& rc);
 
 	void SetIBL(
@@ -70,14 +74,16 @@ private:
 
 	struct DrawInfo
 	{
-		ShaderId              shaderId;
+		ShaderId               shaderId;
 		std::shared_ptr<Model> model;
+		const std::vector<Model::Node>* poseNodes; // per-instance nodes; null = model's own
 	};
 
 	struct TransparencyDrawInfo
 	{
 		ShaderId           shaderId;
 		const Model::Mesh* mesh;
+		const std::vector<Model::Node>* poseNodes;
 		float              distance;
 	};
 

@@ -158,6 +158,7 @@
     <ClInclude Include="Source\Graphics\Light.h" />
     <ClInclude Include="Source\Graphics\Model\GLTFImporter.h" />
     <ClInclude Include="Source\Graphics\Model\Model.h" />
+    <ClInclude Include="Source\Graphics\Model\ModelPose.h" />
     <ClInclude Include="Source\Graphics\Model\ModelRenderer.h" />
     <ClInclude Include="Source\Graphics\Renderer\PrimitiveRenderer.h" />
     <ClInclude Include="Source\Graphics\Renderer\ShapeRenderer.h" />
@@ -215,6 +216,7 @@
     <ClCompile Include="Source\Graphics\Graphics.cpp" />
     <ClCompile Include="Source\Graphics\Model\GLTFImporter.cpp" />
     <ClCompile Include="Source\Graphics\Model\Model.cpp" />
+    <ClCompile Include="Source\Graphics\Model\ModelPose.cpp" />
     <ClCompile Include="Source\Graphics\Model\ModelRenderer.cpp" />
     <ClCompile Include="Source\Graphics\Renderer\PrimitiveRenderer.cpp" />
     <ClCompile Include="Source\Graphics\Renderer\ShapeRenderer.cpp" />

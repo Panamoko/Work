@@ -258,6 +258,9 @@
     <ClInclude Include="Source\Scene\EditorCamera.h">
       <Filter>Source\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Graphics\Model\ModelPose.h">
+      <Filter>Source\Graphics\Model</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -418,6 +421,9 @@
     </ClCompile>
     <ClCompile Include="Source\AI\NavGrid.cpp">
       <Filter>Source\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Graphics\Model\ModelPose.cpp">
+      <Filter>Source\Graphics\Model</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

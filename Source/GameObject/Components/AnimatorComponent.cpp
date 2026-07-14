@@ -68,7 +68,6 @@ void AnimatorComponent::Update(float elapsedTime)
 
 	animationSeconds += elapsedTime * animSpeed;
 
-	// ループとクランプ（寸止め）の処理
 	if (!isLoop)
 	{
 		if (animationSeconds >= currentAnimLength)
@@ -76,7 +75,6 @@ void AnimatorComponent::Update(float elapsedTime)
 	}
 	else
 	{
-		// ★プロの修正：処理落ちで一気に時間が進んだ場合でも安全にループを巻き戻す
 		if (currentAnimLength > 0.0001f) {
 			while (animationSeconds > currentAnimLength) {
 				animationSeconds -= currentAnimLength;
@@ -84,31 +82,18 @@ void AnimatorComponent::Update(float elapsedTime)
 		}
 	}
 
-	// 1. 指定されたアニメーションのポーズを計算
 	if (currentAnimIndexA >= 0 && currentAnimIndexB >= 0)
 	{
 		std::vector<Model::NodePose> posesA = currentPoses;
 		std::vector<Model::NodePose> posesB = currentPoses;
 
-		// =======================================================
-		// ★プロの修正：フェーズシンク（位相同期アルゴリズム）
-		// =======================================================
 		float progressA = 0.0f;
-		// ゼロ除算によるクラッシュを防止
-		if (currentAnimLength > 0.0001f) {
-			// A（メイン）のアニメーションが「現在何パーセント(0.0〜1.0)進んでいるか」を計算
-			progressA = animationSeconds / currentAnimLength;
-		}
+		if (currentAnimLength > 0.0001f) progressA = animationSeconds / currentAnimLength;
 
-		// B（サブ）のアニメーションの全体の長さを取得
 		float animLengthB = model->GetAnimations().at(currentAnimIndexB).secondsLength;
-
-		// Bの再生時間を、Aの進捗率に合わせて「強制的にタイムワープ」させる！
 		float animationSecondsB = animLengthB * progressA;
 
 		model->ComputeAnimation(currentAnimIndexA, animationSeconds, posesA);
-
-		// Bには、通常の時間ではなく強制同期させた時間を渡す
 		model->ComputeAnimation(currentAnimIndexB, animationSecondsB, posesB);
 
 		BlendNodePoses(currentPoses, posesA, posesB, currentBlendRatio);
@@ -118,7 +103,6 @@ void AnimatorComponent::Update(float elapsedTime)
 		model->ComputeAnimation(currentAnimIndexA, animationSeconds, currentPoses);
 	}
 
-	// 2. クロスフェードの適用
 	if (isFading)
 	{
 		fadeTimer += elapsedTime;
@@ -128,13 +112,16 @@ void AnimatorComponent::Update(float elapsedTime)
 			isFading = false;
 			fadeWeight = 1.0f;
 		}
-		// ★バグ回避：同じ配列の同時読み書きを防ぐため、一時バッファ（tempPoses）を用意する
 		std::vector<Model::NodePose> tempPoses = currentPoses;
 		BlendNodePoses(currentPoses, previousPoses, tempPoses, fadeWeight);
 	}
 
-	// 最終結果をモデルに反映
-	model->SetNodePoses(currentPoses);
+	// Only push a pose when we actually have a clip; otherwise leave the
+	// instance at its bind pose (avoids distortion right after a model swap).
+	if (currentAnimIndexA >= 0)
+	{
+		cachedModelComponent->SubmitAnimatorPose(currentPoses);
+	}
 }
 
 void AnimatorComponent::BlendNodePoses(std::vector<Model::NodePose>& outPoses, const std::vector<Model::NodePose>& posesA, const std::vector<Model::NodePose>& posesB, float weightB)

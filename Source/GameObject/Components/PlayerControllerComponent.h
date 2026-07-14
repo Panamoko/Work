@@ -76,22 +76,20 @@ private:
 	float runMoveSpeed = 8.0f;
 	float currentFov = 60.0f;
 
-	// =======================================================
-	// ★追加：慣性（スムースな加減速）用の変数群
-	// =======================================================
-	DirectX::XMFLOAT3 currentVelocity = { 0.0f, 0.0f, 0.0f }; // 現在の移動速度（XZ平面）
-	float acceleration = 15.0f; // 走り出しの鋭さ（低いほど重い）
-	float deceleration = 20.0f; // 止まる時の摩擦（低いほど氷のように滑る）
-	float airControl = 0.2f;  // 空中での操作の効き具合（0.0 ~ 1.0）
+	DirectX::XMFLOAT3 currentVelocity = { 0.0f, 0.0f, 0.0f };
+	float acceleration = 15.0f;
+	float deceleration = 20.0f;
+	float airControl = 0.2f;
 
-	char animIdle[64] = "IDLE";
-	char animWalkF[64] = "WALK";
-	char animWalkB[64] = "BACK";
-	char animWalkL[64] = "LEFT";
-	char animWalkR[64] = "RIGHT";
-	char animRun[64] = "RUN";
-	char animJump[64] = "JUMP";
-	char animFall[64] = "FALL";
+	// Voxel character clip names (character-*.glb): idle / walk / sprint ...
+	char animIdle[64] = "idle";
+	char animWalkF[64] = "walk";
+	char animWalkB[64] = "walk";
+	char animWalkL[64] = "walk";
+	char animWalkR[64] = "walk";
+	char animRun[64] = "sprint";
+	char animJump[64] = "jump";
+	char animFall[64] = "fall";
 
 	float crossFadeTime = 0.15f;
 	float fallClampSeconds = 1.0f;

@@ -93,14 +93,17 @@ SceneGame::SceneGame()
 	playerActor->SetName("Player");
 	playerActor->AddComponent<PlayerControllerComponent>(&camera, &cameraController, collisionMesh);
 	playerActor->AddComponent<HealthComponent>(100.0f);
+	// Player needs an Animator to drive the full-body Voxel model.
+	// Added before the model so it updates first (pose -> model same frame).
+	playerActor->AddComponent<AnimatorComponent>();
 
-	// Full-body player model (Voxel). Hidden during Play so the FPS camera can see.
+	// Full-body player model (Voxel). Swap in Settings > Player.
 	auto playerModelComp = playerActor->AddComponent<ModelComponent>("Data/Model/GLB format/character-a.glb");
 	playerModelComp->SetShaderId(ShaderId::Toon);
 
 	viewModelActor = ActorManager::Instance().Create();
 	viewModelActor->SetName("ViewModel");
-	auto viewModelComp = viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/ShootGun.glb");
+	auto viewModelComp = viewModelActor->AddComponent<ModelComponent>("Data/Model/Weapon/Pistol.glb");
 	viewModelComp->SetShaderId(ShaderId::Toon);
 	viewModelActor->AddComponent<AnimatorComponent>();
 
@@ -131,11 +134,9 @@ SceneGame::SceneGame()
 		}
 	}
 
-	// Enemy: use a Voxel character (same folder as the player). Anim names differ
-	// from the enemy AI's expected names, so it will not animate yet (see notes).
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
-	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/GLB format/character-b.glb");
+	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
 	enemyModelComp->SetShaderId(ShaderId::Toon);
 	enemyActor->AddComponent<AnimatorComponent>();
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);

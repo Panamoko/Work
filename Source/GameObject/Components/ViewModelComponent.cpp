@@ -12,20 +12,24 @@
 #include "Core/Input.h" 
 #include "GameObject/Components/EnemyComponent.h"
 
-// Find a hand/wrist/arm node to hang the weapon on. Returns -1 if none.
 static int FindAttachNode(Model* m)
 {
 	const char* keys[] = { "hand", "wrist", "arm" };
 	const std::vector<Model::Node>& nodes = m->GetNodes();
 	for (const char* k : keys)
-	{
 		for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
 		{
 			std::string low = nodes[i].name;
 			for (char& ch : low) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
 			if (low.find(k) != std::string::npos) return i;
 		}
-	}
+	return -1;
+}
+
+static int FindWeaponIdle(Model* m)
+{
+	const char* names[] = { "Pistol_IDLE", "idle", "Idle", "static" };
+	for (const char* n : names) { int i = m->GetAnimationIndex(n); if (i >= 0) return i; }
 	return -1;
 }
 
@@ -38,13 +42,24 @@ void ViewModelComponent::Start()
 	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
 	animator = GetActor()->GetComponent<AnimatorComponent>().get();
 
-	// Player body was Start()ed first (created earlier), so its model is ready.
 	if (playerController) attachModel = playerController->GetModelComponent();
 
 	LoadSettings();
 
 	if (animator && cachedModelComponent && cachedModelComponent->GetModel()) {
-		int idx = cachedModelComponent->GetModel()->GetAnimationIndex("Pistol_IDLE");
+		int idx = FindWeaponIdle(cachedModelComponent->GetModel().get());
+		if (idx >= 0) animator->Play(idx, 0.1f, true);
+	}
+}
+
+void ViewModelComponent::SwapWeapon(const char* path)
+{
+	if (!cachedModelComponent) return;
+	cachedModelComponent->SetModel(path);
+	currentWeaponState = WeaponState::Idle;
+	actionTimer = 0.0f;
+	if (animator && cachedModelComponent->GetModel()) {
+		int idx = FindWeaponIdle(cachedModelComponent->GetModel().get());
 		if (idx >= 0) animator->Play(idx, 0.1f, true);
 	}
 }
@@ -72,9 +87,7 @@ void ViewModelComponent::LoadSettings()
 		ifs >> muzzleOffset.x >> muzzleOffset.y >> muzzleOffset.z;
 		ifs >> showDebugMuzzle;
 		std::string bone;
-		if (ifs >> bone && bone != "none") {
-			strncpy_s(attachBoneName, bone.c_str(), _TRUNCATE);
-		}
+		if (ifs >> bone && bone != "none") strncpy_s(attachBoneName, bone.c_str(), _TRUNCATE);
 	}
 }
 
@@ -82,31 +95,34 @@ void ViewModelComponent::Update(float elapsedTime)
 {
 	if (!camera) return;
 
-	// Camera basis (used for muzzle + aiming, kept for both FPS and TPS).
 	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera->GetRight());
 	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera->GetUp());
 	DirectX::XMVECTOR F = DirectX::XMLoadFloat3(&camera->GetFront());
 	DirectX::XMVECTOR E = DirectX::XMLoadFloat3(&camera->GetEye());
 
-	// ---- Weapon placement: attach to a player bone (world space) ----
+	// ---- Weapon placement: attach to a player body bone (world space) ----
 	DirectX::XMMATRIX mScale = DirectX::XMMatrixScaling(offsetScale.x, offsetScale.y, offsetScale.z);
 	DirectX::XMMATRIX mOffsetRot = DirectX::XMMatrixRotationRollPitchYaw(offsetRot.x, offsetRot.y, offsetRot.z);
 	DirectX::XMMATRIX mOffsetPos = DirectX::XMMatrixTranslation(offsetPos.x, offsetPos.y, offsetPos.z);
 	DirectX::XMMATRIX mLocal = mScale * mOffsetRot * mOffsetPos;
 
 	DirectX::XMMATRIX mAttach;
-	Model* pm = attachModel ? attachModel->GetModel().get() : nullptr;
-	if (pm && !pm->GetNodes().empty())
+	if (attachModel)
 	{
-		int ni = -1;
-		if (attachBoneName[0] != '\0') ni = pm->GetNodeIndex(attachBoneName);
-		if (ni < 0) ni = FindAttachNode(pm);
-		if (ni < 0) ni = 0; // fallback: model root (= player world transform)
-		mAttach = DirectX::XMLoadFloat4x4(&pm->GetNodes()[ni].worldTransform);
+		const std::vector<Model::Node>& pnodes = attachModel->GetPoseNodes();
+		if (!pnodes.empty())
+		{
+			int ni = -1;
+			if (attachBoneName[0] != '\0' && attachModel->GetModel())
+				ni = attachModel->GetModel()->GetNodeIndex(attachBoneName);
+			if (ni < 0 && attachModel->GetModel()) ni = FindAttachNode(attachModel->GetModel().get());
+			if (ni < 0 || ni >= static_cast<int>(pnodes.size())) ni = 0;
+			mAttach = DirectX::XMLoadFloat4x4(&pnodes[ni].worldTransform);
+		}
+		else mAttach = DirectX::XMMatrixIdentity();
 	}
 	else
 	{
-		// No player body: fall back to camera-relative placement.
 		DirectX::XMMATRIX mCamWorld;
 		mCamWorld.r[0] = DirectX::XMVectorSetW(R, 0.0f); mCamWorld.r[1] = DirectX::XMVectorSetW(U, 0.0f);
 		mCamWorld.r[2] = DirectX::XMVectorSetW(F, 0.0f); mCamWorld.r[3] = DirectX::XMVectorSetW(E, 1.0f);
@@ -117,22 +133,20 @@ void ViewModelComponent::Update(float elapsedTime)
 
 	DirectX::XMVECTOR scaleVec, rotQuatVec, transVec;
 	DirectX::XMMatrixDecompose(&scaleVec, &rotQuatVec, &transVec, mFinal);
-
 	DirectX::XMFLOAT3 wPos, wScale; DirectX::XMFLOAT4 wRot;
 	DirectX::XMStoreFloat3(&wPos, transVec);
 	DirectX::XMStoreFloat4(&wRot, rotQuatVec);
 	DirectX::XMStoreFloat3(&wScale, scaleVec);
-
 	GetActor()->SetPosition(wPos);
 	GetActor()->SetRotation(wRot);
 	GetActor()->SetScale(wScale);
 
-	// Zero-lag: push the fresh world matrix straight into the weapon model
-	// (the model's own Update ran earlier this frame with a stale transform).
-	if (cachedModelComponent && cachedModelComponent->GetModel())
+	// Zero-lag: push the bone-attached world straight into the weapon pose
+	// (the animator already submitted its node poses this frame).
+	if (cachedModelComponent)
 	{
 		DirectX::XMFLOAT4X4 wm; DirectX::XMStoreFloat4x4(&wm, mFinal);
-		cachedModelComponent->GetModel()->UpdateTransform(wm);
+		cachedModelComponent->ApplyWorldTransform(wm);
 	}
 
 	// ---- Muzzle (camera-based aiming) ----
@@ -198,10 +212,7 @@ void ViewModelComponent::Update(float elapsedTime)
 		case WeaponState::Run:
 			animIdx = model->GetAnimationIndex("Pistol_RUN");
 			fadeTime = 0.2f;
-			if (animIdx < 0) {
-				animIdx = model->GetAnimationIndex("Pistol_WALK");
-				animator->SetAnimSpeed(1.5f);
-			}
+			if (animIdx < 0) { animIdx = model->GetAnimationIndex("Pistol_WALK"); animator->SetAnimSpeed(1.5f); }
 			break;
 		case WeaponState::Jump: animIdx = model->GetAnimationIndex("Pistol_JUMP_START"); loop = false; break;
 		case WeaponState::Reload:
@@ -233,7 +244,6 @@ void ViewModelComponent::Update(float elapsedTime)
 				if (enemy && (!wallHit || enemyDist < wallDist)) {
 					enemy->ApplyDamage(34.0f);
 					hitMarkerTimer = 1.0f;
-
 					DirectX::XMVECTOR hp = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&origin), DirectX::XMVectorScale(DirectX::XMLoadFloat3(&dir), enemyDist));
 					DirectX::XMFLOAT3 enemyHitPos; DirectX::XMStoreFloat3(&enemyHitPos, hp);
 					vfxList.push_back({ currentMuzzlePos, {0,0,0}, enemyHitPos, {1.0f, 0.3f, 0.2f, 0.9f}, 0.15f, 0.15f, 1 });
@@ -349,41 +359,34 @@ void ViewModelComponent::OnGUI()
 		}
 	}
 
-	ImGui::TextColored(ImVec4(1, 0.5f, 1, 1), u8"▼ 武器アタッチ設定 (ViewModel)");
-	ImGui::InputText(u8"アタッチ先ボーン名(空=自動)", attachBoneName, sizeof(attachBoneName));
+	ImGui::TextColored(ImVec4(1, 0.6f, 0.2f, 1), u8"▼ 装備する武器モデル");
+	const char* weapons[] = { "Pistol", "Rifle", "Staff", "ShootGun" };
+	for (const char* wname : weapons)
+	{
+		char path[128];
+		sprintf_s(path, "Data/Model/Weapon/%s.glb", wname);
+		if (ImGui::Selectable(wname)) SwapWeapon(path);
+	}
+	if (cachedModelComponent)
+		ImGui::TextDisabled("Current: %s", cachedModelComponent->GetModelPath().c_str());
+	ImGui::Separator();
+
+	ImGui::TextColored(ImVec4(1, 0.5f, 1, 1), u8"▼ アタッチ / 位置補正");
+	ImGui::InputText(u8"アタッチ先ボーン(空=自動)", attachBoneName, sizeof(attachBoneName));
 	if (attachModel && attachModel->GetModel())
 	{
 		int ni = (attachBoneName[0] != '\0') ? attachModel->GetModel()->GetNodeIndex(attachBoneName) : FindAttachNode(attachModel->GetModel().get());
 		if (ni >= 0) ImGui::Text(u8"検出ボーン: [%d] %s", ni, attachModel->GetModel()->GetNodes()[ni].name.c_str());
-		else ImGui::TextDisabled(u8"ボーン未検出 -> ルートに接続");
+		else ImGui::TextDisabled(u8"ボーン未検出 -> ルート接続");
 	}
-	if (ImGui::Button(u8"【 補正設定を保存する 】")) SaveSettings();
-	ImGui::Separator();
-
-	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ 武器ステータス (Ammo)");
-	ImGui::Text(u8"弾薬: %d / %d", currentAmmo, maxAmmo);
-	ImGui::Separator();
-
-	ImGui::TextColored(ImVec4(0, 1, 0, 1), u8"▼ 銃口(マズル) 位置設定");
-	ImGui::Checkbox(u8"銃口の目印(緑の球＋レーザー)を表示する", &showDebugMuzzle);
-	ImGui::DragFloat3(u8"銃口オフセット(X,Y,Z)", &muzzleOffset.x, 0.01f);
-	ImGui::Separator();
-
-	ImGui::TextColored(ImVec4(1, 0.7f, 0.3f, 1), u8"▼ ボーンからのオフセット (位置調整)");
 	ImGui::DragFloat3(u8"スケール", &offsetScale.x, 0.01f, 0.0001f, 100.0f, "%.4f");
 	ImGui::DragFloat3(u8"位置オフセット", &offsetPos.x, 0.01f);
 	ImGui::DragFloat3(u8"回転オフセット", &offsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
-
+	if (ImGui::Button(u8"【 補正設定を保存 】")) SaveSettings();
 	ImGui::Separator();
-	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"▼ アニメーション解析・テスト");
-	Model* model = (cachedModelComponent) ? cachedModelComponent->GetModel().get() : nullptr;
-	if (model && animator)
-	{
-		ImGui::InputText(u8"現在のアニメ名", currentAnimName, sizeof(currentAnimName));
-		if (ImGui::Button(u8"この名前で再生テスト"))
-		{
-			int animIdx = model->GetAnimationIndex(currentAnimName);
-			if (animIdx >= 0) animator->Play(animIdx, 0.1f, true);
-		}
-	}
+
+	ImGui::TextColored(ImVec4(1, 1, 0, 1), u8"▼ 弾薬");
+	ImGui::Text(u8"%d / %d", currentAmmo, maxAmmo);
+	ImGui::Checkbox(u8"銃口デバッグ表示", &showDebugMuzzle);
+	ImGui::DragFloat3(u8"銃口オフセット", &muzzleOffset.x, 0.01f);
 }

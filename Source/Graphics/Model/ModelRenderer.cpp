@@ -9,6 +9,17 @@
 #include "Graphics/ShaderClass/PbrShader.h"
 #include "Graphics/ShaderClass/ToonShader.h"
 
+// Pick a node's world transform: per-instance pose if provided, else the
+// model's own (shared) node the mesh/bone points at.
+static const DirectX::XMFLOAT4X4& BoneWorld(const Model::Bone& bone, const std::vector<Model::Node>* poseNodes)
+{
+	return poseNodes ? (*poseNodes)[bone.nodeIndex].worldTransform : bone.node->worldTransform;
+}
+static const DirectX::XMFLOAT4X4& MeshNodeWorld(const Model::Mesh& mesh, const std::vector<Model::Node>* poseNodes)
+{
+	return poseNodes ? (*poseNodes)[mesh.nodeIndex].worldTransform : mesh.node->worldTransform;
+}
+
 static const char* kShadowHLSL = R"(
 cbuffer CbSkeleton : register(b6)
 {
@@ -107,8 +118,8 @@ void ModelRenderer::InitShadow(ID3D11Device* device)
 void ModelRenderer::RenderShadowDepth(const RenderContext& rc)
 {
 	if (!shadowDSV || !shadowVS) return;
-	// Skip regenerating the shadow map on tiny passes (e.g. the FPS viewmodel pass);
-	// keep the world shadow map so the gun is still shaded by the world.
+	// Skip regenerating the shadow map on tiny passes (e.g. a single-model pass);
+	// keep the world shadow map so that model is still shaded by the world.
 	if (drawInfos.size() < 2) return;
 
 	ID3D11DeviceContext* dc = rc.deviceContext;
@@ -168,6 +179,7 @@ void ModelRenderer::RenderShadowDepth(const RenderContext& rc)
 
 	for (DrawInfo& drawInfo : drawInfos)
 	{
+		const std::vector<Model::Node>* poseNodes = drawInfo.poseNodes;
 		for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
 		{
 			if (mesh.material != nullptr && mesh.material->alphaMode == Model::AlphaMode::Blend) continue;
@@ -183,14 +195,14 @@ void ModelRenderer::RenderShadowDepth(const RenderContext& rc)
 				for (size_t i = 0; i < mesh.bones.size(); ++i)
 				{
 					const Model::Bone& bone = mesh.bones.at(i);
-					DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&bone.node->worldTransform);
+					DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&BoneWorld(bone, poseNodes));
 					DirectX::XMMATRIX O = DirectX::XMLoadFloat4x4(&bone.offsetTransform);
 					DirectX::XMStoreFloat4x4(&cbSkeleton.boneTransforms[i], O * W);
 				}
 			}
 			else
 			{
-				cbSkeleton.boneTransforms[0] = mesh.node->worldTransform;
+				cbSkeleton.boneTransforms[0] = MeshNodeWorld(mesh, poseNodes);
 			}
 			dc->UpdateSubresource(skeletonConstantBuffer.Get(), 0, 0, &cbSkeleton, 0, 0);
 
@@ -209,6 +221,15 @@ void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model)
 	DrawInfo& drawInfo = drawInfos.emplace_back();
 	drawInfo.shaderId = shaderId;
 	drawInfo.model = model;
+	drawInfo.poseNodes = nullptr;
+}
+
+void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model, const std::vector<Model::Node>* poseNodes)
+{
+	DrawInfo& drawInfo = drawInfos.emplace_back();
+	drawInfo.shaderId = shaderId;
+	drawInfo.model = model;
+	drawInfo.poseNodes = poseNodes;
 }
 
 void ModelRenderer::Render(const RenderContext& rc)
@@ -282,7 +303,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 	ID3D11ShaderResourceView* shadowSrvBind = (enableShadow ? shadowSRV.Get() : nullptr);
 	dc->PSSetShaderResources(8, 1, &shadowSrvBind);
 
-	auto drawMesh = [&](const Model::Mesh& mesh, Shader* shader)
+	auto drawMesh = [&](const Model::Mesh& mesh, Shader* shader, const std::vector<Model::Node>* poseNodes)
 		{
 			UINT stride = sizeof(Model::Vertex);
 			UINT offset = 0;
@@ -296,14 +317,14 @@ void ModelRenderer::Render(const RenderContext& rc)
 				for (size_t i = 0; i < mesh.bones.size(); ++i)
 				{
 					const Model::Bone& bone = mesh.bones.at(i);
-					DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&bone.node->worldTransform);
+					DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&BoneWorld(bone, poseNodes));
 					DirectX::XMMATRIX O = DirectX::XMLoadFloat4x4(&bone.offsetTransform);
 					DirectX::XMStoreFloat4x4(&cbSkeleton.boneTransforms[i], O * W);
 				}
 			}
 			else
 			{
-				cbSkeleton.boneTransforms[0] = mesh.node->worldTransform;
+				cbSkeleton.boneTransforms[0] = MeshNodeWorld(mesh, poseNodes);
 			}
 			dc->UpdateSubresource(skeletonConstantBuffer.Get(), 0, 0, &cbSkeleton, 0, 0);
 
@@ -319,6 +340,8 @@ void ModelRenderer::Render(const RenderContext& rc)
 
 	for (DrawInfo& drawInfo : drawInfos)
 	{
+		const std::vector<Model::Node>* poseNodes = drawInfo.poseNodes;
+
 		if (drawInfo.shaderId == ShaderId::Toon)
 		{
 			dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullFront));
@@ -331,7 +354,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 				if (mesh.material->alphaMode == Model::AlphaMode::Blend ||
 					(mesh.material->baseColor.w > 0.01f && mesh.material->baseColor.w < 0.99f)) continue;
 
-				drawMesh(mesh, toonOutlineShader.get());
+				drawMesh(mesh, toonOutlineShader.get(), poseNodes);
 			}
 			toonOutlineShader->End(rc);
 
@@ -345,7 +368,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 		{
 			if (mesh.material == nullptr)
 			{
-				drawMesh(mesh, shader);
+				drawMesh(mesh, shader, poseNodes);
 				continue;
 			}
 
@@ -355,15 +378,14 @@ void ModelRenderer::Render(const RenderContext& rc)
 				TransparencyDrawInfo& tdi = transparencyDrawInfos.emplace_back();
 				tdi.mesh = &mesh;
 				tdi.shaderId = drawInfo.shaderId;
-				DirectX::XMVECTOR pos = DirectX::XMVectorSet(
-					mesh.node->worldTransform._41,
-					mesh.node->worldTransform._42,
-					mesh.node->worldTransform._43, 0);
+				tdi.poseNodes = poseNodes;
+				const DirectX::XMFLOAT4X4& mw = MeshNodeWorld(mesh, poseNodes);
+				DirectX::XMVECTOR pos = DirectX::XMVectorSet(mw._41, mw._42, mw._43, 0);
 				tdi.distance = DirectX::XMVectorGetX(
 					DirectX::XMVector3Dot(CameraFront, DirectX::XMVectorSubtract(pos, CameraPosition)));
 				continue;
 			}
-			drawMesh(mesh, shader);
+			drawMesh(mesh, shader, poseNodes);
 		}
 		shader->End(rc);
 	}
@@ -379,7 +401,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 	{
 		Shader* shader = shaders[static_cast<int>(tdi.shaderId)].get();
 		shader->Begin(rc);
-		drawMesh(*tdi.mesh, shader);
+		drawMesh(*tdi.mesh, shader, tdi.poseNodes);
 		shader->End(rc);
 	}
 	transparencyDrawInfos.clear();

@@ -3,20 +3,12 @@
 #include <cctype>
 #include "Graphics/Graphics.h"
 #include "GameObject/Components/ModelComponent.h"
+#include "GameObject/Actor.h"
 #include "Core/ResourceManager.h"
 
 ModelComponent::ModelComponent(const char* filename)
 {
-	modelFilename = filename;
-
-	model = ResourceManager::Instance().LoadModel(filename);
-
-	if (model != nullptr)
-	{
-		model->GetNodePoses(nodePoses);
-		CacheHeadNode();
-		LoadMaterialSettings();
-	}
+	SetModel(filename);
 }
 
 void ModelComponent::SetModel(const char* filename)
@@ -24,14 +16,14 @@ void ModelComponent::SetModel(const char* filename)
 	modelFilename = filename;
 	animationIndex = -1;
 	animationSeconds = 0.0f;
-	nodePoses.clear();
+	animatorDrove = false;
 	headNodeIndex = -1;
-	headWasHidden = false;
 
 	model = ResourceManager::Instance().LoadModel(filename);
+	pose.SetModel(model);
+
 	if (model != nullptr)
 	{
-		model->GetNodePoses(nodePoses);
 		CacheHeadNode();
 		LoadMaterialSettings();
 	}
@@ -56,6 +48,12 @@ void ModelComponent::CacheHeadNode()
 	}
 }
 
+void ModelComponent::SubmitAnimatorPose(const std::vector<Model::NodePose>& poses)
+{
+	pose.SetNodePoses(poses);
+	animatorDrove = true;
+}
+
 void ModelComponent::PlayAnimation(const char* animName)
 {
 	if (model == nullptr) return;
@@ -70,83 +68,61 @@ void ModelComponent::PlayAnimation(const char* animName)
 
 void ModelComponent::Update(float elapsedTime)
 {
-	if (model == nullptr) return;
+	if (!pose.IsValid()) return;
 
-	bool poseDirty = false;
-
-	if (animationIndex >= 0)
+	// If no AnimatorComponent fed us a pose this frame, run our own clip.
+	if (!animatorDrove && animationIndex >= 0)
 	{
+		pose.ComputeAnimation(animationIndex, animationSeconds);
+
 		const Model::Animation& anim = model->GetAnimations().at(animationIndex);
-
-		model->ComputeAnimation(animationIndex, animationSeconds, nodePoses);
-
 		animationSeconds += elapsedTime * animSpeed;
 		if (animationSeconds > anim.secondsLength)
 		{
 			animationSeconds -= anim.secondsLength;
 		}
-		poseDirty = true;
 	}
 
-	// Head hide (FPS): zero the head node scale so its mesh collapses away.
-	if (headNodeIndex >= 0 && headNodeIndex < static_cast<int>(nodePoses.size()))
+	// FPS head hide: collapse / restore the head node.
+	if (headNodeIndex >= 0)
 	{
-		if (hideHead)
-		{
-			nodePoses[headNodeIndex].scale = { 0.0f, 0.0f, 0.0f };
-			poseDirty = true;
-		}
-		else if (headWasHidden)
-		{
-			nodePoses[headNodeIndex].scale = headBaseScale;
-			poseDirty = true;
-		}
-		headWasHidden = hideHead;
-	}
-
-	if (poseDirty)
-	{
-		model->SetNodePoses(nodePoses);
+		pose.SetNodeScale(headNodeIndex, hideHead ? DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f } : headBaseScale);
 	}
 
 	std::shared_ptr<Actor> owner = GetActor();
 	if (owner != nullptr)
 	{
-		model->UpdateTransform(owner->GetTransform());
+		pose.UpdateTransform(owner->GetTransform());
 	}
+
+	animatorDrove = false;
 }
 
 void ModelComponent::OnEditorSync()
 {
-	if (model == nullptr) return;
+	if (!pose.IsValid()) return;
 
-	// Keep the head restored (or hidden) consistently in Edit mode, since
-	// Update() is not ticked here.
-	if (headNodeIndex >= 0 && headNodeIndex < static_cast<int>(nodePoses.size()))
+	if (headNodeIndex >= 0)
 	{
-		nodePoses[headNodeIndex].scale = hideHead ? DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f } : headBaseScale;
-		model->SetNodePoses(nodePoses);
-		headWasHidden = hideHead;
+		pose.SetNodeScale(headNodeIndex, hideHead ? DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f } : headBaseScale);
 	}
 
 	std::shared_ptr<Actor> owner = GetActor();
 	if (owner != nullptr)
 	{
-		model->UpdateTransform(owner->GetTransform());
+		pose.UpdateTransform(owner->GetTransform());
 	}
 }
 
 void ModelComponent::Draw()
 {
 	if (!isVisible) return;
+	if (model == nullptr) return;
 
-	if (model != nullptr)
+	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
+	if (renderer != nullptr)
 	{
-		ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
-		if (renderer != nullptr)
-		{
-			renderer->Draw(shaderId, model);
-		}
+		renderer->Draw(shaderId, model, &pose.GetNodes());
 	}
 }
 
@@ -196,14 +172,9 @@ void ModelComponent::LoadMaterialSettings()
 
 void ModelComponent::OnGUI()
 {
-	if (model == nullptr)
-	{
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model not loaded");
-	}
-
-	// ---- Model swap (Inspector) --------------------------------------
-	// Type a path and press Load, or pick a preset. Works for the Player
-	// body, the ViewModel weapon, or any model actor.
+	// ---- Model file (Inspector): show current path, allow manual reload. ----
+	// Preset lists intentionally removed here: use Settings > Player to swap
+	// the body / weapon so you never replace the wrong actor by accident.
 	if (ImGui::CollapsingHeader("Model file", ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		ImGui::TextWrapped("Current: %s", modelFilename.c_str());
@@ -218,42 +189,13 @@ void ModelComponent::OnGUI()
 		{
 			SetModel(pathBuf);
 		}
-
-		if (ImGui::TreeNode("Voxel characters (a-r)"))
-		{
-			for (char c = 'a'; c <= 'r'; ++c)
-			{
-				char path[128];
-				sprintf_s(path, "Data/Model/GLB format/character-%c.glb", c);
-				char label[32];
-				sprintf_s(label, "character-%c", c);
-				if (ImGui::Selectable(label))
-				{
-					SetModel(path);
-					strncpy_s(pathBuf, path, _TRUNCATE);
-				}
-			}
-			ImGui::TreePop();
-		}
-
-		if (ImGui::TreeNode("Weapons"))
-		{
-			const char* weapons[] = { "Pistol", "Rifle", "Staff", "ShootGun" };
-			for (const char* w : weapons)
-			{
-				char path[128];
-				sprintf_s(path, "Data/Model/Weapon/%s.glb", w);
-				if (ImGui::Selectable(w))
-				{
-					SetModel(path);
-					strncpy_s(pathBuf, path, _TRUNCATE);
-				}
-			}
-			ImGui::TreePop();
-		}
 	}
 
-	if (model == nullptr) return;
+	if (model == nullptr)
+	{
+		ImGui::TextColored(ImVec4(1, 0, 0, 1), "Model not loaded");
+		return;
+	}
 
 	ImGui::Separator();
 
@@ -268,14 +210,6 @@ void ModelComponent::OnGUI()
 
 	ImGui::Text("Animation");
 	ImGui::SliderFloat("Speed", &animSpeed, 0.0f, 5.0f);
-	if (animationIndex >= 0)
-	{
-		ImGui::Text("Index: %d  Time: %.2f", animationIndex, animationSeconds);
-	}
-	else
-	{
-		ImGui::TextDisabled("No animation");
-	}
 
 	ImGui::Separator();
 
