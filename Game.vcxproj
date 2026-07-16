@@ -207,6 +207,10 @@
     <ClCompile Include="Source\GameObject\Components\AnimatorComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\CrosshairComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\EnemyComponent.cpp" />
+    <ClCompile Include="Source\GameObject\Components\EnemyComponentBehavior.cpp" />
+    <ClCompile Include="Source\GameObject\Components\EnemyComponentCombat.cpp" />
+    <ClCompile Include="Source\GameObject\Components\EnemyComponentGui.cpp" />
+    <ClCompile Include="Source\GameObject\Components\EnemyComponentMovement.cpp" />
     <ClCompile Include="Source\GameObject\Components\HealthComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\ModelComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\PlayerControllerComponent.cpp" />
@@ -228,9 +232,14 @@
     <ClCompile Include="Source\Graphics\ShaderClass\ToonShader.cpp" />
     <ClCompile Include="Source\Physics\CollisionMesh.cpp" />
     <ClCompile Include="Source\Physics\SphereCast.cpp" />
+    <ClCompile Include="Source\Physics\SphereCastSweep.cpp" />
     <ClCompile Include="Source\Physics\TransformUtils.cpp" />
     <ClCompile Include="Source\Scene\Scene.cpp" />
     <ClCompile Include="Source\Scene\SceneGame.cpp" />
+    <ClCompile Include="Source\Scene\SceneGameContent.cpp" />
+    <ClCompile Include="Source\Scene\SceneGameEditor.cpp" />
+    <ClCompile Include="Source\Scene\SceneGameGui.cpp" />
+    <ClCompile Include="Source\Scene\SceneGameTilemap.cpp" />
     <ClCompile Include="Source\Scene\Skybox.cpp" />
     <ClCompile Include="Source\UI\Dialog.cpp" />
     <ClCompile Include="Source\UI\ImGuiRenderer.cpp" />
