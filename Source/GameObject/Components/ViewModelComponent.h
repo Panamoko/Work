@@ -37,7 +37,8 @@ public:
 	void LoadSettings();
 
 private:
-	void SwapWeapon(const char* path);   // load a new weapon model + re-idle
+	void SwapWeapon(const char* path);   // load a new weapon model + rebind animator + re-idle
+	void ScanWeaponAssets();             // gather selectable .glb/.gltf under Data/Model/Weapon
 
 	Camera* camera = nullptr;
 	PlayerControllerComponent* playerController = nullptr;
@@ -47,6 +48,10 @@ private:
 	// ---- Bone attachment (read player body pose) ----
 	ModelComponent* attachModel = nullptr;
 	char attachBoneName[64] = "";        // empty = auto-find hand/wrist/arm
+
+	// ---- Weapon model picker (inspector) ----
+	std::vector<std::string> weaponAssetPaths;   // cached Data/Model/Weapon/**.glb
+	char weaponFilter[64] = "";                  // inspector search box
 
 	WeaponState currentWeaponState = WeaponState::Idle;
 	float actionTimer = 0.0f;

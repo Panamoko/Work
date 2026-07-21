@@ -1,4 +1,6 @@
 #include <imgui.h>
+#include <windows.h>   // OutputDebugStringA
+#include <cstdio>      // sprintf_s
 #include <fstream>
 #include <cmath>
 #include <cfloat>
@@ -78,28 +80,64 @@ void EnemyComponent::ResolveAnimationIndices()
 	}
 }
 
-// Inspector-driven model swap. A plain SetModel() would leave the cached clip
-// indices and the AnimatorComponent's pose buffers pointing at the OLD skeleton,
-// which can crash when the new model has a different node / animation count.
+// Natural (un-scaled) height of the current model, measured from the bind-pose
+// node transforms. Used to keep a swapped model at a consistent on-screen size
+// no matter how the source .glb was authored.
+float EnemyComponent::MeasureModelHeight() const
+{
+	if (!modelComp) return 0.0f;
+	std::shared_ptr<Model> model = modelComp->GetModel();
+	if (!model) return 0.0f;
+
+	float minY = FLT_MAX;
+	float maxY = -FLT_MAX;
+	for (const Model::Mesh& mesh : model->GetMeshes())
+	{
+		DirectX::XMMATRIX nodeW = DirectX::XMLoadFloat4x4(&mesh.node->worldTransform);
+		for (const Model::Vertex& v : mesh.vertices)
+		{
+			DirectX::XMVECTOR p = DirectX::XMVector3Transform(DirectX::XMLoadFloat3(&v.position), nodeW);
+			float y = DirectX::XMVectorGetY(p);
+			minY = (std::min)(minY, y);
+			maxY = (std::max)(maxY, y);
+		}
+	}
+	if (maxY <= minY) return 0.0f;
+	return maxY - minY;
+}
+
 void EnemyComponent::ChangeModel(const char* filename)
 {
-	if (!modelComp || filename == nullptr || filename[0] == '\0') return;
+	std::shared_ptr<Actor> owner = GetActor();
+	if (!modelComp || !owner || filename == nullptr || filename[0] == '\0') return;
 	if (modelComp->GetModelPath() == filename) return; // already this model
 
-	// 1) swap the mesh / skeleton / materials on this actor's ModelComponent
+	// Remember the enemy's current on-screen height. Actor scale is tuned per
+	// model (Enemy3 uses 0.01 because it is authored huge), so blindly reusing it
+	// on a normally-sized model would shrink it to a nearly invisible speck.
+	float worldHeight = MeasureModelHeight() * owner->GetScale().y;
+
+	// 1) swap mesh / skeleton / materials
 	modelComp->SetModel(filename);
 
-	// 2) clip indices are per-model -> refresh them for the new model
+	// 2) re-anchor to the actor (SetModel leaves the new pose at world origin)
+	modelComp->ApplyWorldTransform(owner->GetTransform());
+
+	// 3) per-model clip indices + animator rebind
 	ResolveAnimationIndices();
-
-	// 3) rebind the animator so its pose buffers / current clip match the new
-	//    skeleton (prevents out-of-range access and cross-skeleton blending)
 	if (animator) animator->RebindModel();
-
-	// 4) start the new model from a clean idle state
 	attacking = false;
 	damageDealt = false;
 	PlayState(State::Idle, true);
+
+	// 4) auto-fit: scale the actor so the new model keeps the same visible height
+	float newHeight = MeasureModelHeight();
+	if (newHeight > 1e-4f)
+	{
+		float target = (worldHeight > 1e-4f) ? worldHeight : 1.8f; // fallback ~human height
+		float s = target / newHeight;
+		owner->SetScale({ s, s, s });
+	}
 }
 
 void EnemyComponent::Update(float elapsedTime)

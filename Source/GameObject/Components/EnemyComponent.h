@@ -80,6 +80,8 @@ private:
 	void  ChangeModel(const char* filename);  // inspector: swap the model and refresh animation state safely
 	void  ScanModelAssets();                  // gather selectable .glb/.gltf under Data/Model for the inspector list
 
+	float MeasureModelHeight() const;         // natural (un-scaled) model height, for auto-fit on swap
+
 	// ---- References ----
 	std::weak_ptr<Actor> playerRef;
 	ModelComponent* modelComp = nullptr;

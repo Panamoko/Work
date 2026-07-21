@@ -1,4 +1,6 @@
 ﻿#include <imgui.h>
+#include <filesystem>
+#include <algorithm>
 #include <fstream>
 #include <cctype>
 #include <string>
@@ -55,13 +57,46 @@ void ViewModelComponent::Start()
 void ViewModelComponent::SwapWeapon(const char* path)
 {
 	if (!cachedModelComponent) return;
+	if (cachedModelComponent->GetModelPath() == path) return; // already this weapon
+
 	cachedModelComponent->SetModel(path);
 	currentWeaponState = WeaponState::Idle;
 	actionTimer = 0.0f;
-	if (animator && cachedModelComponent->GetModel()) {
+
+	// Different weapons have different node / clip counts. Rebind the animator to
+	// the new skeleton so its pose buffers and clip index are not left stale
+	// (same fix as the enemy model swap; prevents a collapsed / invisible weapon).
+	if (animator) animator->RebindModel();
+
+	if (animator && cachedModelComponent->GetModel())
+	{
 		int idx = FindWeaponIdle(cachedModelComponent->GetModel().get());
 		if (idx >= 0) animator->Play(idx, 0.1f, true);
 	}
+}
+
+void ViewModelComponent::ScanWeaponAssets()
+{
+	weaponAssetPaths.clear();
+	namespace fs = std::filesystem;
+	const char* root = "Data/Model/Weapon";
+	std::error_code ec;
+	if (fs::exists(root, ec))
+	{
+		for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+		{
+			if (!it->is_regular_file()) continue;
+			std::string ext = it->path().extension().string();
+			for (char& ch : ext) ch = (char)std::tolower((unsigned char)ch);
+			if (ext == ".glb" || ext == ".gltf")
+			{
+				std::string p = it->path().string();
+				for (char& ch : p) if (ch == '\\') ch = '/';
+				weaponAssetPaths.push_back(p);
+			}
+		}
+	}
+	std::sort(weaponAssetPaths.begin(), weaponAssetPaths.end());
 }
 
 void ViewModelComponent::SaveSettings()
@@ -359,14 +394,24 @@ void ViewModelComponent::OnGUI()
 		}
 	}
 
+	// ---- 装備する武器モデル（Data/Model/Weapon をスキャンして一覧表示）----
 	ImGui::TextColored(ImVec4(1, 0.6f, 0.2f, 1), u8"▼ 装備する武器モデル");
-	const char* weapons[] = { "Pistol", "Rifle", "Staff", "ShootGun" };
-	for (const char* wname : weapons)
+	if (weaponAssetPaths.empty()) ScanWeaponAssets();          // 初回のみスキャン
+	if (ImGui::Button(u8"再スキャン")) ScanWeaponAssets();
+	ImGui::SameLine();
+	ImGui::Text("%d weapons", (int)weaponAssetPaths.size());
+	ImGui::PushItemWidth(-1);
+	ImGui::InputTextWithHint("##weaponfilter", "Search...", weaponFilter, sizeof(weaponFilter));
+	ImGui::PopItemWidth();
+	ImGui::BeginChild("weaponlist", ImVec2(0, 120), true);
+	for (const std::string& p : weaponAssetPaths)
 	{
-		char path[128];
-		sprintf_s(path, "Data/Model/Weapon/%s.glb", wname);
-		if (ImGui::Selectable(wname)) SwapWeapon(path);
+		std::string fn = std::filesystem::path(p).filename().string();
+		if (weaponFilter[0] != '\0' && fn.find(weaponFilter) == std::string::npos) continue;
+		bool selected = (cachedModelComponent && cachedModelComponent->GetModelPath() == p);
+		if (ImGui::Selectable(fn.c_str(), selected)) SwapWeapon(p.c_str());
 	}
+	ImGui::EndChild();
 	if (cachedModelComponent)
 		ImGui::TextDisabled("Current: %s", cachedModelComponent->GetModelPath().c_str());
 	ImGui::Separator();
