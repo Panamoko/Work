@@ -6,6 +6,7 @@
 #include "AI/BehaviorTree.h"
 #include "Physics/CollisionMesh.h"
 #include <vector>
+#include <string>
 
 class ModelComponent;
 class AnimatorComponent;
@@ -74,10 +75,19 @@ private:
 	bool MoveTowards(const DirectX::XMFLOAT3& worldTarget, float elapsedTime, float stopDist);
 	DirectX::XMFLOAT3 CollideAndSlide(const DirectX::XMFLOAT3& pos, float moveX, float moveZ);
 
+	// ---- Model switching (inspector) ----
+	void  ResolveAnimationIndices();          // (re)read clip indices (IDLE/RUN/DEATH/PUNCH*) from the current model
+	void  ChangeModel(const char* filename);  // inspector: swap the model and refresh animation state safely
+	void  ScanModelAssets();                  // gather selectable .glb/.gltf under Data/Model for the inspector list
+
 	// ---- References ----
 	std::weak_ptr<Actor> playerRef;
 	ModelComponent* modelComp = nullptr;
 	AnimatorComponent* animator = nullptr;
+
+	// ---- Model switching (inspector) ----
+	std::vector<std::string> modelAssetPaths;   // cached candidate models (Data/Model/**.glb/.gltf)
+	char modelFilter[64] = { 0 };               // inspector search box text
 
 	// ---- Animation indices ----
 	int idleIndex = -1;

@@ -47,15 +47,7 @@ void EnemyComponent::Start()
 		animator = owner->GetComponent<AnimatorComponent>().get();
 		currentYaw = QuatToYaw(owner->GetRotation());
 
-		if (modelComp && modelComp->GetModel())
-		{
-			idleIndex = modelComp->GetModel()->GetAnimationIndex("IDLE");
-			walkIndex = modelComp->GetModel()->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
-			fallIndex = modelComp->GetModel()->GetAnimationIndex("DEATH");      // -1 if none
-			attackIndexL = modelComp->GetModel()->GetAnimationIndex("PUNCHLEFT");
-			attackIndexR = modelComp->GetModel()->GetAnimationIndex("PUNCHRIGHT");
-			attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;   // initial
-		}
+		ResolveAnimationIndices();
 	}
 
 	LoadSettings();
@@ -65,6 +57,49 @@ void EnemyComponent::Start()
 	if (owner) homePos = owner->GetPosition();
 	BuildBehaviorTree();
 	// Nav mesh is built and owned by the stage; it is injected via SetNavGrid().
+}
+
+// Read the animation clip indices for the current model. Called on Start and
+// again whenever the model is swapped (indices are per-model).
+void EnemyComponent::ResolveAnimationIndices()
+{
+	idleIndex = walkIndex = fallIndex = -1;
+	attackIndexL = attackIndexR = attackIndex = -1;
+
+	if (modelComp && modelComp->GetModel())
+	{
+		std::shared_ptr<Model> model = modelComp->GetModel();
+		idleIndex = model->GetAnimationIndex("IDLE");
+		walkIndex = model->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
+		fallIndex = model->GetAnimationIndex("DEATH");      // -1 if none
+		attackIndexL = model->GetAnimationIndex("PUNCHLEFT");
+		attackIndexR = model->GetAnimationIndex("PUNCHRIGHT");
+		attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;
+	}
+}
+
+// Inspector-driven model swap. A plain SetModel() would leave the cached clip
+// indices and the AnimatorComponent's pose buffers pointing at the OLD skeleton,
+// which can crash when the new model has a different node / animation count.
+void EnemyComponent::ChangeModel(const char* filename)
+{
+	if (!modelComp || filename == nullptr || filename[0] == '\0') return;
+	if (modelComp->GetModelPath() == filename) return; // already this model
+
+	// 1) swap the mesh / skeleton / materials on this actor's ModelComponent
+	modelComp->SetModel(filename);
+
+	// 2) clip indices are per-model -> refresh them for the new model
+	ResolveAnimationIndices();
+
+	// 3) rebind the animator so its pose buffers / current clip match the new
+	//    skeleton (prevents out-of-range access and cross-skeleton blending)
+	if (animator) animator->RebindModel();
+
+	// 4) start the new model from a clean idle state
+	attacking = false;
+	damageDealt = false;
+	PlayState(State::Idle, true);
 }
 
 void EnemyComponent::Update(float elapsedTime)

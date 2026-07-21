@@ -22,6 +22,9 @@ public:
 	// 2つのアニメーションのブレンド再生
 	void PlayBlend(int indexA, int indexB, float blendRatio, float fadeLength = 0.15f, bool loop = true);
 
+	// モデル差し替え時に呼ぶ：ポーズ配列を新しいスケルトンに合わせ、再生状態をリセット
+	void RebindModel();
+
 	// ブレンド割合の更新（移動中に毎フレーム呼ぶ）
 	void UpdateBlendRatio(float blendRatio);
 

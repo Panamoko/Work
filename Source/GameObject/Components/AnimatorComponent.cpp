@@ -14,6 +14,32 @@ void AnimatorComponent::Start()
 	}
 }
 
+void AnimatorComponent::RebindModel()
+{
+	// Called after the actor's model was swapped at runtime. Re-cache the model
+	// component (same component, new model) and rebuild the pose buffers for the
+	// NEW skeleton. Clearing the current clip / crossfade prevents both an
+	// out-of-range animation index and blending across two different skeletons.
+	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
+
+	currentAnimIndexA = -1;
+	currentAnimIndexB = -1;
+	currentBlendRatio = 0.0f;
+	animationSeconds = 0.0f;
+	currentAnimLength = 1.0f;
+	isFading = false;
+	fadeTimer = 0.0f;
+
+	currentPoses.clear();
+	previousPoses.clear();
+
+	if (cachedModelComponent && cachedModelComponent->GetModel())
+	{
+		cachedModelComponent->GetModel()->GetNodePoses(currentPoses);
+		previousPoses = currentPoses;
+	}
+}
+
 void AnimatorComponent::Play(int index, float fadeLength, bool loop, float clampTime)
 {
 	this->customClampTime = clampTime;

@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <filesystem>
+#include <cctype>
 #include "GameObject/Components/EnemyComponent.h"
 #include "GameObject/Components/ModelComponent.h"
 #include "GameObject/Components/AnimatorComponent.h"
@@ -20,6 +22,45 @@ void EnemyComponent::OnGUI()
 	ImGui::Text("Enemy  (%s)", dead ? "DEAD" : (state == State::Walk ? "WALK" : "IDLE"));
 	ImGui::ProgressBar(maxHp > 0.0f ? hp / maxHp : 0.0f, ImVec2(-1, 0));
 	ImGui::Text("HP: %.0f / %.0f", hp, maxHp);
+
+	// ---- Model swap (safe: re-resolves clips + rebinds the animator) ----
+	if (ImGui::CollapsingHeader("Model", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		if (modelComp)
+		{
+			std::string cur = std::filesystem::path(modelComp->GetModelPath()).filename().string();
+			ImGui::Text("Current: %s", cur.c_str());
+		}
+		else
+		{
+			ImGui::TextColored(ImVec4(1, 0.4f, 0, 1), "No ModelComponent on this actor");
+		}
+
+		if (modelAssetPaths.empty()) ScanModelAssets(); // lazy first scan
+
+		if (ImGui::Button("Rescan")) ScanModelAssets();
+		ImGui::SameLine();
+		ImGui::Text("%d models", (int)modelAssetPaths.size());
+
+		ImGui::PushItemWidth(-1);
+		ImGui::InputTextWithHint("##enemymodelfilter", "Search...", modelFilter, IM_ARRAYSIZE(modelFilter));
+		ImGui::PopItemWidth();
+
+		ImGui::BeginChild("enemymodellist", ImVec2(0, 140), true);
+		for (const std::string& p : modelAssetPaths)
+		{
+			std::string fn = std::filesystem::path(p).filename().string();
+			if (modelFilter[0] != '\0' && fn.find(modelFilter) == std::string::npos) continue;
+
+			bool selected = (modelComp && modelComp->GetModelPath() == p);
+			if (ImGui::Selectable(fn.c_str(), selected))
+			{
+				ChangeModel(p.c_str());
+			}
+		}
+		ImGui::EndChild();
+		ImGui::TextDisabled("Swapping here refreshes animations automatically.");
+	}
 
 	if (ImGui::CollapsingHeader("Movement", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -88,6 +129,31 @@ void EnemyComponent::OnGUI()
 	if (ImGui::Button("Save Transform")) SaveSettings();
 	ImGui::SameLine();
 	if (ImGui::Button("Load Transform")) LoadSettings();
+}
+
+// Gather every .glb / .gltf under Data/Model for the inspector's model list.
+void EnemyComponent::ScanModelAssets()
+{
+	modelAssetPaths.clear();
+	namespace fs = std::filesystem;
+	const char* root = "Data/Model";
+	std::error_code ec;
+	if (fs::exists(root, ec))
+	{
+		for (fs::recursive_directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+		{
+			if (!it->is_regular_file()) continue;
+			std::string ext = it->path().extension().string();
+			for (char& ch : ext) ch = (char)std::tolower((unsigned char)ch);
+			if (ext == ".glb" || ext == ".gltf")
+			{
+				std::string p = it->path().string();
+				for (char& ch : p) if (ch == '\\') ch = '/';
+				modelAssetPaths.push_back(p);
+			}
+		}
+	}
+	std::sort(modelAssetPaths.begin(), modelAssetPaths.end());
 }
 
 // ---- Save / load transform ----
