@@ -5,7 +5,10 @@
 #include "GameObject/Components/ModelComponent.h"
 #include "GameObject/Actor.h"
 #include "Core/ResourceManager.h"
-
+#include <windows.h>   // OutputDebugStringA
+#include <cstdio>      // sprintf_s
+#include <cstring>     // strcmp
+#include <cmath>       // sqrtf
 ModelComponent::ModelComponent(const char* filename)
 {
 	SetModel(filename);
@@ -93,6 +96,24 @@ void ModelComponent::Update(float elapsedTime)
 	if (owner != nullptr)
 	{
 		pose.UpdateTransform(owner->GetTransform());
+	}
+
+	// ---- TEMP diagnostic: Player head hide ----
+	if (owner && headNodeIndex >= 0 && strcmp(owner->GetName(), "Player") == 0)
+	{
+		static int f = 0;
+		if ((f++ % 20) == 0) // ~3/sec
+		{
+			const Model::Node& hn = pose.GetNodes()[headNodeIndex];
+			float worldScaleX = sqrtf(
+				hn.worldTransform._11 * hn.worldTransform._11 +
+				hn.worldTransform._12 * hn.worldTransform._12 +
+				hn.worldTransform._13 * hn.worldTransform._13);
+			char b[256];
+			sprintf_s(b, "[HeadHide] hide=%d node=%d name=%s localScaleY=%.3f worldScaleX=%.4f\n",
+				hideHead ? 1 : 0, headNodeIndex, hn.name.c_str(), hn.scale.y, worldScaleX);
+			OutputDebugStringA(b);
+		}
 	}
 
 	animatorDrove = false;

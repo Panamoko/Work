@@ -4,11 +4,26 @@
 #include "Shadow.hlsli"   // ShadowMap (t8) + ComputeShadow
 #include "Ibl.hlsli"      // SampleIrradiance / DiffuseIBL / SpecularIBL
 
+float posterize(float value, float step_count)
+{
+    return floor(value / (1.0f / step_count)) * (1.0f / step_count);
+}
+
+float2 posterize(float2 value, float step_count)
+{
+    return float2(posterize(value.x, step_count), posterize(value.y, step_count));
+}
+
+float3 posterize(float3 value, float step_count)
+{
+    return float3(posterize(value.x, step_count), posterize(value.y, step_count), posterize(value.z, step_count));
+}
+
 float4 main(VS_OUT pin) : SV_TARGET
 {
     float4 albedo = baseColorFactor;
     if (hasBaseColorMap)
-        albedo *= BaseColorMap.Sample(LinearSampler, pin.texcoord);
+        albedo *= BaseColorMap.Sample(LinearSampler, posterize(pin.texcoord, 64.0f));
 
     if (alphaMode == 1 && albedo.a < alphaCutoff)
         discard;
@@ -71,16 +86,9 @@ float4 main(VS_OUT pin) : SV_TARGET
     float3 kD_ibl = (1.0f - kS_ibl) * (1.0f - metalness);
 
     float3 irradiance = SampleIrradiance(N);
-    float irradIntensity = length(irradiance);
-    float toonIrrad = smoothstep(0.4f, 0.6f, irradIntensity);
-    float hybridIrrad = lerp(toonIrrad, irradIntensity, 0.2f);
-    irradiance = lerp(irradiance * 0.5f, irradiance, hybridIrrad);
-    float3 diffuseIBL = DiffuseIBL(kD_ibl, irradiance, albedo.rgb);
-
+    float3 diffuseIBL = DiffuseIBL(kD_ibl, irradiance, albedo);
     float3 R = reflect(-V, N);
     float3 specularIBL = SpecularIBL(kS_ibl, R, roughness, NdotV);
-    float toonIblSpec = smoothstep(0.5f, 0.6f, length(specularIBL));
-    specularIBL *= toonIblSpec;
 
     float ao = 1.0f;
     if (hasOcclusionMap)
@@ -90,13 +98,12 @@ float4 main(VS_OUT pin) : SV_TARGET
     }
 
     float3 ambient = (diffuseIBL + specularIBL) * ao;
-    ambient += albedo.rgb * 0.12f; // ambient floor
 
     // ---- Cast shadow: darken direct + ambient together (with a floor) ----
     float shadow = ComputeShadow(pin.worldPosition);
     float shade = lerp(shadowParams.x, 1.0f, shadow); // shadowParams.x = brightness inside shadow
 
-    float3 color = (Lo + ambient) * shade;
+    float3 color = lerp(ambient * 0.25f, (Lo + ambient), shade);
 
     // emissive is not affected by shadow
     if (hasEmissiveMap)

@@ -8,8 +8,24 @@ float3 SRGBToLinear(float3 c)
     return pow(max(c, 0.0f), 2.2f);
 }
 
+float posterize(float value, float step_count)
+{
+    return floor(value / (1.0f / step_count)) * (1.0f / step_count);
+}
+
+float2 posterize(float2 value, float step_count)
+{
+    return float2(posterize(value.x, step_count), posterize(value.y, step_count));
+}
+
+float3 posterize(float3 value, float step_count)
+{
+    return float3(posterize(value.x, step_count), posterize(value.y, step_count), posterize(value.z, step_count));
+}
+
 float4 main(VS_OUT pin) : SV_TARGET
 {
+    pin.texcoord = posterize(pin.texcoord, 32.0f);
     float4 baseColor = baseColorFactor;
     if (hasBaseColorMap)
     {
@@ -41,6 +57,7 @@ float4 main(VS_OUT pin) : SV_TARGET
         float3x3 TBN = float3x3(T, B, N);
         N = normalize(mul(n, TBN));
     }
+    N = posterize(N * 0.5f + 0.5f, 32.0f) * 2 - 1.0f;
 
     float3 V = normalize(cameraPosition.xyz - pin.worldPosition);
     float3 L = normalize(-lightDirection.xyz);
