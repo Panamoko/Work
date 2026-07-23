@@ -140,6 +140,16 @@ void ModelComponent::Draw()
 	if (!isVisible) return;
 	if (model == nullptr) return;
 
+	// FPS head hide を「描画の直前（全Updateの後）」で強制再適用する。
+	// これにより、更新順やアニメーターの再サブミットで頭スケールが戻される
+	// 取り合い（＝一瞬消えてすぐ出る）を確実に抑え込む。
+	if (headNodeIndex >= 0 && hideHead)
+	{
+		pose.SetNodeScale(headNodeIndex, DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f });
+		std::shared_ptr<Actor> owner = GetActor();
+		if (owner != nullptr) pose.UpdateTransform(owner->GetTransform());
+	}
+
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
 	if (renderer != nullptr)
 	{
@@ -234,14 +244,31 @@ void ModelComponent::OnGUI()
 
 	ImGui::Separator();
 
-	if (headNodeIndex >= 0)
+	// ---- FPS head hide ----
+	// The head node is auto-detected by the name "head", but that can match the
+	// wrong node on some models. Pick the correct one here (the list also shows
+	// every node name, so you can see the model's structure).
 	{
+		const std::vector<Model::Node>& nodes = model->GetNodes();
+		std::string preview = (headNodeIndex >= 0 && headNodeIndex < static_cast<int>(nodes.size()))
+			? (std::to_string(headNodeIndex) + ": " + nodes[headNodeIndex].name)
+			: std::string("(none)");
+		if (ImGui::BeginCombo("Head node", preview.c_str()))
+		{
+			if (ImGui::Selectable("(none)", headNodeIndex < 0)) headNodeIndex = -1;
+			for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
+			{
+				std::string label = std::to_string(i) + ": " + nodes[i].name;
+				if (ImGui::Selectable(label.c_str(), i == headNodeIndex))
+				{
+					headNodeIndex = i;
+					headBaseScale = nodes[i].scale;
+				}
+			}
+			ImGui::EndCombo();
+		}
 		bool h = hideHead;
 		if (ImGui::Checkbox("Hide head mesh (FPS)", &h)) hideHead = h;
-	}
-	else
-	{
-		ImGui::TextDisabled("No 'head' node in this model");
 	}
 
 	ImGui::Separator();
