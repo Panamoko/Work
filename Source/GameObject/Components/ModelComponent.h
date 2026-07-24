@@ -45,7 +45,14 @@ public:
 
 	void SaveMaterialSettings();
 	void LoadMaterialSettings();
-
+	// ---- Per-mesh visibility (public に追加) ----
+	void SetMeshVisible(int meshIndex, bool visible);
+	void SetMeshVisible(const char* nodeName, bool visible); // matches mesh.node->name
+	bool IsMeshVisible(int meshIndex) const;
+	void ShowAllMeshes();
+	int  GetMeshCount() const;
+	int  FindMeshByNodeName(const char* nodeName) const;     // -1 if not found
+	const std::vector<bool>& GetMeshVisibility() const { return meshVisible; }
 private:
 	void CacheHeadNode();
 
@@ -66,4 +73,6 @@ private:
 	bool				hideHead = false;
 
 	char	pathBuf[256] = { 0 };
+	// ---- private メンバに追加 ----
+	std::vector<bool>	meshVisible;   // size == model meshes; true = drawn（インスタンス毎）
 };

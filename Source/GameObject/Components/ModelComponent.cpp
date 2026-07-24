@@ -25,13 +25,15 @@ void ModelComponent::SetModel(const char* filename)
 	model = ResourceManager::Instance().LoadModel(filename);
 	pose.SetModel(model);
 
+	// Reset the per-instance mesh visibility to "all visible" for the new model.
+	meshVisible.assign(model ? model->GetMeshes().size() : 0, true);
+
 	if (model != nullptr)
 	{
 		CacheHeadNode();
 		LoadMaterialSettings();
 	}
 }
-
 void ModelComponent::CacheHeadNode()
 {
 	headNodeIndex = -1;
@@ -98,24 +100,6 @@ void ModelComponent::Update(float elapsedTime)
 		pose.UpdateTransform(owner->GetTransform());
 	}
 
-	// ---- TEMP diagnostic: Player head hide ----
-	if (owner && headNodeIndex >= 0 && strcmp(owner->GetName(), "Player") == 0)
-	{
-		static int f = 0;
-		if ((f++ % 20) == 0) // ~3/sec
-		{
-			const Model::Node& hn = pose.GetNodes()[headNodeIndex];
-			float worldScaleX = sqrtf(
-				hn.worldTransform._11 * hn.worldTransform._11 +
-				hn.worldTransform._12 * hn.worldTransform._12 +
-				hn.worldTransform._13 * hn.worldTransform._13);
-			char b[256];
-			sprintf_s(b, "[HeadHide] hide=%d node=%d name=%s localScaleY=%.3f worldScaleX=%.4f\n",
-				hideHead ? 1 : 0, headNodeIndex, hn.name.c_str(), hn.scale.y, worldScaleX);
-			OutputDebugStringA(b);
-		}
-	}
-
 	animatorDrove = false;
 }
 
@@ -140,20 +124,10 @@ void ModelComponent::Draw()
 	if (!isVisible) return;
 	if (model == nullptr) return;
 
-	// FPS head hide を「描画の直前（全Updateの後）」で強制再適用する。
-	// これにより、更新順やアニメーターの再サブミットで頭スケールが戻される
-	// 取り合い（＝一瞬消えてすぐ出る）を確実に抑え込む。
-	if (headNodeIndex >= 0 && hideHead)
-	{
-		pose.SetNodeScale(headNodeIndex, DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f });
-		std::shared_ptr<Actor> owner = GetActor();
-		if (owner != nullptr) pose.UpdateTransform(owner->GetTransform());
-	}
-
 	ModelRenderer* renderer = Graphics::Instance().GetModelRenderer();
 	if (renderer != nullptr)
 	{
-		renderer->Draw(shaderId, model, &pose.GetNodes());
+		renderer->Draw(shaderId, model, &pose.GetNodes(), &meshVisible);
 	}
 }
 
@@ -299,5 +273,54 @@ void ModelComponent::OnGUI()
 			}
 			ImGui::PopID();
 		}
+	}
+}
+
+int ModelComponent::GetMeshCount() const
+{
+	return model ? static_cast<int>(model->GetMeshes().size()) : 0;
+}
+
+bool ModelComponent::IsMeshVisible(int meshIndex) const
+{
+	if (meshIndex < 0 || meshIndex >= static_cast<int>(meshVisible.size())) return true;
+	return meshVisible[meshIndex];
+}
+
+void ModelComponent::SetMeshVisible(int meshIndex, bool visible)
+{
+	if (meshIndex < 0 || meshIndex >= static_cast<int>(meshVisible.size())) return;
+	meshVisible[meshIndex] = visible;
+}
+
+void ModelComponent::ShowAllMeshes()
+{
+	std::fill(meshVisible.begin(), meshVisible.end(), true);
+}
+
+// Find a mesh by the name of the node it is attached to (e.g. "Head").
+// Works when the GLB authors each body part as its own mesh/node.
+int ModelComponent::FindMeshByNodeName(const char* nodeName) const
+{
+	if (!model || nodeName == nullptr) return -1;
+	const std::vector<Model::Mesh>& meshes = model->GetMeshes();
+	for (int i = 0; i < static_cast<int>(meshes.size()); ++i)
+	{
+		const Model::Node* n = meshes[i].node;
+		if (n && n->name == nodeName) return i;
+	}
+	return -1;
+}
+
+// Hide every mesh whose attached node matches (a part can be split into
+// several primitives -> several meshes sharing one node name).
+void ModelComponent::SetMeshVisible(const char* nodeName, bool visible)
+{
+	if (!model || nodeName == nullptr) return;
+	const std::vector<Model::Mesh>& meshes = model->GetMeshes();
+	for (int i = 0; i < static_cast<int>(meshes.size()); ++i)
+	{
+		const Model::Node* n = meshes[i].node;
+		if (n && n->name == nodeName) SetMeshVisible(i, visible);
 	}
 }

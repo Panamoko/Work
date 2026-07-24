@@ -51,6 +51,10 @@ public:
 	float shadowStrength = 0.35f;   // direct-light brightness inside shadow (0=black, 1=none)
 	float shadowBias = 0.0015f; // depth bias to remove acne
 
+	void Draw(ShaderId shaderId, std::shared_ptr<Model> model,
+		const std::vector<Model::Node>* poseNodes,
+		const std::vector<bool>* meshVisible);
+
 private:
 	struct CbScene
 	{
@@ -76,7 +80,8 @@ private:
 	{
 		ShaderId               shaderId;
 		std::shared_ptr<Model> model;
-		const std::vector<Model::Node>* poseNodes; // per-instance nodes; null = model's own
+		const std::vector<Model::Node>* poseNodes;             // per-instance nodes; null = model's own
+		const std::vector<bool>* meshVisible = nullptr; // per-instance mesh mask; null = all visible
 	};
 
 	struct TransparencyDrawInfo

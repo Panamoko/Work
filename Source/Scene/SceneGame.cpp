@@ -214,10 +214,10 @@ void SceneGame::StopPlay()
 	mode = EditorMode::Edit;
 	RestoreTransforms();
 
-	// Restore the head when returning to Edit.
+	// Restore the head mesh when returning to Edit.
 	if (playerActor)
 		if (auto m = playerActor->GetComponent<ModelComponent>())
-			m->SetHideHead(false);
+			m->SetMeshVisible("Head", true);
 
 	editorCam.SyncFromCamera(camera);
 }
@@ -322,10 +322,16 @@ void SceneGame::Render(float elapsedTime)
 
 void SceneGame::ApplyCameraView()
 {
-	// Head mesh: hidden in FPS, shown in TPS.
+	// FPS = hide only the head MESH (keep body/arms drawn). TPS = show everything.
+	// Uses per-mesh visibility, so it generalizes to Helmet/Armor later.
 	if (playerActor)
+	{
 		if (auto m = playerActor->GetComponent<ModelComponent>())
-			m->SetHideHead(cameraView == 0);
+		{
+			m->SetVisible(true);                        // body always drawn
+			m->SetMeshVisible("Head", cameraView == 0); // ← GLBの頭メッシュのノード名に合わせる
+		}
+	}
 
 	// TPS: pull the camera back along its view direction, keeping the same look.
 	if (cameraView == 1 && playerActor)

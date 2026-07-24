@@ -180,8 +180,13 @@ void ModelRenderer::RenderShadowDepth(const RenderContext& rc)
 	for (DrawInfo& drawInfo : drawInfos)
 	{
 		const std::vector<Model::Node>* poseNodes = drawInfo.poseNodes;
-		for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
+		const std::vector<bool>* mv = drawInfo.meshVisible;
+		const std::vector<Model::Mesh>& meshes = drawInfo.model->GetMeshes();
+		for (size_t mi = 0; mi < meshes.size(); ++mi)
 		{
+			if (mv && mi < mv->size() && !(*mv)[mi]) continue; // per-instance hidden mesh
+			const Model::Mesh& mesh = meshes[mi];
+
 			if (mesh.material != nullptr && mesh.material->alphaMode == Model::AlphaMode::Blend) continue;
 
 			UINT stride = sizeof(Model::Vertex);
@@ -224,12 +229,15 @@ void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model)
 	drawInfo.poseNodes = nullptr;
 }
 
-void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model, const std::vector<Model::Node>* poseNodes)
+void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model,
+	const std::vector<Model::Node>* poseNodes,
+	const std::vector<bool>* meshVisible)
 {
 	DrawInfo& drawInfo = drawInfos.emplace_back();
 	drawInfo.shaderId = shaderId;
 	drawInfo.model = model;
 	drawInfo.poseNodes = poseNodes;
+	drawInfo.meshVisible = meshVisible;
 }
 
 void ModelRenderer::Render(const RenderContext& rc)
@@ -341,14 +349,19 @@ void ModelRenderer::Render(const RenderContext& rc)
 	for (DrawInfo& drawInfo : drawInfos)
 	{
 		const std::vector<Model::Node>* poseNodes = drawInfo.poseNodes;
+		const std::vector<bool>* mv = drawInfo.meshVisible;
+		const std::vector<Model::Mesh>& meshes = drawInfo.model->GetMeshes();
 
 		if (drawInfo.shaderId == ShaderId::Toon)
 		{
 			dc->RSSetState(rc.renderState->GetRasterizerState(RasterizerState::SolidCullFront));
 			toonOutlineShader->Begin(rc);
 
-			for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
+			for (size_t mi = 0; mi < meshes.size(); ++mi)
 			{
+				if (mv && mi < mv->size() && !(*mv)[mi]) continue; // per-instance hidden mesh
+				const Model::Mesh& mesh = meshes[mi];
+
 				if (mesh.material == nullptr) continue;
 
 				if (mesh.material->alphaMode == Model::AlphaMode::Blend ||
@@ -364,8 +377,11 @@ void ModelRenderer::Render(const RenderContext& rc)
 		Shader* shader = shaders[static_cast<int>(drawInfo.shaderId)].get();
 		shader->Begin(rc);
 
-		for (const Model::Mesh& mesh : drawInfo.model->GetMeshes())
+		for (size_t mi = 0; mi < meshes.size(); ++mi)
 		{
+			if (mv && mi < mv->size() && !(*mv)[mi]) continue; // per-instance hidden mesh
+			const Model::Mesh& mesh = meshes[mi];
+
 			if (mesh.material == nullptr)
 			{
 				drawMesh(mesh, shader, poseNodes);
