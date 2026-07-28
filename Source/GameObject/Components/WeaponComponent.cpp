@@ -5,7 +5,7 @@
 #include "GameObject/Components/PlayerControllerComponent.h"
 #include "Graphics/Model/Model.h"
 #include "Graphics/Graphics.h"
-#include "Graphics/Camera.h"
+#include "Camera/Camera.h"     // ← "Graphics/Camera.h" から修正
 #include "Core/Input.h"
 #include <imgui.h>
 #include <fstream>
@@ -286,14 +286,16 @@ void WeaponComponent::OnGUI()
 	ImGui::Checkbox(u8"カメラ相対（TP腕対策/ビューモデル化）", &cameraRelative);
 	ImGui::InputText(u8"ソケットボーン", socketBoneName, sizeof(socketBoneName));
 
-	ImGui::SeparatorText("SocketOffset / ADS");
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(0.6f, 0.9f, 1, 1), u8"SocketOffset / ADS");
 	ImGui::DragFloat3(u8"Hip位置", &hipOffsetPos.x, 0.005f);
 	ImGui::DragFloat3(u8"Hip回転", &hipOffsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
 	ImGui::DragFloat3(u8"ADS位置", &adsOffsetPos.x, 0.005f);
 	ImGui::DragFloat3(u8"ADS回転", &adsOffsetRot.x, 0.01f, -DirectX::XM_PI, DirectX::XM_PI);
 	ImGui::DragFloat3(u8"スケール", &offsetScale.x, 0.01f, 0.0001f, 100.0f, "%.4f");
 
-	ImGui::SeparatorText("Recoil / Sway / Bob / Breath");
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(0.6f, 0.9f, 1, 1), u8"Recoil / Sway / Bob / Breath");
 	ImGui::DragFloat(u8"リコイル後退", &recoilKickBack, 0.005f);
 	ImGui::DragFloat(u8"リコイル跳上", &recoilKickUp, 0.005f);
 	ImGui::DragFloat(u8"リコイル横ブレ", &recoilKickSide, 0.005f);
