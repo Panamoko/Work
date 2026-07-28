@@ -21,8 +21,11 @@ void EnemyComponent::PlayState(State s, bool force)
 	state = s;
 	if (animator)
 	{
+		// index直指定 -> Role駆動へ。マッピング未解決(-1)なら再生しない。
 		int idx = (s == State::Walk) ? walkIndex : idleIndex;
-		if (idx >= 0) animator->Play(idx, blendTime, true);
+		if (idx >= 0)
+			animator->Play((s == State::Walk) ? LogicalAnimationRole::MoveForward
+				: LogicalAnimationRole::Idle, blendTime);
 	}
 }
 

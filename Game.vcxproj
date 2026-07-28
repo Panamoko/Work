@@ -153,6 +153,8 @@
     <ClInclude Include="Source\GameObject\Components\PlayerControllerComponent.h" />
     <ClInclude Include="Source\GameObject\Components\ViewModelComponent.h" />
     <ClInclude Include="Source\GameObject\Components\WeaponComponent.h" />
+    <ClInclude Include="Source\GameObject\Definition\AnimationSet.h" />
+    <ClInclude Include="Source\GameObject\Definition\SemanticRoles.h" />
     <ClInclude Include="Source\GameObject\Weapon\Weapon.h" />
     <ClInclude Include="Source\Graphics\GpuResourceUtils.h" />
     <ClInclude Include="Source\Graphics\Graphics.h" />
@@ -217,6 +219,7 @@
     <ClCompile Include="Source\GameObject\Components\PlayerControllerComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\ViewModelComponent.cpp" />
     <ClCompile Include="Source\GameObject\Components\WeaponComponent.cpp" />
+    <ClCompile Include="Source\GameObject\Definition\AnimationSet.cpp" />
     <ClCompile Include="Source\GameObject\Weapon\Weapon.cpp" />
     <ClCompile Include="Source\Graphics\GpuResourceUtils.cpp" />
     <ClCompile Include="Source\Graphics\Graphics.cpp" />

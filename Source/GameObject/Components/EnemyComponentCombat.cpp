@@ -135,12 +135,14 @@ bool EnemyComponent::CanAttack()
 
 void EnemyComponent::BeginAttack()
 {
-	// alternate PUNCHLEFT / PUNCHRIGHT each swing
+	// 左右の殴りを交互に（PrimaryAttack=右 / SecondaryAttack=左 にMapping済み）
 	nextPunchRight = !nextPunchRight;
 	attackIndex = nextPunchRight ? attackIndexR : attackIndexL;
 	if (attackIndex < 0) attackIndex = (attackIndexR >= 0 ? attackIndexR : attackIndexL);
 
-	if (animator && attackIndex >= 0) animator->Play(attackIndex, blendTime, false);
+	if (animator && attackIndex >= 0)
+		animator->Play(nextPunchRight ? LogicalAnimationRole::PrimaryAttack
+			: LogicalAnimationRole::SecondaryAttack, blendTime);
 	attacking = true;
 	damageDealt = false;
 }

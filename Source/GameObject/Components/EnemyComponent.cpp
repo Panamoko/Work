@@ -15,7 +15,7 @@
 #include "AI/EnemyBehaviors.h"
 #include "Physics/CollisionMesh.h"
 #include "AI/NavGrid.h"
-
+#include "GameObject/Definition/AnimationSet.h"
 // Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
 {
@@ -49,7 +49,28 @@ void EnemyComponent::Start()
 		animator = owner->GetComponent<AnimatorComponent>().get();
 		currentYaw = QuatToYaw(owner->GetRotation());
 
-		ResolveAnimationIndices();
+		if (modelComp && modelComp->GetModel())
+		{
+			// 実Clip名は「例」。キャラ定義層(ここ)でRoleへMappingして吸収する。
+			// 以降 AI/State側は Role でしか再生しない（実名を知らない）。
+			auto set = std::make_shared<AnimationSet>();
+			set->Assign(LogicalAnimationRole::Idle, "IDLE", true);
+			set->Assign(LogicalAnimationRole::MoveForward, "RUN", true);   // WALKが無いのでRUN
+			set->Assign(LogicalAnimationRole::PrimaryAttack, "PUNCHRIGHT", false, blendTime, 1.0f, LogicalAnimationRole::SecondaryAttack);
+			set->Assign(LogicalAnimationRole::SecondaryAttack, "PUNCHLEFT", false, blendTime, 1.0f, LogicalAnimationRole::PrimaryAttack);
+			set->Assign(LogicalAnimationRole::Death, "DEATH", false);
+			set->ResolveAgainst(modelComp->GetModel().get());
+			if (animator) animator->SetAnimationSet(set);
+
+			// 既存ガード(>=0判定・攻撃タイミング参照)用に、indexキャッシュも解決しておく。
+			// ※Fallbackを含めない生の解決結果(Find->resolvedIndex)を使い、元の-1挙動を維持。
+			idleIndex = set->Find(LogicalAnimationRole::Idle)->resolvedIndex;
+			walkIndex = set->Find(LogicalAnimationRole::MoveForward)->resolvedIndex;
+			attackIndexR = set->Find(LogicalAnimationRole::PrimaryAttack)->resolvedIndex;
+			attackIndexL = set->Find(LogicalAnimationRole::SecondaryAttack)->resolvedIndex;
+			fallIndex = set->Find(LogicalAnimationRole::Death)->resolvedIndex;
+			attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;   // initial
+		}
 	}
 
 	LoadSettings();
@@ -174,7 +195,7 @@ void EnemyComponent::Die()
 	if (dead) return;
 	dead = true;
 	Unregister();
-	if (animator && fallIndex >= 0) animator->Play(fallIndex, 0.1f, false);
+	if (animator && fallIndex >= 0) animator->Play(LogicalAnimationRole::Death, 0.1f);
 	deathTimer = deathTime;
 }
 

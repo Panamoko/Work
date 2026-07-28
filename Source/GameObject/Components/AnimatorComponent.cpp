@@ -11,6 +11,10 @@ void AnimatorComponent::Start()
 	{
 		cachedModelComponent->GetModel()->GetNodePoses(currentPoses);
 		previousPoses = currentPoses;
+
+		// AnimationSetがあればこのModelの実Clipへ解決しておく
+		if (animationSet)
+			animationSet->ResolveAgainst(cachedModelComponent->GetModel().get());
 	}
 }
 
@@ -175,4 +179,89 @@ void AnimatorComponent::OnGUI()
 {
 	ImGui::TextColored(ImVec4(0, 1, 1, 1), u8"▼ Animator 内部状態");
 	ImGui::Text(u8"クロスフェード: %s (%.2f / %.2f)", isFading ? "TRUE" : "FALSE", fadeTimer, fadeLength);
+
+	ImGui::Separator();
+	ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), u8"▼ AnimationSet (Role -> Clip)");
+
+	Model* model = (cachedModelComponent && cachedModelComponent->GetModel())
+		? cachedModelComponent->GetModel().get() : nullptr;
+
+	if (!model)
+	{
+		ImGui::TextDisabled(u8"Model 未リンク");
+		return;
+	}
+
+	if (!animationSet)
+	{
+		ImGui::TextDisabled(u8"AnimationSet 未生成");
+		if (ImGui::Button(u8"【 推定AnimationSetを生成 (MakeGuess) 】"))
+		{
+			animationSet = std::make_shared<AnimationSet>(AnimationSet::MakeGuess(model));
+		}
+		ImGui::TextDisabled(u8"※候補名は「例」。生成後にRole->Clipの解決結果が出ます");
+		return;
+	}
+
+	// 生成済み：Role ごとの解決結果と、その場再生ボタン
+	if (ImGui::Button(u8"再解決 (ResolveAgainst)")) animationSet->ResolveAgainst(model);
+	ImGui::SameLine();
+	if (ImGui::Button(u8"破棄")) { animationSet.reset(); return; }
+
+	ImGui::Separator();
+	for (int i = 0; i < static_cast<int>(LogicalAnimationRole::_Count); ++i)
+	{
+		LogicalAnimationRole role = static_cast<LogicalAnimationRole>(i);
+		const AnimationRoleEntry* e = animationSet->Find(role);
+		int idx = animationSet->ResolveIndex(role);
+
+		ImGui::PushID(i);
+		if (ImGui::SmallButton(u8"▶")) Play(role);   // ★Play(role)の動作確認
+		ImGui::SameLine();
+		if (e && !e->clipName.empty())
+			ImGui::Text(u8"%-15s -> [%d] %s", ToString(role), idx, e->clipName.c_str());
+		else if (idx >= 0)
+			ImGui::TextDisabled(u8"%-15s -> fallback [%d]", ToString(role), idx);
+		else
+			ImGui::TextDisabled(u8"%-15s -> (未割当/未解決)", ToString(role));
+		ImGui::PopID();
+	}
+}
+
+void AnimatorComponent::SetAnimationSet(std::shared_ptr<AnimationSet> set)
+{
+	animationSet = std::move(set);
+	if (animationSet && cachedModelComponent && cachedModelComponent->GetModel())
+		animationSet->ResolveAgainst(cachedModelComponent->GetModel().get());
+}
+
+void AnimatorComponent::Play(LogicalAnimationRole role, float fadeOverride)
+{
+	if (!cachedModelComponent || !cachedModelComponent->GetModel()) return;
+
+	// Mapping未設定なら推定Setをフォールバック生成（実名はコードに固定しない）
+	if (!animationSet)
+	{
+		animationSet = std::make_shared<AnimationSet>(
+			AnimationSet::MakeGuess(cachedModelComponent->GetModel().get()));
+		OutputDebugStringA("[AnimationSet] no set assigned -> using MakeGuess fallback\n");
+	}
+
+	const AnimationRoleEntry* e = animationSet->Find(role);
+	int index = animationSet->ResolveIndex(role);
+	if (index < 0)
+	{
+		// 未割当/未解決：空再生せず Idle へフォールバック（それも無ければ何もしない）
+		index = animationSet->ResolveIndex(LogicalAnimationRole::Idle);
+		if (index < 0)
+		{
+			OutputDebugStringA("[AnimationSet] unresolved role and no Idle fallback -> skip\n");
+			return;
+		}
+	}
+
+	float fade = (fadeOverride >= 0.0f) ? fadeOverride : (e ? e->blendTime : 0.15f);
+	bool  loop = e ? e->loop : true;
+	SetAnimSpeed(e ? e->playbackRate : 1.0f);
+	Play(index, fade, loop);   // 従来のindex再生へ委譲
 }

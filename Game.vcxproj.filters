@@ -61,6 +61,9 @@
     <Filter Include="Source\GameObject\Weapon">
       <UniqueIdentifier>{b5d5b26a-82dc-4842-87f4-088c633cdf1a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\GameObject\Definition">
+      <UniqueIdentifier>{7985c643-8ee4-476d-b980-928fb3fbfd78}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -267,6 +270,12 @@
     <ClInclude Include="Source\GameObject\Weapon\Weapon.h">
       <Filter>Source\GameObject\Weapon</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GameObject\Definition\SemanticRoles.h">
+      <Filter>Source\GameObject\Definition</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GameObject\Definition\AnimationSet.h">
+      <Filter>Source\GameObject\Definition</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -460,6 +469,9 @@
     </ClCompile>
     <ClCompile Include="Source\GameObject\Weapon\Weapon.cpp">
       <Filter>Source\GameObject\Weapon</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\GameObject\Definition\AnimationSet.cpp">
+      <Filter>Source\GameObject\Definition</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
