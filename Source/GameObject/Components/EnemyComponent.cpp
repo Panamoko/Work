@@ -19,8 +19,8 @@
 // Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
 {
-	static std::vector<EnemyComponent*> reg;
-	return reg;
+	static std::vector<EnemyComponent*>* reg = new std::vector<EnemyComponent*>();
+	return *reg;
 }
 
 EnemyComponent::EnemyComponent(std::shared_ptr<Actor> player)
@@ -92,11 +92,25 @@ void EnemyComponent::ResolveAnimationIndices()
 	if (modelComp && modelComp->GetModel())
 	{
 		std::shared_ptr<Model> model = modelComp->GetModel();
-		idleIndex = model->GetAnimationIndex("IDLE");
-		walkIndex = model->GetAnimationIndex("RUN");        // no WALK clip -> use RUN
-		fallIndex = model->GetAnimationIndex("DEATH");      // -1 if none
-		attackIndexL = model->GetAnimationIndex("PUNCHLEFT");
-		attackIndexR = model->GetAnimationIndex("PUNCHRIGHT");
+
+		// 実Clip名は「例」。キャラ定義層(ここ)でRoleへMappingして吸収する。
+		// 左右パンチは Primary=右 / Secondary=左 に割り当て、相互にFallbackさせる。
+		auto set = std::make_shared<AnimationSet>();
+		set->Assign(LogicalAnimationRole::Idle, "IDLE", true);
+		set->Assign(LogicalAnimationRole::MoveForward, "RUN", true);   // WALKが無いのでRUN
+		set->Assign(LogicalAnimationRole::PrimaryAttack, "PUNCHRIGHT", false, blendTime, 1.0f, LogicalAnimationRole::SecondaryAttack);
+		set->Assign(LogicalAnimationRole::SecondaryAttack, "PUNCHLEFT", false, blendTime, 1.0f, LogicalAnimationRole::PrimaryAttack);
+		set->Assign(LogicalAnimationRole::Death, "DEATH", false);
+		set->ResolveAgainst(model.get());
+		if (animator) animator->SetAnimationSet(set);
+
+		// 既存ガード(>=0判定・攻撃タイミング参照)用にindexキャッシュも解決する。
+		// ※Fallbackを含めない生の結果(Find->resolvedIndex)で、元の-1挙動を維持。
+		idleIndex = set->Find(LogicalAnimationRole::Idle)->resolvedIndex;
+		walkIndex = set->Find(LogicalAnimationRole::MoveForward)->resolvedIndex;
+		attackIndexR = set->Find(LogicalAnimationRole::PrimaryAttack)->resolvedIndex;
+		attackIndexL = set->Find(LogicalAnimationRole::SecondaryAttack)->resolvedIndex;
+		fallIndex = set->Find(LogicalAnimationRole::Death)->resolvedIndex;
 		attackIndex = (attackIndexR >= 0) ? attackIndexR : attackIndexL;
 	}
 }
@@ -198,6 +212,7 @@ void EnemyComponent::Die()
 	if (animator && fallIndex >= 0) animator->Play(LogicalAnimationRole::Death, 0.1f);
 	deathTimer = deathTime;
 }
+
 
 // ---- Gun hit test (sphere) ----
 bool EnemyComponent::RayHitSelf(const DirectX::XMFLOAT3& o, const DirectX::XMFLOAT3& d, float maxDist, float& outT)
