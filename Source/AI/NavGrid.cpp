@@ -242,15 +242,40 @@ bool NavGrid::FindPath(const DirectX::XMFLOAT3& start, const DirectX::XMFLOAT3& 
 
 	if (goalIdx != startIdx && came[goalIdx] < 0) return false;
 
-	std::vector<DirectX::XMFLOAT3> rev;
+	// --- reconstruct cell-index path (start -> goal) ---
+	std::vector<int> idxPath;
 	for (int cur = goalIdx; cur != -1; cur = came[cur])
 	{
-		int cx = cur % cols, cz = cur / cols;
-		rev.push_back({ minX + (cx + 0.5f) * cellSize, cells[cur].floorY, minZ + (cz + 0.5f) * cellSize });
+		idxPath.push_back(cur);
 		if (cur == startIdx) break;
 	}
-	std::reverse(rev.begin(), rev.end());
-	outPath = std::move(rev);
+	std::reverse(idxPath.begin(), idxPath.end());
+
+	// --- string-pulling: 見通しが通る中間点を省いて直線化（8方向グリッドの
+	//     ジグザグ遠回りを解消）。壁の角越えは LineOfSight 側で禁止。 ---
+	std::vector<int> smoothed;
+	if (!idxPath.empty())
+	{
+		smoothed.push_back(idxPath[0]);
+		int anchor = 0;
+		for (int i = 2; i < (int)idxPath.size(); ++i)
+		{
+			if (!LineOfSight(idxPath[anchor], idxPath[i]))
+			{
+				smoothed.push_back(idxPath[i - 1]);
+				anchor = i - 1;
+			}
+		}
+		if (idxPath.size() >= 2) smoothed.push_back(idxPath.back());
+	}
+
+	// --- convert kept cells to world centers ---
+	outPath.reserve(smoothed.size());
+	for (int idx : smoothed)
+	{
+		int cx = idx % cols, cz = idx / cols;
+		outPath.push_back({ minX + (cx + 0.5f) * cellSize, cells[idx].floorY, minZ + (cz + 0.5f) * cellSize });
+	}
 	return !outPath.empty();
 }
 
@@ -285,4 +310,40 @@ void NavGrid::CollectDebugCells(const DirectX::XMFLOAT3& center, float radius,
 			out.push_back(a); out.push_back(b); out.push_back(e);
 			out.push_back(a); out.push_back(e); out.push_back(d);
 		}
+}
+
+// True if a straight line between two cells stays entirely on reachable cells
+// (diagonal corner-cutting disallowed). Used to straighten the A* path.
+bool NavGrid::LineOfSight(int aIdx, int bIdx) const
+{
+	int ax = aIdx % cols, az = aIdx / cols;
+	int bx = bIdx % cols, bz = bIdx / cols;
+
+	int dx = (bx >= ax) ? (bx - ax) : (ax - bx);
+	int dz = (bz >= az) ? (bz - az) : (az - bz);
+	int sx = (ax < bx) ? 1 : -1;
+	int sz = (az < bz) ? 1 : -1;
+	int err = dx - dz;
+	int x = ax, z = az;
+
+	while (true)
+	{
+		if (!InBounds(x, z) || !cells[Index(x, z)].reachable) return false;
+		if (x == bx && z == bz) break;
+
+		int e2 = 2 * err;
+		bool stepX = (e2 > -dz);
+		bool stepZ = (e2 < dx);
+		if (stepX && stepZ)
+		{
+			// diagonal step: both orthogonal neighbors must be open (no corner cut)
+			if (!InBounds(x + sx, z) || !cells[Index(x + sx, z)].reachable) return false;
+			if (!InBounds(x, z + sz) || !cells[Index(x, z + sz)].reachable) return false;
+			err -= dz; x += sx;
+			err += dx; z += sz;
+		}
+		else if (stepX) { err -= dz; x += sx; }
+		else { err += dx; z += sz; }
+	}
+	return true;
 }

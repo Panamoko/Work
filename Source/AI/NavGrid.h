@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+
 #include <DirectXMath.h>
 
 struct CollisionMesh;
@@ -49,6 +50,8 @@ private:
 	int  NearestWalkable(int cx, int cz) const;
 	int  NearestReachable(int cx, int cz) const;
 	void FloodFill(int seedIdx);
+	bool LineOfSight(int aIdx, int bIdx) const;
+
 
 	int   cols = 0, rows = 0;
 	float cellSize = 1.0f;

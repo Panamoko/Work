@@ -9,6 +9,7 @@
 #include <cstdio>      // sprintf_s
 #include <cstring>     // strcmp
 #include <cmath>       // sqrtf
+
 ModelComponent::ModelComponent(const char* filename)
 {
 	SetModel(filename);
@@ -312,15 +313,23 @@ int ModelComponent::FindMeshByNodeName(const char* nodeName) const
 	return -1;
 }
 
-// Hide every mesh whose attached node matches (a part can be split into
-// several primitives -> several meshes sharing one node name).
+// Hide every mesh whose attached node name CONTAINS nodeName (case-insensitive).
+// 実GLBは "Head" / "head" / "Head_0" 等まちまちなので、完全一致ではなく
+// 大小無視の部分一致で名前差を吸収する（見つからなければ何も起きない）。
 void ModelComponent::SetMeshVisible(const char* nodeName, bool visible)
 {
 	if (!model || nodeName == nullptr) return;
+
+	std::string key = nodeName;
+	for (char& c : key) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
 	const std::vector<Model::Mesh>& meshes = model->GetMeshes();
 	for (int i = 0; i < static_cast<int>(meshes.size()); ++i)
 	{
 		const Model::Node* n = meshes[i].node;
-		if (n && n->name == nodeName) SetMeshVisible(i, visible);
+		if (!n) continue;
+		std::string low = n->name;
+		for (char& c : low) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		if (low.find(key) != std::string::npos) SetMeshVisible(i, visible);
 	}
 }

@@ -322,14 +322,14 @@ void SceneGame::Render(float elapsedTime)
 
 void SceneGame::ApplyCameraView()
 {
-	// FPS = hide only the head MESH (keep body/arms drawn). TPS = show everything.
-	// Uses per-mesh visibility, so it generalizes to Helmet/Armor later.
+	// FPS = 頭Meshだけ隠す（体・腕は描く）。TPS = 全部出す。
+	// SetMeshVisible の第2引数は「visible」なので、FPS(0)で false=非表示。
 	if (playerActor)
 	{
 		if (auto m = playerActor->GetComponent<ModelComponent>())
 		{
 			m->SetVisible(true);                        // body always drawn
-			m->SetMeshVisible("Head", cameraView == 0); // ← GLBの頭メッシュのノード名に合わせる
+			m->SetMeshVisible("Head", cameraView != 0); // ★ FPS(0)=非表示 / TPS=表示
 		}
 	}
 

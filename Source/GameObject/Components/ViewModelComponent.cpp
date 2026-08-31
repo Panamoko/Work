@@ -46,6 +46,11 @@ void ViewModelComponent::Start()
 
 	if (playerController) attachModel = playerController->GetModelComponent();
 
+	// SkeletonProfile: プレイヤー全身モデルの SemanticBoneRole -> NodeIndex を推定。
+	// 実Bone名(Hand_R / RightHand / mixamorig:RightHand ...)は「例」で、名前差はここで吸収。
+	if (attachModel && attachModel->GetModel())
+		attachSkeleton = SkeletonProfile::MakeGuess(attachModel->GetModel().get());
+
 	LoadSettings();
 
 	if (animator && cachedModelComponent && cachedModelComponent->GetModel()) {

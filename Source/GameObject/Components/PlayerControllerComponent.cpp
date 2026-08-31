@@ -393,7 +393,16 @@ void PlayerControllerComponent::UpdateAnimation(Model* characterModel, bool stat
 }
 
 void PlayerControllerComponent::UpdateCameraFollow(DirectX::FXMVECTOR currentVelocity, float elapsedTime) {
-	DirectX::XMVECTOR vEyePos = DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&position), DirectX::XMLoadFloat3(&cameraOffsetPos));
+	// 目の位置：高さ(Y)はワールド上方向、左右(X)・前後(Z)は「向いている方向」基準。
+	// これで振り向いても目が顔から前に出たまま＝頭/胴体に埋まらない。
+	DirectX::XMVECTOR vEyePos = DirectX::XMLoadFloat3(&position);
+	vEyePos = DirectX::XMVectorAdd(vEyePos, DirectX::XMVectorSet(0.0f, cameraOffsetPos.y, 0.0f, 0.0f)); // eye height
+
+	DirectX::XMMATRIX R_Yaw = DirectX::XMMatrixRotationY(characterYaw);
+	DirectX::XMVECTOR vForward = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Yaw);
+	DirectX::XMVECTOR vRight = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), R_Yaw);
+	vEyePos = DirectX::XMVectorAdd(vEyePos, DirectX::XMVectorScale(vForward, cameraOffsetPos.z)); // 前方（顔から前へ）
+	vEyePos = DirectX::XMVectorAdd(vEyePos, DirectX::XMVectorScale(vRight, cameraOffsetPos.x)); // 左右
 
 	DirectX::XMMATRIX R_Camera = DirectX::XMMatrixRotationRollPitchYaw(cameraPitch, characterYaw, 0.0f);
 	DirectX::XMVECTOR vTargetDirection = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f), R_Camera);
@@ -407,8 +416,7 @@ void PlayerControllerComponent::UpdateCameraFollow(DirectX::FXMVECTOR currentVel
 	float screenW = Graphics::Instance().GetScreenWidth();
 	float screenH = Graphics::Instance().GetScreenHeight();
 	if (screenW > 0 && screenH > 0) {
-		// Speed-based FOV: scales from 60 (idle) toward 75 (run) using the actual
-		// physical velocity, so the widened FOV holds during airborne inertia.
+		// Speed-based FOV（据え置き）
 		float currentSpeed = DirectX::XMVectorGetX(DirectX::XMVector3Length(currentVelocity));
 		float speedRatio = std::clamp((currentSpeed - manualMoveSpeed) / (runMoveSpeed - manualMoveSpeed), 0.0f, 1.0f);
 		float targetFov = 60.0f + (15.0f * speedRatio);

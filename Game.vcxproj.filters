@@ -276,6 +276,9 @@
     <ClInclude Include="Source\GameObject\Definition\AnimationSet.h">
       <Filter>Source\GameObject\Definition</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GameObject\Definition\SkeletonProfile.h">
+      <Filter>Source\GameObject\Definition</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -471,6 +474,9 @@
       <Filter>Source\GameObject\Weapon</Filter>
     </ClCompile>
     <ClCompile Include="Source\GameObject\Definition\AnimationSet.cpp">
+      <Filter>Source\GameObject\Definition</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\GameObject\Definition\SkeletonProfile.cpp">
       <Filter>Source\GameObject\Definition</Filter>
     </ClCompile>
   </ItemGroup>

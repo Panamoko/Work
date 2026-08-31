@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <DirectXMath.h>
+#include "GameObject/Definition/SkeletonProfile.h"
 #include "GameObject/Component.h"
 
 enum class WeaponState { Idle, Walk, Run, Jump, Reload, Fire };
@@ -47,7 +48,8 @@ private:
 
 	// ---- Bone attachment (read player body pose) ----
 	ModelComponent* attachModel = nullptr;
-	char attachBoneName[64] = "";        // empty = auto-find hand/wrist/arm
+	char attachBoneName[64] = "";        // empty = auto (SkeletonProfile PrimaryHand)
+	SkeletonProfile attachSkeleton;      // SemanticBoneRole -> node index（推定/上書き可）
 
 	// ---- Weapon model picker (inspector) ----
 	std::vector<std::string> weaponAssetPaths;   // cached Data/Model/Weapon/**.glb
