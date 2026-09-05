@@ -22,10 +22,23 @@
 #include <cstring>
 #include <cfloat>
 #include <windows.h>
+#include <chrono>
 #pragma comment(lib, "d3dcompiler.lib")
 
 SceneGame::SceneGame()
 {
+
+	// ===== 起動計測（一時的）=====
+	auto __t0 = std::chrono::high_resolution_clock::now();
+	auto LAP = [&](const char* label) {
+		auto now = std::chrono::high_resolution_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(now - __t0).count();
+		char buf[128]; sprintf_s(buf, "[BOOT] %-22s %8.1f ms\n", label, ms);
+		OutputDebugStringA(buf);
+		__t0 = now;
+		};
+	// ============================
+
 	ID3D11Device* device = Graphics::Instance().GetDevice();
 	float screenWidth = Graphics::Instance().GetScreenWidth();
 	float screenHeight = Graphics::Instance().GetScreenHeight();
@@ -44,6 +57,7 @@ SceneGame::SceneGame()
 	stageActor = ActorManager::Instance().Create();
 	stageActor->SetName("Stage");
 	auto stageModelComp = stageActor->AddComponent<ModelComponent>("Data/Model/Stage/RP_MAP_1.glb");
+	LAP("stage model");
 
 	CollisionMesh collisionMesh;
 	Model* stageModel = stageModelComp->GetModel().get();
@@ -77,6 +91,7 @@ SceneGame::SceneGame()
 	}
 	collisionMesh.BuildSpatialGrid();
 	stageCollision = collisionMesh;
+	LAP("collision build");
 	Actor::SetEditorGround(&stageCollision);
 
 	playerActor = ActorManager::Instance().Create();
@@ -127,6 +142,7 @@ SceneGame::SceneGame()
 	enemyActor = ActorManager::Instance().Create();
 	enemyActor->SetName("Enemy");
 	auto enemyModelComp = enemyActor->AddComponent<ModelComponent>("Data/Model/Character/Enemy3.glb");
+	LAP("other models");
 	enemyModelComp->SetShaderId(ShaderId::Toon);
 	enemyActor->AddComponent<AnimatorComponent>();
 	auto enemyComp = enemyActor->AddComponent<EnemyComponent>(playerActor);
@@ -140,7 +156,8 @@ SceneGame::SceneGame()
 	skybox.Initialize(device);
 
 	editorCam.SyncFromCamera(camera);
-	ScanAssets();
+	//ScanAssets();
+	LAP("scan assets");
 }
 
 SceneGame::~SceneGame()

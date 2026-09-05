@@ -26,6 +26,7 @@
 
 void SceneGame::DrawGUI()
 {
+	if (!assetsScanned) { ScanAssets(); assetsScanned = true; }
 	ImGuiIO& io = ImGui::GetIO();
 	const float topH = 38.0f, leftW = 300.0f, rightW = 340.0f, bottomH = 240.0f;
 	const float hierH = (io.DisplaySize.y - topH) * 0.55f;

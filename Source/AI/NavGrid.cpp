@@ -33,7 +33,7 @@ void NavGrid::Build(const CollisionMesh& m, float cs, float ah, float step, cons
 			minY = std::min(minY, p.y); maxY = std::max(maxY, p.y);
 		}
 
-	while (((maxX - minX) / cellSize + 2) * ((maxZ - minZ) / cellSize + 2) > 200000.0f)
+	while (((maxX - minX) / cellSize + 2) * ((maxZ - minZ) / cellSize + 2) > 40000.0f)
 		cellSize *= 2.0f;
 
 	cols = (int)std::ceil((maxX - minX) / cellSize) + 1;
@@ -198,9 +198,13 @@ bool NavGrid::FindPath(const DirectX::XMFLOAT3& start, const DirectX::XMFLOAT3& 
 	if (startIdx < 0 || goalIdx < 0) return false;
 
 	const int n = (int)cells.size();
-	std::vector<float> g(n, FLT_MAX);
-	std::vector<int> came(n, -1);
-	std::vector<char> closed(n, 0);
+	// スクラッチは使い回し（毎リパスの n×3 アロケーションを排除）。
+	static thread_local std::vector<float> g;
+	static thread_local std::vector<int>   came;
+	static thread_local std::vector<char>  closed;
+	g.assign(n, FLT_MAX);
+	came.assign(n, -1);
+	closed.assign(n, 0);
 
 	int goalX = goalIdx % cols, goalZ = goalIdx / cols;
 	auto heur = [&](int idx)

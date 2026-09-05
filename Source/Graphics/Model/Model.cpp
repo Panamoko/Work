@@ -195,35 +195,39 @@ Model::Model(ID3D11Device* device, const char* filename, float sampleRate)
 {
 	std::filesystem::path filepath(filename);
 	std::filesystem::path dirpath(filepath.parent_path());
-
 	std::filesystem::path extension = filepath.extension();
 
-	// 独自形式のモデルファイルの存在確認
-	filepath.replace_extension(".cereal");
-	if (std::filesystem::exists(filepath))
+	// 独自バイナリキャッシュ(.cereal)のパス
+	std::filesystem::path cachepath = filepath;
+	cachepath.replace_extension(".cereal");
+
+	// キャッシュが存在し、かつ元GLBより新しければキャッシュを使う（古ければ作り直す）
+	bool cacheFresh = false;
+	if (std::filesystem::exists(cachepath))
 	{
-		// 独自形式のモデルファイルの読み込み
-		Deserialize(filepath.string().c_str());
+		std::error_code ec;
+		auto ct = std::filesystem::last_write_time(cachepath, ec);
+		if (ec) cacheFresh = true;                                        // 比較不能ならキャッシュを信頼
+		else if (!std::filesystem::exists(filepath)) cacheFresh = true;   // 元GLBが無ければキャッシュのみ
+		else { auto st = std::filesystem::last_write_time(filepath, ec); cacheFresh = (!ec && ct >= st); }
+	}
+
+	if (cacheFresh)
+	{
+		// 独自形式(高速)を読み込む
+		Deserialize(cachepath.string().c_str());
 	}
 	else if (extension == ".gltf" || extension == ".glb")
 	{
-		// 汎用モデルファイルの読み込み
+		// 汎用GLBをパース
 		GLTFImporter importer(filename);
-
-		// マテリアルデータ読み取り
 		importer.LoadMaterials(materials, device);
-
-		// ノードデータ読み取り
 		importer.LoadNodes(nodes);
-
-		// メッシュデータ読み取り
 		importer.LoadMeshes(meshes, nodes);
-
-		// アニメーションデータ読み取り
 		importer.LoadAnimations(animations, nodes, sampleRate);
 
-		// 独自形式のモデルファイルを保存
-		//Serialize(filepath.string().c_str());
+		// ★次回から高速化：パース結果をバイナリキャッシュへ保存
+		Serialize(cachepath.string().c_str());
 	}
 	else
 	{

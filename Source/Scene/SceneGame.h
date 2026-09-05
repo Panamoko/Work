@@ -95,6 +95,7 @@ private:
 
 	// Content drawer
 	std::vector<std::string> assetPaths;
+	bool assetsScanned = false;   // Content Browser ‰‰ñ•`‰æ‚É ScanAssets ‚·‚é
 	AssetNode assetTree;
 	int spawnType = 0; // 0 = Prop, 1 = Enemy
 	std::vector<std::shared_ptr<class Actor>> spawnedActors;
