@@ -67,6 +67,21 @@
     <Filter Include="External\Tracy">
       <UniqueIdentifier>{2a6f6055-3e9d-4d21-a3c9-b227a0289090}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine">
+      <UniqueIdentifier>{11a0fe7b-35ab-4f75-86bd-fdac18620bc2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Platform">
+      <UniqueIdentifier>{fa9b8f53-b023-4011-9621-8f5dd3467cbc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Graphics">
+      <UniqueIdentifier>{cd7e82d3-eff8-4eec-8b87-f95c53dfa5ca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Core">
+      <UniqueIdentifier>{95b2ac32-b14d-4526-8523-f6dc657deb70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Editor">
+      <UniqueIdentifier>{330bfb6d-fdb7-463e-bb3a-d6133d14bcba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -282,6 +297,18 @@
     <ClInclude Include="Source\GameObject\Definition\SkeletonProfile.h">
       <Filter>Source\GameObject\Definition</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Platform\Window.h">
+      <Filter>Source\Engine\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\GraphicsDevice.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Core\Engine.h">
+      <Filter>Source\Engine\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\ImGuiLayer.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -484,6 +511,18 @@
     </ClCompile>
     <ClCompile Include="External\Tracy\TracyClient.cpp">
       <Filter>External\Tracy</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Platform\Window.cpp">
+      <Filter>Source\Engine\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\GraphicsDevice.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Core\Engine.cpp">
+      <Filter>Source\Engine\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp">
+      <Filter>Source\Engine\Editor</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
