@@ -8,6 +8,8 @@
 #include "Scene/SceneGame.h"
 #include "Core/Input.h" // ★ 入力システムをインクルード
 
+#include<tracy/Tracy.hpp>
+
 // 垂直同期間隔設定
 static const int syncInterval = 1;
 

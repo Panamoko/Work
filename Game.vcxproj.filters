@@ -64,6 +64,9 @@
     <Filter Include="Source\GameObject\Definition">
       <UniqueIdentifier>{7985c643-8ee4-476d-b980-928fb3fbfd78}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External\Tracy">
+      <UniqueIdentifier>{2a6f6055-3e9d-4d21-a3c9-b227a0289090}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -478,6 +481,9 @@
     </ClCompile>
     <ClCompile Include="Source\GameObject\Definition\SkeletonProfile.cpp">
       <Filter>Source\GameObject\Definition</Filter>
+    </ClCompile>
+    <ClCompile Include="External\Tracy\TracyClient.cpp">
+      <Filter>External\Tracy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
