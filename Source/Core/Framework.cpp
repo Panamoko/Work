@@ -40,16 +40,19 @@ Framework::~Framework()
 // 更新処理
 void Framework::Update(float elapsedTime)
 {
+	ZoneScopedN("Update");
 	// ★ 最優先処理：ゲームロジックが動く前に、全入力デバイスの状態を最新にする！
 	Input::Instance().Update();
 
 	ImGuiRenderer::NewFrame();
 	scene->Update(elapsedTime);
+	
 }
 
 // 描画処理
 void Framework::Render(float elapsedTime)
 {
+	ZoneScopedN("Render");
 	ID3D11DeviceContext* dc = Graphics::Instance().GetDeviceContext();
 
 	// Render the scene into an offscreen HDR target.
@@ -114,6 +117,8 @@ int Framework::Run()
 			float elapsedTime = timer.TimeInterval();
 			Update(elapsedTime);
 			Render(elapsedTime);
+
+			FrameMark;
 		}
 	}
 	return static_cast<int>(msg.wParam);
