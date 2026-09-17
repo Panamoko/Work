@@ -16,6 +16,8 @@
 #include "Physics/CollisionMesh.h"
 #include "AI/NavGrid.h"
 #include "GameObject/Definition/AnimationSet.h"
+#include <tracy/Tracy.hpp>
+
 // Registry of all live enemies (for the player's gun raycast).
 static std::vector<EnemyComponent*>& EnemyRegistry()
 {
@@ -177,6 +179,7 @@ void EnemyComponent::ChangeModel(const char* filename)
 
 void EnemyComponent::Update(float elapsedTime)
 {
+	ZoneScopedN("Enemy::Update");
 	if (dead)
 	{
 		deathTimer -= elapsedTime;
@@ -188,8 +191,8 @@ void EnemyComponent::Update(float elapsedTime)
 		return;
 	}
 
-	UpdatePerception(elapsedTime); // evaluate sight/cooldowns once
-	tree.Update(elapsedTime);      // decide + act (single tick)
+	{ ZoneScopedN("Enemy::Perception"); UpdatePerception(elapsedTime); }  // Åö
+	{ ZoneScopedN("Enemy::BehaviorTree"); tree.Update(elapsedTime); }     // Åö
 }
 
 // ---- Damage / death (enemy's own HP; the player's gun calls ApplyDamage) ----

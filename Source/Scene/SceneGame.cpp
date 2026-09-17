@@ -23,6 +23,7 @@
 #include <cfloat>
 #include <windows.h>
 #include <chrono>
+#include <tracy/Tracy.hpp>
 #pragma comment(lib, "d3dcompiler.lib")
 
 SceneGame::SceneGame()
@@ -176,12 +177,19 @@ SceneGame::~SceneGame()
 
 void SceneGame::Update(float elapsedTime)
 {
+	ZoneScopedN("Scene::Update");                     // ★追加
 	if (mode == EditorMode::Play)
 	{
-		ActorManager::Instance().Update(elapsedTime);
-		ActorManager::Instance().UpdateTransform();
+		{
+			ZoneScopedN("Actors::Update");              // ★追加（この2行で囲む）
+			ActorManager::Instance().Update(elapsedTime);
+		}
+		{
+			ZoneScopedN("Actors::Transform");           // ★追加
+			ActorManager::Instance().UpdateTransform();
+		}
 
-		// F5 toggles FPS <-> TPS (Minecraft-style).
+		// F5 toggles FPS <-> TPS ... （以下は元のまま）
 		bool f5 = (GetAsyncKeyState(VK_F5) & 0x8000) != 0;
 		if (f5 && !prevF5) cameraView ^= 1;
 		prevF5 = f5;
@@ -291,19 +299,23 @@ void SceneGame::DrawNavMeshDebug(const DirectX::XMFLOAT4X4& view, const DirectX:
 
 void SceneGame::Render(float elapsedTime)
 {
+	ZoneScopedN("Scene::Render");
 	RenderContext rc;
 	rc.deviceContext = Graphics::Instance().GetDeviceContext();
 	rc.renderState = Graphics::Instance().GetRenderState();
 	rc.camera = &camera;
 
-	skybox.Draw(camera);
+	{ ZoneScopedN("Skybox"); skybox.Draw(camera); }
 
 	// The weapon is now a normal bone-attached world actor: show it in Play,
 	// hide it in Edit (it is not positioned there).
 	auto vmModelComp = viewModelActor->GetComponent<ModelComponent>();
 	if (vmModelComp) vmModelComp->SetVisible(mode == EditorMode::Play);
 
-	ActorManager::Instance().Render(rc);
+	{
+		ZoneScopedN("Actors::Render");                  // ★ ActorManager::Render を囲む
+		ActorManager::Instance().Render(rc);
+	}
 
 	DirectX::XMVECTOR R = DirectX::XMLoadFloat3(&camera.GetRight());
 	DirectX::XMVECTOR U = DirectX::XMLoadFloat3(&camera.GetUp());

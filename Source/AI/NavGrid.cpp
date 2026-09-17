@@ -4,6 +4,7 @@
 #include <cfloat>
 #include <cmath>
 #include <algorithm>
+#include <tracy/Tracy.hpp>
 
 namespace
 {
@@ -14,6 +15,7 @@ namespace
 
 void NavGrid::Build(const CollisionMesh& m, float cs, float ah, float step, const DirectX::XMFLOAT3& seed)
 {
+	ZoneScopedN("NavGrid::Build");
 	cells.clear();
 	cols = rows = 0;
 	cellSize = (cs > 0.01f) ? cs : 1.0f;
@@ -187,6 +189,7 @@ bool NavGrid::IsWalkable(const DirectX::XMFLOAT3& w) const
 bool NavGrid::FindPath(const DirectX::XMFLOAT3& start, const DirectX::XMFLOAT3& goal,
 	std::vector<DirectX::XMFLOAT3>& outPath) const
 {
+	ZoneScopedN("NavGrid::FindPath");
 	outPath.clear();
 	if (cells.empty()) return false;
 

@@ -8,6 +8,7 @@
 #include "Graphics/ShaderClass/LambertShader.h"
 #include "Graphics/ShaderClass/PbrShader.h"
 #include "Graphics/ShaderClass/ToonShader.h"
+#include <tracy/Tracy.hpp>
 
 // Pick a node's world transform: per-instance pose if provided, else the
 // model's own (shared) node the mesh/bone points at.
@@ -117,6 +118,7 @@ void ModelRenderer::InitShadow(ID3D11Device* device)
 
 void ModelRenderer::RenderShadowDepth(const RenderContext& rc)
 {
+	ZoneScopedN("Pass:ShadowDepth");
 	if (!shadowDSV || !shadowVS) return;
 	// Skip regenerating the shadow map on tiny passes (e.g. a single-model pass);
 	// keep the world shadow map so that model is still shaded by the world.
@@ -242,6 +244,7 @@ void ModelRenderer::Draw(ShaderId shaderId, std::shared_ptr<Model> model,
 
 void ModelRenderer::Render(const RenderContext& rc)
 {
+	ZoneScopedN("ModelRenderer");
 	ID3D11DeviceContext* dc = rc.deviceContext;
 
 	if (enableShadow)
@@ -250,6 +253,7 @@ void ModelRenderer::Render(const RenderContext& rc)
 	}
 
 	{
+		ZoneScopedN("Pass:Main");
 		static LightManager defaultLightManager;
 		const LightManager* lightManager = rc.lightManager ? rc.lightManager : &defaultLightManager;
 

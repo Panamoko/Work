@@ -7,6 +7,7 @@
 #include "GameObject/Actor.h"
 #include "Graphics/Model/ModelRenderer.h"
 #include "Physics/CollisionMesh.h"
+#include <tracy/Tracy.hpp>
 
 // =====================================================================
 // Actor ÉNÉâÉXÇÃé¿ëï
@@ -22,6 +23,7 @@ void Actor::Start()
 
 void Actor::Update(float elapsedTime)
 {
+	ZoneScopedN("Actor::Update");                     // Åöí«â¡
 	for (std::shared_ptr<Component>& component : components)
 	{
 		component->Update(elapsedTime);
@@ -219,13 +221,14 @@ void ActorManager::Remove(std::shared_ptr<Actor> actor)
 
 void ActorManager::Update(float elapsedTime)
 {
+	ZoneScopedN("Actors::UpdateLoop");
 	for (std::shared_ptr<Actor>& actor : startActors)
 	{
 		actor->Start();
 		updateActors.emplace_back(actor);
 	}
 	startActors.clear();
-
+	TracyPlot("Actor count", (int64_t)updateActors.size());
 	for (std::shared_ptr<Actor>& actor : updateActors)
 	{
 		actor->Update(elapsedTime);

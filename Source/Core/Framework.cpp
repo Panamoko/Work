@@ -11,7 +11,7 @@
 #include<tracy/Tracy.hpp>
 
 // 垂直同期間隔設定
-static const int syncInterval = 1;
+static const int syncInterval = 0;
 
 // コンストラクタ
 Framework::Framework(HWND hWnd)
@@ -67,7 +67,10 @@ void Framework::Render(float elapsedTime)
 	ImGuiRenderer::Render(dc);
 
 	// Present.
-	Graphics::Instance().Present(syncInterval);
+	{
+		ZoneScopedN("Present");                          // ★追加
+		Graphics::Instance().Present(syncInterval);
+	}
 }
 
 // テンプレート関数とGUI関数の空定義（ヘッダーとの整合性維持）

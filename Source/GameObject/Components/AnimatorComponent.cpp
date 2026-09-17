@@ -2,7 +2,7 @@
 #include <cmath>
 #include <imgui.h>
 #include "GameObject/Components/AnimatorComponent.h"
-
+#include <tracy/Tracy.hpp>
 void AnimatorComponent::Start()
 {
 	cachedModelComponent = GetActor()->GetComponent<ModelComponent>().get();
@@ -92,6 +92,7 @@ void AnimatorComponent::UpdateBlendRatio(float blendRatio)
 
 void AnimatorComponent::Update(float elapsedTime)
 {
+	ZoneScopedN("Animator::Update");
 	if (!cachedModelComponent) return;
 	Model* model = cachedModelComponent->GetModel().get();
 	if (!model) return;
