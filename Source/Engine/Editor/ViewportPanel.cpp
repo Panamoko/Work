@@ -2,27 +2,44 @@
 #include "Engine/Systems/RenderSystem.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
+#include "Engine/Graphics/Mesh.h"
+#include "Engine/Graphics/MeshShader.h"
 #include <d3d11.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <DirectXMath.h>
-
+#include "Engine/Editor/EntityCommands.h"
+#include "Engine/Scene/MeshRendererComponent.h"
+#include <string>
 namespace uel {
 
     void ViewportPanel::Initialize(ID3D11Device* device)
     {
+        devicePtr = device;                 // ★追加
         rt.Create(device, viewWidth, viewHeight);
-        cube.Initialize(device);
+        shader.Initialize(device);
+        cubeMesh = Mesh::CreateCube(device);
         DirectX::XMStoreFloat4x4(&view, DirectX::XMMatrixIdentity());
         DirectX::XMStoreFloat4x4(&proj, DirectX::XMMatrixIdentity());
     }
 
-    void ViewportPanel::DrawUI(ID3D11Device* device, World& world, EntityId selected, CommandHistory& history)
+    void ViewportPanel::DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history) 
     {
         ImGuizmo::BeginFrame();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
+
+        // --- Gizmo モード切替ツールバー（キー不要で確実に切替）---
+        auto modeButton = [&](const char* label, int op) {
+            bool active = (gizmoOp == op);
+            if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.50f, 0.80f, 1.0f));
+            if (ImGui::SmallButton(label)) gizmoOp = op;
+            if (active) ImGui::PopStyleColor();
+            };
+        modeButton("Translate", ImGuizmo::TRANSLATE); ImGui::SameLine();
+        modeButton("Rotate", ImGuizmo::ROTATE);    ImGui::SameLine();
+        modeButton("Scale", ImGuizmo::SCALE);
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
         int w = (int)avail.x, h = (int)avail.y;
@@ -45,11 +62,23 @@ namespace uel {
         if (rt.GetSRV())
             ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
 
-        ImGuiIO& io = ImGui::GetIO();
-        if ((ImGui::IsWindowFocused() || ImGui::IsWindowHovered()) && !io.WantTextInput) {
-            if (ImGui::IsKeyPressed('W')) gizmoOp = ImGuizmo::TRANSLATE;
-            if (ImGui::IsKeyPressed('E')) gizmoOp = ImGuizmo::ROTATE;
-            if (ImGui::IsKeyPressed('R')) gizmoOp = ImGuizmo::SCALE;
+        // ★ Asset Browser からのドロップで Entity 生成
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_GLB"))
+            {
+                std::string p = payload->Data ? static_cast<const char*>(payload->Data) : "";
+                if (!p.empty())
+                {
+                    std::string name = p.substr(p.find_last_of('/') + 1);
+                    EntityId id = EditorCreateEntity(world, history, name.c_str());
+                    if (Entity* e = world.Get(id))
+                        if (auto* m = e->GetComponent<MeshRendererComponent>())
+                            m->assetId = p;
+                    selected = id;
+                }
+            }
+            ImGui::EndDragDropTarget();
         }
 
         Entity* e = world.Get(selected);
@@ -86,12 +115,13 @@ namespace uel {
     void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world)
     {
         rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
-        if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0) return;
+        if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
 
         using namespace DirectX;
         XMFLOAT4X4 viewProj;
         XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
-        RenderSystem::Render(world, cube, context, viewProj);
+
+        RenderSystem::Render(world, shader, *cubeMesh, meshCache, devicePtr, context, viewProj);
     }
 
 } // namespace uel

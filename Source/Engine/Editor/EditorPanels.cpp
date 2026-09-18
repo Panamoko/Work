@@ -4,14 +4,42 @@
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
 #include "Engine/Serialization/StageSerializer.h"   
+#include "Engine/Editor/EntityCommands.h"   
+#include "Engine/Config/EngineConfig.h"
 #include <imgui.h>
 #include <cstdio>
-
+#include <cstring>
+#include <filesystem>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <cctype>
+#include <map>
 namespace uel {
 
-    void DrawHierarchyPanel(World& world, EntityId& selected)
+    void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history)
     {
         ImGui::Begin("Hierarchy");
+
+        if (ImGui::Button("+ Create"))
+            selected = EditorCreateEntity(world, history, "Entity");
+
+        ImGui::SameLine();
+        if (ImGui::Button("Duplicate")) {
+            if (world.Get(selected)) {
+                EntityId id = EditorDuplicateEntity(world, history, selected);
+                if (id.IsValid()) selected = id;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Delete")) {
+            if (world.Get(selected)) {
+                EditorDeleteEntity(world, history, selected);
+                selected = EntityId{};
+            }
+        }
+        ImGui::Separator();
+
         for (const auto& slot : world.Slots())
         {
             if (!slot) continue;
@@ -54,8 +82,14 @@ namespace uel {
         if (MeshRendererComponent* m = e->GetComponent<MeshRendererComponent>())
         {
             ImGui::Separator(); ImGui::TextUnformatted("MeshRenderer");
-            ImGui::Checkbox("Visible", &m->visible);   // ※Undo未対応（後で）
-            ImGui::ColorEdit4("Color", &m->color.x);   // ※Undo未対応（後で）
+
+            char buf[260];
+            strncpy_s(buf, sizeof(buf), m->assetId.c_str(), _TRUNCATE);
+            if (ImGui::InputText("Asset (GLB path)", buf, sizeof(buf)))
+                m->assetId = buf;                       // 空なら立方体、パスを入れるとGLB
+
+            ImGui::Checkbox("Visible", &m->visible);
+            ImGui::ColorEdit4("Color", &m->color.x);
         }
 
         ImGui::End();
@@ -103,6 +137,111 @@ namespace uel {
             selected = EntityId{}; // 旧IDは無効化されるので選択リセット
             history.Clear();       // ロード後は履歴クリア
         }
+    }
+
+    void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history)
+    {
+        // dir -> [fullpath...]
+        static std::map<std::string, std::vector<std::string>> groups;
+        static int   total = 0;
+        static bool  scanned = false;
+        static char  search[128] = "";
+        static std::string picked;
+
+        ImGui::Begin("Asset Browser");
+
+        if (!scanned || ImGui::Button("Rescan"))
+        {
+            groups.clear();
+            total = 0;
+            std::error_code ec;
+            std::filesystem::path root = kAssetRoot;
+            if (std::filesystem::exists(root, ec)) {
+                try {
+                    for (auto& entry : std::filesystem::recursive_directory_iterator(
+                        root, std::filesystem::directory_options::skip_permission_denied)) {
+                        if (!entry.is_regular_file()) continue;
+                        std::string ext = entry.path().extension().string();
+                        for (char& c : ext) c = (char)std::tolower((unsigned char)c);
+                        if (ext != ".glb") continue;
+                        std::string full = entry.path().generic_string();
+                        std::string dir = full.substr(0, full.find_last_of('/'));
+                        groups[dir].push_back(full);
+                        ++total;
+                    }
+                }
+                catch (...) {}
+            }
+            scanned = true;
+        }
+        ImGui::SameLine();
+        ImGui::Text("%d assets", total);
+
+        ImGui::InputTextWithHint("##search", "search...", search, sizeof(search));
+
+        bool hasPick = !picked.empty();
+        if (ImGui::Button("Assign to Selected") && hasPick) {
+            if (Entity* e = world.Get(selected)) {
+                auto* m = e->GetComponent<MeshRendererComponent>();
+                if (!m) m = e->AddComponent<MeshRendererComponent>();
+                m->assetId = picked;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Create Entity") && hasPick) {
+            std::string name = picked.substr(picked.find_last_of('/') + 1);
+            EntityId id = EditorCreateEntity(world, history, name.c_str());
+            if (Entity* e = world.Get(id))
+                if (auto* m = e->GetComponent<MeshRendererComponent>())
+                    m->assetId = picked;
+            selected = id;
+        }
+
+        ImGui::Separator();
+        ImGui::BeginChild("assetlist");
+
+        const bool filtering = (search[0] != '\0');
+        for (auto& kv : groups)
+        {
+            const std::string& dir = kv.first;
+            const auto& list = kv.second;
+
+            // 検索中：一致ファイルが無いフォルダは非表示、あるフォルダは自動展開
+            if (filtering) {
+                bool any = false;
+                for (const auto& f : list) {
+                    std::string n = f.substr(f.find_last_of('/') + 1);
+                    if (n.find(search) != std::string::npos) { any = true; break; }
+                }
+                if (!any) continue;
+                ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+            }
+
+            // フォルダ名はルート以下の相対で表示（見やすさ）
+            if (ImGui::TreeNode(dir.c_str()))
+            {
+                for (const auto& f : list)
+                {
+                    std::string name = f.substr(f.find_last_of('/') + 1);
+                    if (filtering && name.find(search) == std::string::npos) continue;
+
+                    char item[320];
+                    snprintf(item, sizeof(item), "%s##%s", name.c_str(), f.c_str());
+                    if (ImGui::Selectable(item, f == picked))
+                        picked = f;
+
+                    if (ImGui::BeginDragDropSource()) {
+                        ImGui::SetDragDropPayload("ASSET_GLB", f.c_str(), f.size() + 1);
+                        ImGui::TextUnformatted(name.c_str());
+                        ImGui::EndDragDropSource();
+                    }
+                }
+                ImGui::TreePop();
+            }
+        }
+
+        ImGui::EndChild();
+        ImGui::End();
     }
 
 } // namespace uel

@@ -15,6 +15,8 @@ namespace uel {
         void Clear() { entities.clear(); generations.clear(); freeList.clear(); }
 
 
+        // 構造変更のUndo用：指定IDでEntityを復元/確保する低レベルAPI
+        Entity* RestoreEntity(EntityId id, const std::string& name);
 
         // 全スロット（nullptr=空き）。UI/System はこれで反復する。
         const std::vector<std::unique_ptr<Entity>>& Slots() const { return entities; }

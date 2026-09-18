@@ -44,7 +44,16 @@ namespace uel {
         make("Floor", { 0.0f,-0.5f,  0.0f }, { 6.0f, 0.2f, 6.0f }, true, { 0.35f,0.35f,0.38f,1 });
         make("Cube", { 0.0f, 0.5f,  0.0f }, { 1,1,1 }, true, { 0.85f,0.55f,0.25f,1 });
         make("Light", { 2.0f, 1.0f,  0.0f }, { 0.3f,0.3f,0.3f }, true, { 0.95f,0.9f,0.3f,1 });
-
+        // GLB 表示のデモ（軽い .glb を指定）
+        {
+            EntityId id = world.CreateEntity("Crystal");
+            Entity* e = world.Get(id);
+            auto* t = e->AddComponent<TransformComponent>();
+            t->position = { -2.0f, 0.5f, 0.0f };
+            auto* m = e->AddComponent<MeshRendererComponent>();
+            m->color = { 0.6f, 0.85f, 1.0f, 1.0f };
+            m->assetId = "Data/Model/STAGE GLB format/detail-crystal.glb";
+        }
         return true;
     }
 
@@ -57,8 +66,9 @@ namespace uel {
             imgui->BeginDockspace();                             // ③ DockSpace（メニュー下に配置）
             HandleShortcuts(history);
             viewport->DrawUI(graphics->GetDevice(), world, selected, history);
-            DrawHierarchyPanel(world, selected);
+            DrawHierarchyPanel(world, selected, history);   
             DrawInspectorPanel(world, selected, history, inspectorSession);
+            DrawAssetBrowserPanel(world, selected, history);
             Update();
 
             viewport->RenderScene(graphics->GetContext(), world);

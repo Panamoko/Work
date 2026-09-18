@@ -91,6 +91,12 @@
     <Filter Include="Source\Engine\Serialization">
       <UniqueIdentifier>{9271d9b2-8ca2-4f87-a27d-da92822f35a8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Assets">
+      <UniqueIdentifier>{9490fd7d-6f13-4b6a-974b-ab7418a702bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Config">
+      <UniqueIdentifier>{29f59585-2688-468b-adc1-ff48695f1d8e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -363,6 +369,24 @@
     <ClInclude Include="Source\Engine\Serialization\StageSerializer.h">
       <Filter>Source\Engine\Serialization</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\EntityCommands.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\Mesh.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\MeshShader.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Assets\GltfMeshLoader.h">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Assets\MeshCache.h">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Config\EngineConfig.h">
+      <Filter>Source\Engine\Config</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -598,6 +622,21 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp">
       <Filter>Source\Engine\Serialization</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\EntityCommands.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\Mesh.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\MeshShader.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Assets\GltfMeshLoader.cpp">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Assets\MeshCache.cpp">
+      <Filter>Source\Engine\Assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

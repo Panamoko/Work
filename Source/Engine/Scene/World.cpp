@@ -1,4 +1,5 @@
 #include "Engine/Scene/World.h"
+#include <algorithm>
 
 namespace uel {
 
@@ -40,6 +41,24 @@ namespace uel {
         if (id.index >= entities.size()) return nullptr;
         if (generations[id.index] != id.generation) return nullptr; // ŒÃ‚¢ID
         return entities[id.index].get();
+    }
+
+    Entity* World::RestoreEntity(EntityId id, const std::string& name)
+    {
+        uint32_t index = id.index;
+        if (index >= entities.size()) {
+            entities.resize(index + 1);
+            generations.resize(index + 1, 0);
+        }
+        // ‚±‚Ìindex‚ª‹ó‚«ƒŠƒXƒg‚É‚ ‚ê‚Îæ‚èœ‚­
+        freeList.erase(std::remove(freeList.begin(), freeList.end(), index), freeList.end());
+
+        generations[index] = id.generation;
+        auto e = std::make_unique<Entity>();
+        e->id = id;
+        e->name = name;
+        entities[index] = std::move(e);
+        return entities[index].get();
     }
 
 } // namespace uel
