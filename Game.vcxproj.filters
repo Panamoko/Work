@@ -82,6 +82,15 @@
     <Filter Include="Source\Engine\Editor">
       <UniqueIdentifier>{330bfb6d-fdb7-463e-bb3a-d6133d14bcba}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Scene">
+      <UniqueIdentifier>{407bb780-5f4d-44a0-8729-ca65b60af87e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Systems">
+      <UniqueIdentifier>{6a48037d-9068-44ea-8735-dee1b78c688b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Engine\Serialization">
+      <UniqueIdentifier>{9271d9b2-8ca2-4f87-a27d-da92822f35a8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -309,6 +318,51 @@
     <ClInclude Include="Source\Engine\Editor\ImGuiLayer.h">
       <Filter>Source\Engine\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\RenderTexture.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\ViewportPanel.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\EntityId.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\Component.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\TransformComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\Entity.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\World.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\EditorPanels.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\CubeRenderer.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\MeshRendererComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Systems\RenderSystem.h">
+      <Filter>Source\Engine\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\CommandHistory.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\TransformSnapshot.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\TransformEdit.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Serialization\StageSerializer.h">
+      <Filter>Source\Engine\Serialization</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -523,6 +577,27 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp">
       <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\RenderTexture.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\ViewportPanel.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Scene\World.cpp">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\EditorPanels.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\CubeRenderer.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Systems\RenderSystem.cpp">
+      <Filter>Source\Engine\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp">
+      <Filter>Source\Engine\Serialization</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

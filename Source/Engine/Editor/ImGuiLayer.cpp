@@ -30,15 +30,17 @@ namespace uel {
         ImGui::DestroyContext();
     }
 
-    void ImGuiLayer::BeginFrame()
+    void ImGuiLayer::NewFrame()
     {
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+    }
 
-        // --- 画面全体を覆う DockSpace ホスト（Editor Shell の土台）---
+    void ImGuiLayer::BeginDockspace()
+    {
         ImGuiViewport* vp = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(vp->GetWorkPos());
+        ImGui::SetNextWindowPos(vp->GetWorkPos());     // メインメニューバー分を除いた領域
         ImGui::SetNextWindowSize(vp->GetWorkSize());
         ImGui::SetNextWindowViewport(vp->ID);
 
@@ -46,7 +48,7 @@ namespace uel {
             ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-            ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_MenuBar;
+            ImGuiWindowFlags_NoBackground;
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -56,20 +58,7 @@ namespace uel {
 
         ImGuiID dockId = ImGui::GetID("EngineDockSpace");
         ImGui::DockSpace(dockId, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
-
-        if (ImGui::BeginMenuBar())
-        {
-            if (ImGui::BeginMenu("File")) { ImGui::MenuItem("(Coming soon)"); ImGui::EndMenu(); }
-            if (ImGui::BeginMenu("Edit")) { ImGui::MenuItem("(Coming soon)"); ImGui::EndMenu(); }
-            ImGui::EndMenuBar();
-        }
-        ImGui::End(); // DockSpaceHost
-
-        // --- 動作確認用の仮パネル（Step 4 以降で本実装へ）---
-        ImGui::Begin("Hierarchy"); ImGui::TextUnformatted("Scene Outliner (TODO)"); ImGui::End();
-        ImGui::Begin("Inspector"); ImGui::TextUnformatted("Details (TODO)");        ImGui::End();
-        ImGui::Begin("Viewport");  ImGui::TextUnformatted("RenderTexture (Step 4)"); ImGui::End();
-        ImGui::ShowDemoWindow();
+        ImGui::End();
     }
 
     void ImGuiLayer::EndFrame()
@@ -80,6 +69,8 @@ namespace uel {
 
     bool ImGuiLayer::HandleMessage(HWND h, UINT m, WPARAM w, LPARAM l)
     {
+        // コンテキスト未生成/破棄後にWin32メッセージが来ても安全に無視する。
+        if (ImGui::GetCurrentContext() == nullptr) return false;   // ★追加
         return ImGui_ImplWin32_WndProcHandler(h, m, w, l) != 0;
     }
 

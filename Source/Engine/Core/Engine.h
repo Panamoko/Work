@@ -4,6 +4,10 @@
 #include "Engine/Platform/Window.h"
 #include "Engine/Graphics/GraphicsDevice.h"
 #include "Engine/Editor/ImGuiLayer.h"
+#include "Engine/Editor/ViewportPanel.h"
+#include "Engine/Editor/CommandHistory.h"
+#include "Engine/Editor/TransformEdit.h"
+#include "Engine/Scene/World.h"
 
 namespace uel {
 
@@ -15,11 +19,16 @@ namespace uel {
 
     private:
         void Update();
-        void Render();
 
         std::unique_ptr<Window>         window;
         std::unique_ptr<GraphicsDevice> graphics;
         std::unique_ptr<ImGuiLayer>     imgui;
+        std::unique_ptr<ViewportPanel>  viewport;
+
+        World                world;
+        EntityId             selected;
+        CommandHistory       history;
+        TransformEditSession inspectorSession;   // Inspectorï“èWóp
     };
 
 } // namespace uel
