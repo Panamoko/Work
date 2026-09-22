@@ -3,8 +3,8 @@
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Graphics/MeshShader.h"
 #include "Engine/Editor/TransformEdit.h"
+#include "Engine/Editor/EditorCamera.h"
 #include "Engine/Scene/EntityId.h"
-#include "Engine/Assets/MeshCache.h"
 #include <DirectXMath.h>
 #include <memory>
 
@@ -13,12 +13,13 @@ struct ID3D11DeviceContext;
 
 namespace uel {
     class World;
+    class MeshCache;   // ëOï˚êÈåæ
 
     class ViewportPanel {
     public:
         void Initialize(ID3D11Device* device);
         void DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history);
-        void RenderScene(ID3D11DeviceContext* context, World& world);
+        void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache, ID3D11Device* device);
 
     private:
         RenderTexture rt;
@@ -31,8 +32,7 @@ namespace uel {
         DirectX::XMFLOAT4X4 proj{};
         int gizmoOp = 0;
         TransformEditSession gizmoSession;
-        MeshCache      meshCache;
-        ID3D11Device* devicePtr = nullptr;
+        EditorCamera camera;
     };
 
 } // namespace uel

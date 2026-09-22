@@ -25,7 +25,8 @@ namespace uel {
                 std::shared_ptr<Mesh> gm = cache.GetOrLoad(device, m->assetId);
                 if (gm && gm->IsValid()) meshToDraw = gm.get();
             }
-            shader.Draw(context, *meshToDraw, t->GetWorldMatrix(), viewProj, m->color);
+            shader.Draw(context, *meshToDraw, t->GetWorldMatrix(), viewProj, m->color,
+                &m->hiddenSubmesh, &m->submeshRole, m->firstPerson);
         }
     }
 

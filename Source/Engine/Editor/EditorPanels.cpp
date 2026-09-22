@@ -6,6 +6,9 @@
 #include "Engine/Serialization/StageSerializer.h"   
 #include "Engine/Editor/EntityCommands.h"   
 #include "Engine/Config/EngineConfig.h"
+#include "Engine/Assets/MeshCache.h"
+#include "Engine/Graphics/Mesh.h"
+#include <memory>
 #include <imgui.h>
 #include <cstdio>
 #include <cstring>
@@ -53,7 +56,8 @@ namespace uel {
         ImGui::End();
     }
 
-    void DrawInspectorPanel(World& world, EntityId selected, CommandHistory& history, TransformEditSession& session)
+    void DrawInspectorPanel(World& world, EntityId selected, CommandHistory& history,
+        TransformEditSession& session, MeshCache& cache, ID3D11Device* device)
     {
         ImGui::Begin("Inspector");
         Entity* e = world.Get(selected);
@@ -65,31 +69,64 @@ namespace uel {
         if (TransformComponent* t = e->GetComponent<TransformComponent>())
         {
             ImGui::Separator(); ImGui::TextUnformatted("Transform");
-
             ImGui::DragFloat3("Position", &t->position.x, 0.05f);
-            if (ImGui::IsItemActivated())              BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit())   CommitTransformEdit(session, world, history);
-
+            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
             ImGui::DragFloat3("Rotation", &t->rotationEuler.x, 0.5f);
-            if (ImGui::IsItemActivated())              BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit())   CommitTransformEdit(session, world, history);
-
+            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
             ImGui::DragFloat3("Scale", &t->scale.x, 0.05f, 0.001f, 1000.0f);
-            if (ImGui::IsItemActivated())              BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit())   CommitTransformEdit(session, world, history);
+            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
         }
 
         if (MeshRendererComponent* m = e->GetComponent<MeshRendererComponent>())
         {
             ImGui::Separator(); ImGui::TextUnformatted("MeshRenderer");
-
-            char buf[260];
-            strncpy_s(buf, sizeof(buf), m->assetId.c_str(), _TRUNCATE);
-            if (ImGui::InputText("Asset (GLB path)", buf, sizeof(buf)))
-                m->assetId = buf;                       // 空なら立方体、パスを入れるとGLB
-
+            char buf[260]; strncpy_s(buf, sizeof(buf), m->assetId.c_str(), _TRUNCATE);
+            if (ImGui::InputText("Asset (GLB path)", buf, sizeof(buf))) m->assetId = buf;
             ImGui::Checkbox("Visible", &m->visible);
             ImGui::ColorEdit4("Color", &m->color.x);
+
+            // サブメッシュ：役割割当＋可視（このインスタンス）
+            if (!m->assetId.empty()) {
+                std::shared_ptr<Mesh> mesh = cache.GetOrLoad(device, m->assetId);
+                if (mesh && mesh->IsValid()) {
+                    const auto& subs = mesh->GetSubmeshes();
+                    if (m->hiddenSubmesh.size() < subs.size()) m->hiddenSubmesh.resize(subs.size(), 0);
+                    if (m->submeshRole.size() < subs.size()) m->submeshRole.resize(subs.size(), 0);
+
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("Submeshes / Roles (this instance)");
+                    ImGui::Checkbox("First-person (hide FP-hidden)", &m->firstPerson);
+
+                    if (ImGui::Button("Auto-detect head role")) {
+                        for (size_t i = 0; i < subs.size(); ++i) {
+                            std::string low = subs[i].name;
+                            for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
+                            bool headLike = (low.find("head") != std::string::npos)
+                                || (low.find("face") != std::string::npos)
+                                || (low.find("skull") != std::string::npos);
+                            m->submeshRole[i] = headLike ? (uint8_t)1 : (uint8_t)0;
+                        }
+                    }
+
+                    const char* roleNames[] = { "None", "FP-Hidden" };
+                    for (size_t i = 0; i < subs.size(); ++i) {
+                        ImGui::PushID((int)i);
+                        bool vis = (m->hiddenSubmesh[i] == 0);
+                        if (ImGui::Checkbox("##vis", &vis)) m->hiddenSubmesh[i] = vis ? 0 : 1;
+                        ImGui::SameLine();
+                        int role = m->submeshRole[i];
+                        ImGui::SetNextItemWidth(110);
+                        if (ImGui::Combo("##role", &role, roleNames, 2)) m->submeshRole[i] = (uint8_t)role;
+                        ImGui::SameLine();
+                        std::string nm = subs[i].name.empty() ? ("submesh " + std::to_string(i)) : subs[i].name;
+                        ImGui::TextUnformatted(nm.c_str());
+                        ImGui::PopID();
+                    }
+                }
+            }
         }
 
         ImGui::End();

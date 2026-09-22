@@ -1,15 +1,18 @@
 #pragma once
 #include "Engine/Scene/EntityId.h"
 
-namespace uel {
-	class World;
-	class CommandHistory;
-	struct TransformEditSession;
+struct ID3D11Device;   // ★ グローバル名前空間で前方宣言（uelの外）
 
-	void DrawHierarchyPanel(World& world, EntityId& selected);
-	void DrawInspectorPanel(World& world, EntityId selected, CommandHistory& history, TransformEditSession& session);
-	void HandleShortcuts(CommandHistory& history);
-	void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history);
-	void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history);
-	void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
+namespace uel {
+    class World;
+    class CommandHistory;
+    struct TransformEditSession;
+    class MeshCache;       // これは uel の中でOK（MeshCache は uel の型）
+
+    void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history);
+    void DrawInspectorPanel(World& world, EntityId selected, CommandHistory& history,
+        TransformEditSession& session, MeshCache& cache, ID3D11Device* device);
+    void HandleShortcuts(CommandHistory& history);
+    void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history);
+    void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
 }

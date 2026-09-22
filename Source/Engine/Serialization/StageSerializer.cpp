@@ -25,8 +25,16 @@ namespace uel {
             template<class A> void serialize(A& ar) { ar(CEREAL_NVP(position), CEREAL_NVP(rotationEuler), CEREAL_NVP(scale)); }
         };
         struct MeshDTO {
-            std::string assetId; Vec4DTO color; bool visible = true;
-            template<class A> void serialize(A& ar) { ar(CEREAL_NVP(assetId), CEREAL_NVP(color), CEREAL_NVP(visible)); }
+            std::string      assetId;
+            Vec4DTO          color;
+            bool             visible = true;
+            bool             firstPerson = false;
+            std::vector<int> hiddenSubmesh;
+            std::vector<int> submeshRole;
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(assetId), CEREAL_NVP(color), CEREAL_NVP(visible),
+                    CEREAL_NVP(firstPerson), CEREAL_NVP(hiddenSubmesh), CEREAL_NVP(submeshRole));
+            }
         };
         struct EntityDTO {
             std::string name; TransformDTO transform; bool hasMesh = false; MeshDTO mesh;
@@ -52,13 +60,16 @@ namespace uel {
                 ed.mesh.assetId = m->assetId;
                 ed.mesh.color = { m->color.x, m->color.y, m->color.z, m->color.w };
                 ed.mesh.visible = m->visible;
+                ed.mesh.firstPerson = m->firstPerson;
+                ed.mesh.hiddenSubmesh.assign(m->hiddenSubmesh.begin(), m->hiddenSubmesh.end());
+                ed.mesh.submeshRole.assign(m->submeshRole.begin(), m->submeshRole.end());
             }
             entities.push_back(std::move(ed));
         }
 
         std::ofstream ofs(path);
         if (!ofs) return false;
-        int schemaVersion = 1;
+        int schemaVersion = 2;
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("schemaVersion", schemaVersion),
             cereal::make_nvp("entities", entities));
@@ -96,6 +107,9 @@ namespace uel {
                 m->assetId = ed.mesh.assetId;
                 m->color = { ed.mesh.color.x, ed.mesh.color.y, ed.mesh.color.z, ed.mesh.color.w };
                 m->visible = ed.mesh.visible;
+                m->firstPerson = ed.mesh.firstPerson;
+                m->hiddenSubmesh.assign(ed.mesh.hiddenSubmesh.begin(), ed.mesh.hiddenSubmesh.end());
+                m->submeshRole.assign(ed.mesh.submeshRole.begin(), ed.mesh.submeshRole.end());
             }
         }
         return true;

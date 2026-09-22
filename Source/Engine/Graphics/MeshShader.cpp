@@ -2,6 +2,7 @@
 #include "Engine/Graphics/Mesh.h"
 #include <d3dcompiler.h>
 #include <cstring>
+#include <cstdint>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -13,26 +14,32 @@ namespace uel {
         struct CB { XMFLOAT4X4 world; XMFLOAT4X4 viewProj; XMFLOAT4 color; XMFLOAT4 lightDir; };
 
         const char* kHLSL = R"(
+Texture2D    tex  : register(t0);
+SamplerState samp : register(s0);
 cbuffer CB : register(b0) {
     float4x4 world;
     float4x4 viewProj;
     float4   color;
     float4   lightDir;
 };
-struct VSIn { float3 pos : POSITION; float3 nrm : NORMAL; };
-struct PSIn { float4 pos : SV_POSITION; float3 nrm : NORMAL; };
+struct VSIn { float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
+struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
 PSIn VSMain(VSIn i) {
     PSIn o;
-    float4 wpos = mul(float4(i.pos, 1.0), world);
+    float4 wpos = mul(float4(i.pos,1.0), world);
     o.pos = mul(wpos, viewProj);
     o.nrm = mul(i.nrm, (float3x3)world);
+    o.col = i.col;
+    o.uv  = i.uv;
     return o;
 }
 float4 PSMain(PSIn i) : SV_TARGET {
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz);
     float d = saturate(dot(n, l));
-    float3 c = color.rgb * (0.25 + 0.75 * d);
+    float4 t = tex.Sample(samp, i.uv);
+    float3 base = t.rgb * i.col.rgb * color.rgb;   // テクスチャ×頂点色×ティント
+    float3 c = base * (0.25 + 0.75 * d);
     return float4(c, 1.0);
 }
 )";
@@ -47,10 +54,12 @@ float4 PSMain(PSIn i) : SV_TARGET {
         if (FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
 
         D3D11_INPUT_ELEMENT_DESC il[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0 },
-            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
-        if (FAILED(device->CreateInputLayout(il, 2, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), layout.GetAddressOf()))) return false;
+        if (FAILED(device->CreateInputLayout(il, 4, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), layout.GetAddressOf()))) return false;
 
         D3D11_BUFFER_DESC cbd = {};
         cbd.Usage = D3D11_USAGE_DEFAULT; cbd.ByteWidth = sizeof(CB); cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
@@ -60,11 +69,32 @@ float4 PSMain(PSIn i) : SV_TARGET {
         rd.FillMode = D3D11_FILL_SOLID; rd.CullMode = D3D11_CULL_NONE; rd.DepthClipEnable = TRUE;
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
 
+        // サンプラ
+        D3D11_SAMPLER_DESC smp = {};
+        smp.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        smp.AddressU = smp.AddressV = smp.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+        smp.MaxLOD = D3D11_FLOAT32_MAX;
+        if (FAILED(device->CreateSamplerState(&smp, sampler.GetAddressOf()))) return false;
+
+        // 1x1 白テクスチャ（テクスチャ無しメッシュ用）
+        uint32_t white = 0xFFFFFFFF;
+        D3D11_TEXTURE2D_DESC wd = {};
+        wd.Width = wd.Height = 1; wd.MipLevels = 1; wd.ArraySize = 1;
+        wd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; wd.SampleDesc.Count = 1;
+        wd.Usage = D3D11_USAGE_IMMUTABLE; wd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        D3D11_SUBRESOURCE_DATA wsd = {}; wsd.pSysMem = &white; wsd.SysMemPitch = 4;
+        ComPtr<ID3D11Texture2D> wtex;
+        if (FAILED(device->CreateTexture2D(&wd, &wsd, wtex.GetAddressOf()))) return false;
+        if (FAILED(device->CreateShaderResourceView(wtex.Get(), nullptr, whiteSRV.GetAddressOf()))) return false;
+
         return true;
     }
 
     void MeshShader::Draw(ID3D11DeviceContext* context, const Mesh& mesh,
-        const XMFLOAT4X4& world, const XMFLOAT4X4& viewProj, const XMFLOAT4& color)
+        const XMFLOAT4X4& world, const XMFLOAT4X4& viewProj, const XMFLOAT4& color,
+        const std::vector<uint8_t>* hiddenSubmesh,
+        const std::vector<uint8_t>* submeshRole,
+        bool firstPerson)
     {
         if (!mesh.IsValid()) return;
 
@@ -81,9 +111,24 @@ float4 PSMain(PSIn i) : SV_TARGET {
         context->VSSetConstantBuffers(0, 1, cb.GetAddressOf());
         context->PSSetConstantBuffers(0, 1, cb.GetAddressOf());
         context->RSSetState(raster.Get());
+        context->PSSetSamplers(0, 1, sampler.GetAddressOf());
 
         mesh.Bind(context);
-        context->DrawIndexed(mesh.IndexCount(), 0, 0);
+        const auto& subs = mesh.GetSubmeshes();
+        for (size_t i = 0; i < subs.size(); ++i) {
+            const auto& sm = subs[i];
+            if (!sm.visible || sm.indexCount == 0) continue;
+
+            bool hide = false;
+            if (hiddenSubmesh && i < hiddenSubmesh->size() && (*hiddenSubmesh)[i]) hide = true;          // 手動非表示
+            if (firstPerson && submeshRole && i < submeshRole->size()
+                && (*submeshRole)[i] == (uint8_t)1 /*FirstPersonHidden*/) hide = true;                   // 役割で非表示
+            if (hide) continue;
+
+            ID3D11ShaderResourceView* srv = sm.texture ? sm.texture.Get() : whiteSRV.Get();
+            context->PSSetShaderResources(0, 1, &srv);
+            context->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
+        }
     }
 
 } // namespace uel

@@ -150,6 +150,7 @@
     <ClInclude Include="Source\Engine\Config\EngineConfig.h" />
     <ClInclude Include="Source\Engine\Core\Engine.h" />
     <ClInclude Include="Source\Engine\Editor\CommandHistory.h" />
+    <ClInclude Include="Source\Engine\Editor\EditorCamera.h" />
     <ClInclude Include="Source\Engine\Editor\EditorPanels.h" />
     <ClInclude Include="Source\Engine\Editor\EntityCommands.h" />
     <ClInclude Include="Source\Engine\Editor\ImGuiLayer.h" />
@@ -238,6 +239,7 @@
     <ClCompile Include="Source\Engine\Assets\GltfMeshLoader.cpp" />
     <ClCompile Include="Source\Engine\Assets\MeshCache.cpp" />
     <ClCompile Include="Source\Engine\Core\Engine.cpp" />
+    <ClCompile Include="Source\Engine\Editor\EditorCamera.cpp" />
     <ClCompile Include="Source\Engine\Editor\EditorPanels.cpp" />
     <ClCompile Include="Source\Engine\Editor\EntityCommands.cpp" />
     <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp" />

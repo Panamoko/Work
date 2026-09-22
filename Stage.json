@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "entities": [
         {
             "name": "Camera",
@@ -29,7 +29,10 @@
                     "z": 0.0,
                     "w": 1.0
                 },
-                "visible": true
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
             }
         },
         {
@@ -60,20 +63,23 @@
                     "z": 0.3799999952316284,
                     "w": 1.0
                 },
-                "visible": true
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
             }
         },
         {
             "name": "Cube",
             "transform": {
                 "position": {
-                    "x": -3.5110771656036379,
-                    "y": 2.488736391067505,
-                    "z": -1.011962890625
+                    "x": 0.0,
+                    "y": 0.5,
+                    "z": 0.0
                 },
                 "rotationEuler": {
                     "x": 0.0,
-                    "y": -0.0,
+                    "y": 0.0,
                     "z": 0.0
                 },
                 "scale": {
@@ -91,7 +97,10 @@
                     "z": 0.25,
                     "w": 1.0
                 },
-                "visible": true
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
             }
         },
         {
@@ -122,7 +131,92 @@
                     "z": 0.30000001192092898,
                     "w": 1.0
                 },
-                "visible": true
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            }
+        },
+        {
+            "name": "Crystal",
+            "transform": {
+                "position": {
+                    "x": -2.0,
+                    "y": 0.5,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/STAGE GLB format/detail-crystal.glb",
+                "color": {
+                    "x": 0.6000000238418579,
+                    "y": 0.8500000238418579,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            }
+        },
+        {
+            "name": "character-a.glb",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/GLB format/character-a.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": true,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1
+                ]
             }
         }
     ]

@@ -67,11 +67,11 @@ namespace uel {
             HandleShortcuts(history);
             viewport->DrawUI(graphics->GetDevice(), world, selected, history);
             DrawHierarchyPanel(world, selected, history);   
-            DrawInspectorPanel(world, selected, history, inspectorSession);
+            DrawInspectorPanel(world, selected, history, inspectorSession, meshCache, graphics->GetDevice());
             DrawAssetBrowserPanel(world, selected, history);
             Update();
 
-            viewport->RenderScene(graphics->GetContext(), world);
+            viewport->RenderScene(graphics->GetContext(), world, meshCache, graphics->GetDevice());
             graphics->BeginFrame(0.10f, 0.12f, 0.15f, 1.0f);
             imgui->EndFrame();
             graphics->EndFrame();

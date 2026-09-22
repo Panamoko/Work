@@ -10,12 +10,13 @@
 #include <DirectXMath.h>
 #include "Engine/Editor/EntityCommands.h"
 #include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Assets/MeshCache.h"
 #include <string>
 namespace uel {
 
     void ViewportPanel::Initialize(ID3D11Device* device)
     {
-        devicePtr = device;                 // š’Ç‰Á
+
         rt.Create(device, viewWidth, viewHeight);
         shader.Initialize(device);
         cubeMesh = Mesh::CreateCube(device);
@@ -40,7 +41,14 @@ namespace uel {
         modeButton("Translate", ImGuizmo::TRANSLATE); ImGui::SameLine();
         modeButton("Rotate", ImGuizmo::ROTATE);    ImGui::SameLine();
         modeButton("Scale", ImGuizmo::SCALE);
-
+        ImGuiIO& io = ImGui::GetIO();
+        if ((ImGui::IsWindowFocused() || ImGui::IsWindowHovered())
+            && !io.WantTextInput && !ImGui::IsMouseDown(1))  
+        {
+            if (ImGui::IsKeyPressed('W')) gizmoOp = ImGuizmo::TRANSLATE;
+            if (ImGui::IsKeyPressed('E')) gizmoOp = ImGuizmo::ROTATE;
+            if (ImGui::IsKeyPressed('R')) gizmoOp = ImGuizmo::SCALE;
+        }
         ImVec2 avail = ImGui::GetContentRegionAvail();
         int w = (int)avail.x, h = (int)avail.y;
         if (w > 0 && h > 0 && (w != viewWidth || h != viewHeight)) {
@@ -49,13 +57,11 @@ namespace uel {
         }
 
         using namespace DirectX;
+        camera.Update(ImGui::IsWindowHovered());   
+        view = camera.GetView();
+
         float aspect = (viewHeight > 0) ? (float)viewWidth / (float)viewHeight : 1.0f;
-        XMMATRIX v = XMMatrixLookAtLH(
-            XMVectorSet(4.0f, 4.0f, -7.0f, 0.0f),
-            XMVectorSet(0.0f, 0.5f, 0.0f, 0.0f),
-            XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f));
         XMMATRIX p = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), aspect, 0.1f, 100.0f);
-        XMStoreFloat4x4(&view, v);
         XMStoreFloat4x4(&proj, p);
 
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
@@ -112,7 +118,7 @@ namespace uel {
         ImGui::PopStyleVar();
     }
 
-    void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world)
+    void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache, ID3D11Device* device)
     {
         rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
         if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
@@ -121,7 +127,7 @@ namespace uel {
         XMFLOAT4X4 viewProj;
         XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
 
-        RenderSystem::Render(world, shader, *cubeMesh, meshCache, devicePtr, context, viewProj);
+        RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
     }
 
 } // namespace uel

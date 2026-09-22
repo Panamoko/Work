@@ -8,6 +8,7 @@
 #include "Engine/Editor/CommandHistory.h"
 #include "Engine/Editor/TransformEdit.h"
 #include "Engine/Scene/World.h"
+#include "Engine/Assets/MeshCache.h"
 
 namespace uel {
 
@@ -29,6 +30,7 @@ namespace uel {
         EntityId             selected;
         CommandHistory       history;
         TransformEditSession inspectorSession;   // Inspectorï“èWóp
+        MeshCache            meshCache;
     };
 
 } // namespace uel
