@@ -57,7 +57,13 @@ namespace uel {
 
     LRESULT Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
     {
-        // まず ImGui 等のフックへ。消費されたら終了。
+        if (msg == WM_SIZE && wparam != SIZE_MINIMIZED)   // ★クライアント領域の実サイズを保持
+        {
+            width = static_cast<int>(LOWORD(lparam));
+            height = static_cast<int>(HIWORD(lparam));
+        }
+
+        // まず ImGui 等のフックへ。
         if (messageHook && messageHook(hwnd, msg, wparam, lparam))
             return true;
 

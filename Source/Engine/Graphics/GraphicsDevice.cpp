@@ -73,11 +73,36 @@ namespace uel {
         const float color[4] = { r, g, b, a };
         context->OMSetRenderTargets(1, renderTargetView.GetAddressOf(), nullptr);
         context->ClearRenderTargetView(renderTargetView.Get(), color);
+
+        D3D11_VIEWPORT vp = {};
+        vp.Width = static_cast<float>(width);
+        vp.Height = static_cast<float>(height);
+        vp.MinDepth = 0.0f; vp.MaxDepth = 1.0f;
+        context->RSSetViewports(1, &vp);
     }
 
     void GraphicsDevice::EndFrame()
     {
         swapChain->Present(1, 0); // VSync ON
+    }
+
+    void GraphicsDevice::Resize(int w, int h)
+    {
+        if (!swapChain || w <= 0 || h <= 0) return;
+        if (w == width && h == height) return;         // 変化なしなら何もしない
+
+        // バックバッファ参照を全て解放してからリサイズ
+        ID3D11RenderTargetView* nullRTV = nullptr;
+        context->OMSetRenderTargets(1, &nullRTV, nullptr);
+        renderTargetView.Reset();
+
+        if (FAILED(swapChain->ResizeBuffers(0, (UINT)w, (UINT)h, DXGI_FORMAT_UNKNOWN, 0))) return;
+
+        ComPtr<ID3D11Texture2D> backBuffer;
+        if (FAILED(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), &backBuffer))) return;
+        if (FAILED(device->CreateRenderTargetView(backBuffer.Get(), nullptr, renderTargetView.GetAddressOf()))) return;
+
+        width = w; height = h;
     }
 
 } // namespace uel

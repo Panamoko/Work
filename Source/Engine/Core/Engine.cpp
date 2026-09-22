@@ -61,6 +61,8 @@ namespace uel {
     {
         while (window->ProcessMessages())
         {
+            graphics->Resize(window->GetWidth(), window->GetHeight());
+
             imgui->NewFrame();                                   // ① NewFrame
             DrawMainMenuBar(world, selected, history);           // ② メインメニュー（先に）
             imgui->BeginDockspace();                             // ③ DockSpace（メニュー下に配置）

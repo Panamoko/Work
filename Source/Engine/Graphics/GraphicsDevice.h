@@ -14,6 +14,8 @@ namespace uel {
         void BeginFrame(float r, float g, float b, float a); // RTVをセットしてクリア
         void EndFrame();                                     // Present
 
+        void Resize(int width, int height);
+
         ID3D11Device* GetDevice()  const { return device.Get(); }
         ID3D11DeviceContext* GetContext() const { return context.Get(); }
 
