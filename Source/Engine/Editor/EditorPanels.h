@@ -13,6 +13,7 @@ namespace uel {
     void DrawInspectorPanel(World& world, EntityId selected, CommandHistory& history,
         TransformEditSession& session, MeshCache& cache, ID3D11Device* device);
     void HandleShortcuts(CommandHistory& history);
-    void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history);
+    void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
+        bool playing, bool& togglePlayRequested);
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
 }

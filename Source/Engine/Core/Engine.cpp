@@ -63,12 +63,16 @@ namespace uel {
         {
             graphics->Resize(window->GetWidth(), window->GetHeight());
 
-            imgui->NewFrame();                                   // ① NewFrame
-            DrawMainMenuBar(world, selected, history);           // ② メインメニュー（先に）
-            imgui->BeginDockspace();                             // ③ DockSpace（メニュー下に配置）
+            imgui->NewFrame();
+
+            bool togglePlay = false;
+            DrawMainMenuBar(world, selected, history, mode == EditorMode::Play, togglePlay);
+            if (togglePlay) { if (mode == EditorMode::Edit) StartPlay(); else StopPlay(); }
+
+            imgui->BeginDockspace();
             HandleShortcuts(history);
-            viewport->DrawUI(graphics->GetDevice(), world, selected, history);
-            DrawHierarchyPanel(world, selected, history);   
+            viewport->DrawUI(graphics->GetDevice(), world, selected, history, mode == EditorMode::Play, meshCache);
+            DrawHierarchyPanel(world, selected, history);
             DrawInspectorPanel(world, selected, history, inspectorSession, meshCache, graphics->GetDevice());
             DrawAssetBrowserPanel(world, selected, history);
             Update();
@@ -82,5 +86,39 @@ namespace uel {
     }
 
     void Engine::Update() {}
+
+    void Engine::StartPlay()
+    {
+        mode = EditorMode::Play;
+        playViewEntity = selected;
+        playPrevFirstPerson = false;
+        playHadTransform = false;
+
+        if (Entity* e = world.Get(selected)) {
+            if (auto* m = e->GetComponent<MeshRendererComponent>()) {
+                playPrevFirstPerson = m->firstPerson;
+                m->firstPerson = true;
+            }
+            if (auto* t = e->GetComponent<TransformComponent>()) {
+                playXform = { t->position, t->rotationEuler, t->scale };  // 開始位置を保存
+                playHadTransform = true;
+            }
+        }
+    }
+
+    void Engine::StopPlay()
+    {
+        if (Entity* e = world.Get(playViewEntity)) {
+            if (auto* m = e->GetComponent<MeshRendererComponent>())
+                m->firstPerson = playPrevFirstPerson;
+            if (playHadTransform)
+                if (auto* t = e->GetComponent<TransformComponent>()) {
+                    t->position = playXform.position;   // 位置を元に戻す
+                    t->rotationEuler = playXform.rotationEuler;
+                    t->scale = playXform.scale;
+                }
+        }
+        mode = EditorMode::Edit;
+    }
 
 } // namespace uel

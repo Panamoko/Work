@@ -12,6 +12,8 @@
 
 namespace uel {
 
+    enum class EditorMode { Edit, Play };
+
     class Engine {
     public:
         ~Engine();
@@ -20,6 +22,8 @@ namespace uel {
 
     private:
         void Update();
+        void StartPlay();
+        void StopPlay();
 
         std::unique_ptr<Window>         window;
         std::unique_ptr<GraphicsDevice> graphics;
@@ -31,6 +35,13 @@ namespace uel {
         CommandHistory       history;
         TransformEditSession inspectorSession;   // Inspector編集用
         MeshCache            meshCache;
+
+        EditorMode mode = EditorMode::Edit;
+        EntityId   playViewEntity;
+        bool       playPrevFirstPerson = false;
+        bool           playHadTransform = false;   // ★
+        TransformSnapshot playXform;               // ★開始時の位置を保存して復元
+
     };
 
 } // namespace uel

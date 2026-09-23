@@ -97,6 +97,9 @@
     <Filter Include="Source\Engine\Config">
       <UniqueIdentifier>{29f59585-2688-468b-adc1-ff48695f1d8e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Physics">
+      <UniqueIdentifier>{8a735fcb-d88b-453b-9f94-21f208a320b2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -390,6 +393,9 @@
     <ClInclude Include="Source\Engine\Editor\EditorCamera.h">
       <Filter>Source\Engine\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Physics\GroundQuery.h">
+      <Filter>Source\Engine\Physics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -643,6 +649,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Editor\EditorCamera.cpp">
       <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp">
+      <Filter>Source\Engine\Physics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

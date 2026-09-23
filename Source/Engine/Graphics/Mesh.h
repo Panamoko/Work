@@ -35,12 +35,17 @@ namespace uel {
         bool IsValid() const { return !submeshes.empty(); }
         const std::vector<Submesh>& GetSubmeshes() const { return submeshes; }
 
+        const std::vector<DirectX::XMFLOAT3>& Positions() const { return cpuPositions; }
+        const std::vector<uint32_t>& Indices()   const { return cpuIndices; }
+
         static std::shared_ptr<Mesh> CreateCube(ID3D11Device* device);
 
     private:
         Microsoft::WRL::ComPtr<ID3D11Buffer> vb;
         Microsoft::WRL::ComPtr<ID3D11Buffer> ib;
         std::vector<Submesh> submeshes;
+        std::vector<DirectX::XMFLOAT3> cpuPositions;   // ★レイキャスト用
+        std::vector<uint32_t>          cpuIndices;     // ★
     };
 
 } // namespace uel

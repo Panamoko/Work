@@ -162,6 +162,7 @@
     <ClInclude Include="Source\Engine\Graphics\Mesh.h" />
     <ClInclude Include="Source\Engine\Graphics\MeshShader.h" />
     <ClInclude Include="Source\Engine\Graphics\RenderTexture.h" />
+    <ClInclude Include="Source\Engine\Physics\GroundQuery.h" />
     <ClInclude Include="Source\Engine\Platform\Window.h" />
     <ClInclude Include="Source\Engine\Scene\Component.h" />
     <ClInclude Include="Source\Engine\Scene\Entity.h" />
@@ -249,6 +250,7 @@
     <ClCompile Include="Source\Engine\Graphics\Mesh.cpp" />
     <ClCompile Include="Source\Engine\Graphics\MeshShader.cpp" />
     <ClCompile Include="Source\Engine\Graphics\RenderTexture.cpp" />
+    <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp" />
     <ClCompile Include="Source\Engine\Platform\Window.cpp" />
     <ClCompile Include="Source\Engine\Scene\World.cpp" />
     <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp" />

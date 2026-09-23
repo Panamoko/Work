@@ -1,4 +1,4 @@
-#include "Engine/Editor/EditorPanels.h"
+ï»¿#include "Engine/Editor/EditorPanels.h"
 #include "Engine/Editor/TransformEdit.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
@@ -88,7 +88,7 @@ namespace uel {
             ImGui::Checkbox("Visible", &m->visible);
             ImGui::ColorEdit4("Color", &m->color.x);
 
-            // ƒTƒuƒƒbƒVƒ…F–ğŠ„Š„“–{‰Â‹i‚±‚ÌƒCƒ“ƒXƒ^ƒ“ƒXj
+            // ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ï¼šå½¹å‰²å‰²å½“ï¼‹å¯è¦–ï¼ˆã“ã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ï¼‰
             if (!m->assetId.empty()) {
                 std::shared_ptr<Mesh> mesh = cache.GetOrLoad(device, m->assetId);
                 if (mesh && mesh->IsValid()) {
@@ -139,40 +139,40 @@ namespace uel {
         if (io.KeyCtrl && ImGui::IsKeyPressed('Z')) history.Undo();
         if (io.KeyCtrl && ImGui::IsKeyPressed('Y')) history.Redo();
     }
-    void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history)
+
+    void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
+        bool playing, bool& togglePlayRequested)
     {
         const char* kPath = "Stage.json";
         bool doSave = false, doLoad = false;
 
         if (ImGui::BeginMainMenuBar())
         {
-            if (ImGui::BeginMenu("File"))
-            {
+            if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Save Stage", "Ctrl+S")) doSave = true;
                 if (ImGui::MenuItem("Load Stage", "Ctrl+L")) doLoad = true;
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Edit"))
-            {
+            if (ImGui::BeginMenu("Edit")) {
                 if (ImGui::MenuItem("Undo", "Ctrl+Z", false, history.CanUndo())) history.Undo();
                 if (ImGui::MenuItem("Redo", "Ctrl+Y", false, history.CanRedo())) history.Redo();
                 ImGui::EndMenu();
             }
+            // Play / Stop
+            if (ImGui::MenuItem(playing ? "Stop" : "Play")) togglePlayRequested = true;
             ImGui::EndMainMenuBar();
         }
 
         ImGuiIO& io = ImGui::GetIO();
-        if (!io.WantTextInput && io.KeyCtrl)
-        {
+        if (!io.WantTextInput && io.KeyCtrl) {
             if (ImGui::IsKeyPressed('S')) doSave = true;
             if (ImGui::IsKeyPressed('L')) doLoad = true;
         }
 
         if (doSave) StageSerializer::Save(world, kPath);
-        if (doLoad && StageSerializer::Load(world, kPath))
-        {
-            selected = EntityId{}; // ‹ŒID‚Í–³Œø‰»‚³‚ê‚é‚Ì‚Å‘I‘ğƒŠƒZƒbƒg
-            history.Clear();       // ƒ[ƒhŒã‚Í—š—ğƒNƒŠƒA
+        if (doLoad && StageSerializer::Load(world, kPath)) {
+            selected = EntityId{};
+            history.Clear();
         }
     }
 
@@ -243,7 +243,7 @@ namespace uel {
             const std::string& dir = kv.first;
             const auto& list = kv.second;
 
-            // ŒŸõ’†Fˆê’vƒtƒ@ƒCƒ‹‚ª–³‚¢ƒtƒHƒ‹ƒ_‚Í”ñ•\¦A‚ ‚éƒtƒHƒ‹ƒ_‚Í©“®“WŠJ
+            // æ¤œç´¢ä¸­ï¼šä¸€è‡´ãƒ•ã‚¡ã‚¤ãƒ«ãŒç„¡ã„ãƒ•ã‚©ãƒ«ãƒ€ã¯éè¡¨ç¤ºã€ã‚ã‚‹ãƒ•ã‚©ãƒ«ãƒ€ã¯è‡ªå‹•å±•é–‹
             if (filtering) {
                 bool any = false;
                 for (const auto& f : list) {
@@ -254,7 +254,7 @@ namespace uel {
                 ImGui::SetNextItemOpen(true, ImGuiCond_Always);
             }
 
-            // ƒtƒHƒ‹ƒ_–¼‚Íƒ‹[ƒgˆÈ‰º‚Ì‘Š‘Î‚Å•\¦iŒ©‚â‚·‚³j
+            // ãƒ•ã‚©ãƒ«ãƒ€åã¯ãƒ«ãƒ¼ãƒˆä»¥ä¸‹ã®ç›¸å¯¾ã§è¡¨ç¤ºï¼ˆè¦‹ã‚„ã™ã•ï¼‰
             if (ImGui::TreeNode(dir.c_str()))
             {
                 for (const auto& f : list)

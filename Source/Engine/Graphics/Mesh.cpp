@@ -26,6 +26,11 @@ namespace uel {
         if (FAILED(device->CreateBuffer(&bd, &sd, ib.GetAddressOf()))) return false;
 
         submeshes = subs;
+
+        cpuPositions.resize(vertexCount);
+        for (size_t i = 0; i < vertexCount; ++i) cpuPositions[i] = vertices[i].position;
+        cpuIndices.assign(indices, indices + idxCount);
+
         return true;
     }
 
