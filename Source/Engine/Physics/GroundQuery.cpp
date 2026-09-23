@@ -41,4 +41,37 @@ namespace uel {
         return found;
     }
 
+    bool RaycastMesh(const Mesh& mesh, const XMMATRIX& world,
+        const XMFLOAT3& origin, const XMFLOAT3& dir, float maxDist, float& outDist)
+    {
+        const auto& pos = mesh.Positions();
+        const auto& idx = mesh.Indices();
+        XMVECTOR O = XMLoadFloat3(&origin);
+        XMVECTOR D = XMVector3Normalize(XMLoadFloat3(&dir));
+        const float EPS = 1e-6f;
+        bool found = false;
+        float best = maxDist;
+
+        for (size_t i = 0; i + 3 <= idx.size(); i += 3) {
+            XMVECTOR v0 = XMVector3TransformCoord(XMLoadFloat3(&pos[idx[i + 0]]), world);
+            XMVECTOR v1 = XMVector3TransformCoord(XMLoadFloat3(&pos[idx[i + 1]]), world);
+            XMVECTOR v2 = XMVector3TransformCoord(XMLoadFloat3(&pos[idx[i + 2]]), world);
+            XMVECTOR e1 = XMVectorSubtract(v1, v0);
+            XMVECTOR e2 = XMVectorSubtract(v2, v0);
+            XMVECTOR h = XMVector3Cross(D, e2);
+            float a = XMVectorGetX(XMVector3Dot(e1, h));
+            if (a > -EPS && a < EPS) continue;
+            float f = 1.0f / a;
+            XMVECTOR s = XMVectorSubtract(O, v0);
+            float u = f * XMVectorGetX(XMVector3Dot(s, h));
+            if (u < 0.0f || u > 1.0f) continue;
+            XMVECTOR q = XMVector3Cross(s, e1);
+            float v = f * XMVectorGetX(XMVector3Dot(D, q));
+            if (v < 0.0f || u + v > 1.0f) continue;
+            float t = f * XMVectorGetX(XMVector3Dot(e2, q));
+            if (t > EPS && t < best) { best = t; found = true; }
+        }
+        if (found) outDist = best;
+        return found;
+    }
 } // namespace uel

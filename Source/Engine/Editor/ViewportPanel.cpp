@@ -140,6 +140,36 @@ namespace uel {
                     pt->position.y + playEyeHeight,
                     pt->position.z + cy * playEyeForward, 0);
                 XMStoreFloat4x4(&view, XMMatrixLookAtLH(eye, XMVectorAdd(eye, look), up));
+
+                // 射撃：左クリックで前方にレイ、最初に当たったEntityを赤く
+                if (active && !io.WantTextInput && ImGui::IsMouseClicked(0)) {
+                    XMFLOAT3 ro, rd;
+                    XMStoreFloat3(&ro, eye);
+                    XMStoreFloat3(&rd, look);
+                    Entity* hitE = nullptr; float bestT = 1000.0f;
+                    for (const auto& slot : world.Slots()) {
+                        if (!slot) continue;
+                        Entity* ge = slot.get();
+                        if (ge->id == selected) continue;
+                        auto* gt = ge->GetComponent<TransformComponent>();
+                        auto* gm = ge->GetComponent<MeshRendererComponent>();
+                        if (!gt || !gm || !gm->visible) continue;
+                        const Mesh* gmesh = cubeMesh.get();
+                        if (!gm->assetId.empty()) {
+                            auto sp = cache.GetOrLoad(device, gm->assetId);
+                            if (sp && sp->IsValid()) gmesh = sp.get();
+                        }
+                        if (!gmesh) continue;
+                        XMFLOAT4X4 gwm = gt->GetWorldMatrix();
+                        XMMATRIX gw = XMLoadFloat4x4(&gwm);
+                        float t;
+                        if (RaycastMesh(*gmesh, gw, ro, rd, bestT, t)) { bestT = t; hitE = ge; }
+                    }
+                    if (hitE)
+                        if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
+                            hm->color = { 1.0f, 0.2f, 0.2f, 1.0f };
+                }
+
             }
             else {
                 view = camera.GetView();
@@ -154,7 +184,12 @@ namespace uel {
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
         if (rt.GetSRV())
             ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
-
+        if (playMode) {
+            ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
+            dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
+        }
         // 編集時のみ：ドロップ・キー・グリッド・ギズモ
         if (!playMode) {
             if (ImGui::BeginDragDropTarget()) {
