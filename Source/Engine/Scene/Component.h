@@ -1,11 +1,11 @@
 #pragma once
-
 namespace uel {
+    struct GameContext;
 
-    // データ専用のComponent基底。ロジックはSystemが持つ（仕様書5.3 / 20章）。
+    // データ基底＋ゲームTick（既定は何もしない。UE の ActorComponent 相当）
     class Component {
     public:
         virtual ~Component() = default;
+        virtual void Update(GameContext&) {}
     };
-
-} // namespace uel
+}

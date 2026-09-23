@@ -7,7 +7,9 @@
 #include "Engine/Graphics/MeshShader.h"
 #include "Engine/Editor/EntityCommands.h"
 #include "Engine/Assets/MeshCache.h"
-#include "Engine/Physics/GroundQuery.h"
+#include "Engine/Game/PlayerComponent.h"
+#include "Engine/Game/GameContext.h"
+#include "Engine/Game/InputState.h"
 #include <d3d11.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -32,7 +34,6 @@ namespace uel {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
 
-        // ツールバー
         if (!playMode) {
             auto modeButton = [&](const char* label, int op) {
                 bool active = (gizmoOp == op);
@@ -50,10 +51,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapS", &snapScale, 0.05f, 0.01f, 10.0f, "S:%.2f");
         }
         else {
-            ImGui::TextUnformatted("PLAY (RMB:look WASD:move Space:jump)"); ImGui::SameLine();
-            ImGui::SetNextItemWidth(80); ImGui::DragFloat("EyeY", &playEyeHeight, 0.05f, 0.0f, 20.0f); ImGui::SameLine();
-            ImGui::SetNextItemWidth(80); ImGui::DragFloat("Fwd", &playEyeForward, 0.05f, 0.0f, 10.0f); ImGui::SameLine();
-            ImGui::SetNextItemWidth(80); ImGui::DragFloat("Ground", &playGroundY, 0.05f, -20.0f, 20.0f);
+            ImGui::TextUnformatted("PLAY (RMB:look  WASD:move  Space:jump  LMB:shoot)");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -66,110 +64,27 @@ namespace uel {
         using namespace DirectX;
         float aspect = (viewHeight > 0) ? (float)viewWidth / (float)viewHeight : 1.0f;
 
-        // Play開始時：ピッチと縦速度をリセット
-        if (playMode && !prevPlayMode) { playPitch = 0.0f; playVelY = 0.0f; }
-        prevPlayMode = playMode;
-
+        // ビュー行列
         if (playMode) {
             Entity* p = world.Get(selected);
-            TransformComponent* pt = p ? p->GetComponent<TransformComponent>() : nullptr;
-            if (pt) {
+            if (p) {
+                auto* pc = p->GetComponent<PlayerComponent>();
+                if (!pc) pc = p->AddComponent<PlayerComponent>();
+
                 ImGuiIO& io = ImGui::GetIO();
-                bool active = ImGui::IsWindowHovered() || ImGui::IsWindowFocused();
+                bool actv = ImGui::IsWindowHovered() || ImGui::IsWindowFocused();
+                InputState in;
+                in.enabled = actv && !io.WantTextInput;
+                in.keyW = ImGui::IsKeyDown('W'); in.keyS = ImGui::IsKeyDown('S');
+                in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
+                in.jumpPressed = ImGui::IsKeyPressed(' ', false);
+                in.shootClicked = ImGui::IsMouseClicked(0);
+                in.lookActive = io.MouseDown[1];
+                in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
 
-                // 見回し（右クリック中）：ヤウ=本体 / ピッチ=カメラのみ
-                if (io.MouseDown[1] && active) {
-                    pt->rotationEuler.y += io.MouseDelta.x * 0.15f;
-                    playPitch -= io.MouseDelta.y * 0.004f;
-                    const float lim = 1.55f;
-                    if (playPitch > lim) playPitch = lim;
-                    if (playPitch < -lim) playPitch = -lim;
-                }
-
-                float yaw = XMConvertToRadians(pt->rotationEuler.y);
-                float sy = sinf(yaw), cy = cosf(yaw);
-
-                // 移動（WASD）：本体を水平移動
-                float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
-                float speed = 4.0f * dt;
-                if (active && !io.WantTextInput) {
-                    if (ImGui::IsKeyDown('W')) { pt->position.x += sy * speed; pt->position.z += cy * speed; }
-                    if (ImGui::IsKeyDown('S')) { pt->position.x -= sy * speed; pt->position.z -= cy * speed; }
-                    if (ImGui::IsKeyDown('D')) { pt->position.x += cy * speed; pt->position.z -= sy * speed; }
-                    if (ImGui::IsKeyDown('A')) { pt->position.x -= cy * speed; pt->position.z += sy * speed; }
-                }
-
-                // 足元の地面の高さを取得（自分以外のメッシュ）
-                float ground = playGroundY;
-                for (const auto& slot : world.Slots()) {
-                    if (!slot) continue;
-                    Entity* ge = slot.get();
-                    if (ge->id == selected) continue;
-                    auto* gt = ge->GetComponent<TransformComponent>();
-                    auto* gm = ge->GetComponent<MeshRendererComponent>();
-                    if (!gt || !gm || !gm->visible) continue;
-
-                    const Mesh* gmesh = cubeMesh.get();
-                    if (!gm->assetId.empty()) {
-                        auto sp = cache.GetOrLoad(device, gm->assetId);
-                        if (sp && sp->IsValid()) gmesh = sp.get();
-                    }
-                    if (!gmesh) continue;
-
-                    XMFLOAT4X4 gwm = gt->GetWorldMatrix();
-                    XMMATRIX gw = XMLoadFloat4x4(&gwm);
-                    float gy;
-                    if (RaycastGroundColumn(*gmesh, gw, pt->position.x, pt->position.z, gy)) {
-                        if (gy <= pt->position.y + playEyeHeight && gy > ground) ground = gy;
-                    }
-                }
-
-                // 重力・接地・ジャンプ
-                bool grounded = (pt->position.y <= ground + 0.001f);
-                if (grounded && active && !io.WantTextInput && ImGui::IsKeyPressed(' ', false))
-                    playVelY = 6.0f;
-                playVelY -= 15.0f * dt;
-                pt->position.y += playVelY * dt;
-                if (pt->position.y < ground) { pt->position.y = ground; playVelY = 0.0f; }
-
-                // カメラ：目の位置からヤウ+ピッチ方向を見る
-                float cp = cosf(playPitch), sp = sinf(playPitch);
-                XMVECTOR look = XMVectorSet(cp * sy, sp, cp * cy, 0);
-                XMVECTOR up = XMVectorSet(0, 1, 0, 0);
-                XMVECTOR eye = XMVectorSet(pt->position.x + sy * playEyeForward,
-                    pt->position.y + playEyeHeight,
-                    pt->position.z + cy * playEyeForward, 0);
-                XMStoreFloat4x4(&view, XMMatrixLookAtLH(eye, XMVectorAdd(eye, look), up));
-
-                // 射撃：左クリックで前方にレイ、最初に当たったEntityを赤く
-                if (active && !io.WantTextInput && ImGui::IsMouseClicked(0)) {
-                    XMFLOAT3 ro, rd;
-                    XMStoreFloat3(&ro, eye);
-                    XMStoreFloat3(&rd, look);
-                    Entity* hitE = nullptr; float bestT = 1000.0f;
-                    for (const auto& slot : world.Slots()) {
-                        if (!slot) continue;
-                        Entity* ge = slot.get();
-                        if (ge->id == selected) continue;
-                        auto* gt = ge->GetComponent<TransformComponent>();
-                        auto* gm = ge->GetComponent<MeshRendererComponent>();
-                        if (!gt || !gm || !gm->visible) continue;
-                        const Mesh* gmesh = cubeMesh.get();
-                        if (!gm->assetId.empty()) {
-                            auto sp = cache.GetOrLoad(device, gm->assetId);
-                            if (sp && sp->IsValid()) gmesh = sp.get();
-                        }
-                        if (!gmesh) continue;
-                        XMFLOAT4X4 gwm = gt->GetWorldMatrix();
-                        XMMATRIX gw = XMLoadFloat4x4(&gwm);
-                        float t;
-                        if (RaycastMesh(*gmesh, gw, ro, rd, bestT, t)) { bestT = t; hitE = ge; }
-                    }
-                    if (hitE)
-                        if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
-                            hm->color = { 1.0f, 0.2f, 0.2f, 1.0f };
-                }
-
+                GameContext ctx{ world, *p, cache, device, (io.DeltaTime > 0.0f ? io.DeltaTime : 1.0f / 60.0f), in };
+                pc->Update(ctx);
+                view = pc->GetView();
             }
             else {
                 view = camera.GetView();
@@ -184,12 +99,15 @@ namespace uel {
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
         if (rt.GetSRV())
             ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
+
+        // クロスヘア（Play）
         if (playMode) {
             ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
             ImDrawList* dl = ImGui::GetWindowDrawList();
             dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
             dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
         }
+
         // 編集時のみ：ドロップ・キー・グリッド・ギズモ
         if (!playMode) {
             if (ImGui::BeginDragDropTarget()) {

@@ -100,6 +100,9 @@
     <Filter Include="Source\Engine\Physics">
       <UniqueIdentifier>{8a735fcb-d88b-453b-9f94-21f208a320b2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Game">
+      <UniqueIdentifier>{879b3f8f-e8c9-48ee-b080-3a8550a32fd9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -396,6 +399,15 @@
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h">
       <Filter>Source\Engine\Physics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\InputState.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\GameContext.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\PlayerComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -652,6 +664,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp">
       <Filter>Source\Engine\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\PlayerComponent.cpp">
+      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

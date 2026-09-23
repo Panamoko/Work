@@ -10,11 +10,13 @@ namespace uel {
 
     class MeshCache {
     public:
-        // 読み込み済みなら返す。未読なら読み込んでキャッシュ（失敗は nullptr をキャッシュし再試行しない）。
         std::shared_ptr<Mesh> GetOrLoad(ID3D11Device* device, const std::string& path);
-
+        std::shared_ptr<Mesh> GetCube(ID3D11Device* device);   // ★衝突用の手続き立方体
     private:
         std::unordered_map<std::string, std::shared_ptr<Mesh>> cache;
+        std::shared_ptr<Mesh> cube;   // ★
+
+
     };
 
 } // namespace uel

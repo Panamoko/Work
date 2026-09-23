@@ -12,5 +12,9 @@ namespace uel {
         cache[path] = m;
         return m;
     }
-
+    std::shared_ptr<Mesh> MeshCache::GetCube(ID3D11Device* device)
+    {
+        if (!cube) cube = Mesh::CreateCube(device);
+        return cube;
+    }
 } // namespace uel

@@ -2,6 +2,7 @@
 #include "Engine/Editor/EditorPanels.h"
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Game/PlayerComponent.h"
 
 namespace uel {
 
@@ -95,9 +96,16 @@ namespace uel {
         playHadTransform = false;
 
         if (Entity* e = world.Get(selected)) {
-            if (auto* m = e->GetComponent<MeshRendererComponent>()) {
-                playPrevFirstPerson = m->firstPerson;
-                m->firstPerson = true;
+            if (Entity* e = world.Get(selected)) {
+                e->AddComponent<PlayerComponent>();   // ★プレイヤー化（UEでComponentを付ける感覚）
+                if (auto* m = e->GetComponent<MeshRendererComponent>()) {
+                    playPrevFirstPerson = m->firstPerson;
+                    m->firstPerson = true;
+                }
+                if (auto* t = e->GetComponent<TransformComponent>()) {
+                    playXform = { t->position, t->rotationEuler, t->scale };
+                    playHadTransform = true;
+                }
             }
             if (auto* t = e->GetComponent<TransformComponent>()) {
                 playXform = { t->position, t->rotationEuler, t->scale };  // 開始位置を保存

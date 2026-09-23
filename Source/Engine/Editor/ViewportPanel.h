@@ -35,24 +35,11 @@ namespace uel {
         TransformEditSession gizmoSession;
         EditorCamera camera;
 
-        // ★グリッド／スナップ設定
         bool  showGrid = true;
         bool  snapEnabled = false;
-        float snapTranslate = 1.0f;   // 移動グリッド量
-        float snapRotate = 15.0f;  // 回転角度（度）
-        float snapScale = 0.25f; // 拡縮倍率
-
-        float playEyeHeight = 1.6f;
-        float playEyeForward = 0.5f;
-
-        // ★Play用カメラ状態（エンティティは動かさない）
-        DirectX::XMFLOAT3 playPos{ 0.0f, 0.0f, 0.0f }; // （未使用でも可）
-        float playYaw = 0.0f;
-        float playPitch = 0.0f;
-        bool  prevPlayMode = false;
-
-        float playVelY = 0.0f;   // ★縦速度（重力/ジャンプ）
-        float playGroundY = 0.0f;   // ★地面の高さ（足元）
+        float snapTranslate = 1.0f;
+        float snapRotate = 15.0f;
+        float snapScale = 0.25f;
 
     };
 
