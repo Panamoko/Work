@@ -170,6 +170,7 @@
     <ClInclude Include="Source\Engine\Scene\Component.h" />
     <ClInclude Include="Source\Engine\Scene\Entity.h" />
     <ClInclude Include="Source\Engine\Scene\EntityId.h" />
+    <ClInclude Include="Source\Engine\Scene\HPComponent.h" />
     <ClInclude Include="Source\Engine\Scene\MeshRendererComponent.h" />
     <ClInclude Include="Source\Engine\Scene\TransformComponent.h" />
     <ClInclude Include="Source\Engine\Scene\World.h" />

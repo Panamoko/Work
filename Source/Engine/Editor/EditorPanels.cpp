@@ -8,6 +8,7 @@
 #include "Engine/Config/EngineConfig.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
+#include "Engine/Scene/HPComponent.h"
 #include <memory>
 #include <imgui.h>
 #include <cstdio>
@@ -128,7 +129,15 @@ namespace uel {
                 }
             }
         }
-
+        if (HPComponent* hpc = e->GetComponent<HPComponent>()) {
+            ImGui::Separator(); ImGui::TextUnformatted("Health");
+            ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
+            ImGui::DragFloat("MaxHP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
+        }
+        else {
+            if (ImGui::Button("Add Health (make target)"))
+                e->AddComponent<HPComponent>();
+        }
         ImGui::End();
     }
 

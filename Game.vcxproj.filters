@@ -408,6 +408,9 @@
     <ClInclude Include="Source\Engine\Game\PlayerComponent.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\HPComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">

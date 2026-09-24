@@ -7,6 +7,7 @@
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
+#include "Engine/Scene/HPComponent.h"
 #include <cmath>
 #include <memory>
 
@@ -117,7 +118,19 @@ namespace uel {
                 float tt;
                 if (RaycastMesh(*mp, gw, eyePos, rd, bestT, tt)) { bestT = tt; hitE = ge; }
             }
-            if (hitE) if (auto* hm = hitE->GetComponent<MeshRendererComponent>()) hm->color = { 1.0f, 0.2f, 0.2f, 1.0f };
+            if (hitE) {
+                if (auto* hpc = hitE->GetComponent<HPComponent>()) {
+                    hpc->hp -= 34.0f;                                   // ダメージ
+                    if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
+                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
+                    if (hpc->hp <= 0.0f)
+                        ctx.world.DestroyEntity(hitE->id);             // 撃破＝消滅
+                }
+                else {
+                    if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
+                        hm->color = { 1.0f, 0.2f, 0.2f, 1.0f };        // HP無しは従来どおり赤く
+                }
+            }
         }
 
         // カメラ
