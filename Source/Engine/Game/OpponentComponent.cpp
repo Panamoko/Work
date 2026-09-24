@@ -4,6 +4,7 @@
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Scene/HPComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -21,11 +22,36 @@ namespace uel {
         if (!t) return;
         float dt = ctx.dt;
 
-        // プレイヤー（PlayerComponent を持つEntity）を探す
+    // プレイヤー探索
         Entity* player = nullptr;
         for (const auto& slot : ctx.world.Slots()) {
             if (!slot) continue;
             if (slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
+        }
+
+        float len = 1e9f;
+        if (player) {
+            if (auto* pt = player->GetComponent<TransformComponent>()) {
+                float dxp = pt->position.x - t->position.x;
+                float dzp = pt->position.z - t->position.z;
+                len = sqrtf(dxp * dxp + dzp * dzp);
+                if (len > stopRange) {
+                    float step = moveSpeed * dt;
+                    t->position.x += dxp / len * step;
+                    t->position.z += dzp / len * step;
+                }
+                if (len > 1e-4f)
+                    t->rotationEuler.y = atan2f(dxp, dzp) * 57.2958f;
+            }
+        }
+
+        // （ここは従来どおり）地面追従 → 重力＆接地 ...
+
+        // ★接触攻撃（クールダウン付き）
+        attackTimer -= dt;
+        if (player && len <= attackRange && attackTimer <= 0.0f) {
+            if (auto* php = player->GetComponent<HPComponent>()) php->hp -= attackDamage;
+            attackTimer = attackInterval;
         }
 
         // プレイヤーへ直進＋向く

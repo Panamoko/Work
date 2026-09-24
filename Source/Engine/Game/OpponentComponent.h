@@ -7,7 +7,11 @@ namespace uel {
         void Update(GameContext& ctx) override;
         float moveSpeed = 2.0f;
         float stopRange = 1.2f;
+        float attackRange = 1.5f;
+        float attackDamage = 10.0f;
+        float attackInterval = 1.0f;   // •b
     private:
         float velY = 0.0f;
+        float attackTimer = 0.0f;
     };
 }

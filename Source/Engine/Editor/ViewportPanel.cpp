@@ -10,12 +10,13 @@
 #include "Engine/Game/PlayerComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/InputState.h"
+#include "Engine/Scene/HPComponent.h"
 #include <d3d11.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
 #include <DirectXMath.h>
 #include <string>
-
+#include <cstdio>
 namespace uel {
 
     void ViewportPanel::Initialize(ID3D11Device* device)
@@ -116,59 +117,41 @@ namespace uel {
         }
 
         // 編集時のみ：ドロップ・キー・グリッド・ギズモ
-        if (!playMode) {
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_GLB")) {
-                    std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
-                    if (!pth.empty()) {
-                        std::string name = pth.substr(pth.find_last_of('/') + 1);
-                        EntityId id = EditorCreateEntity(world, history, name.c_str());
-                        if (Entity* e = world.Get(id))
-                            if (auto* m = e->GetComponent<MeshRendererComponent>()) m->assetId = pth;
-                        selected = id;
-                    }
+        if (playMode) {
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
+
+            // クロスヘア
+            dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
+            dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
+
+            Entity* p = world.Get(selected);
+            PlayerComponent* pc = p ? p->GetComponent<PlayerComponent>() : nullptr;
+
+            // ヒットマーカー（命中時に赤い×）
+            if (pc && pc->GetHitMarker() > 0.0f) {
+                ImU32 col = IM_COL32(255, 60, 60, 255);
+                dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
+                dl->AddLine(ImVec2(c.x + 12, c.y - 12), ImVec2(c.x + 4, c.y - 4), col, 2.0f);
+                dl->AddLine(ImVec2(c.x - 12, c.y + 12), ImVec2(c.x - 4, c.y + 4), col, 2.0f);
+                dl->AddLine(ImVec2(c.x + 12, c.y + 12), ImVec2(c.x + 4, c.y + 4), col, 2.0f);
+            }
+
+            // プレイヤーHPバー
+            if (p) {
+                if (auto* php = p->GetComponent<HPComponent>()) {
+                    float bx = imgPos.x + 20.0f, by = imgPos.y + viewHeight - 40.0f, bw = 220.0f, bh = 18.0f;
+                    float frac = (php->maxHp > 0.0f) ? php->hp / php->maxHp : 0.0f;
+                    if (frac < 0) frac = 0; if (frac > 1) frac = 1;
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(40, 40, 40, 200));
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * frac, by + bh), IM_COL32(220, 60, 60, 230));
+                    dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 180));
+                    char hpTxt[32]; snprintf(hpTxt, sizeof(hpTxt), "HP %.0f/%.0f", php->hp, php->maxHp);
+                    dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
+
+                    if (php->hp <= 0.0f)
+                        dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
                 }
-                ImGui::EndDragDropTarget();
-            }
-
-            ImGuiIO& io = ImGui::GetIO();
-            if ((ImGui::IsWindowFocused() || ImGui::IsWindowHovered()) && !io.WantTextInput && !ImGui::IsMouseDown(1)) {
-                if (ImGui::IsKeyPressed('W')) gizmoOp = ImGuizmo::TRANSLATE;
-                if (ImGui::IsKeyPressed('E')) gizmoOp = ImGuizmo::ROTATE;
-                if (ImGui::IsKeyPressed('R')) gizmoOp = ImGuizmo::SCALE;
-            }
-
-            ImGuizmo::SetOrthographic(false);
-            ImGuizmo::SetDrawlist();
-            ImGuizmo::SetRect(imgPos.x, imgPos.y, (float)viewWidth, (float)viewHeight);
-
-            if (showGrid) {
-                XMFLOAT4X4 gridM; XMStoreFloat4x4(&gridM, XMMatrixIdentity());
-                ImGuizmo::DrawGrid(&view._11, &proj._11, &gridM._11, 10.0f);
-            }
-
-            Entity* e = world.Get(selected);
-            TransformComponent* t = e ? e->GetComponent<TransformComponent>() : nullptr;
-            if (t) {
-                XMFLOAT4X4 model = t->GetWorldMatrix();
-                float snapArr[3];
-                if (gizmoOp == ImGuizmo::TRANSLATE) { snapArr[0] = snapArr[1] = snapArr[2] = snapTranslate; }
-                else if (gizmoOp == ImGuizmo::ROTATE) { snapArr[0] = snapRotate; }
-                else { snapArr[0] = snapScale; }
-                float* snapPtr = snapEnabled ? snapArr : nullptr;
-
-                ImGuizmo::Manipulate(&view._11, &proj._11, (ImGuizmo::OPERATION)gizmoOp, ImGuizmo::LOCAL, &model._11, nullptr, snapPtr);
-
-                bool usingNow = ImGuizmo::IsUsing();
-                if (usingNow && !gizmoSession.active) BeginTransformEdit(gizmoSession, selected, *t);
-                if (usingNow) {
-                    float tr[3], rot[3], sc[3];
-                    ImGuizmo::DecomposeMatrixToComponents(&model._11, tr, rot, sc);
-                    t->position = { tr[0], tr[1], tr[2] };
-                    t->rotationEuler = { rot[0], rot[1], rot[2] };
-                    t->scale = { sc[0], sc[1], sc[2] };
-                }
-                if (!usingNow && gizmoSession.active) CommitTransformEdit(gizmoSession, world, history);
             }
         }
 

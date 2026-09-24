@@ -102,6 +102,9 @@ namespace uel {
         if (Entity* e = world.Get(selected)) {
             if (Entity* e = world.Get(selected)) {
                 e->AddComponent<PlayerComponent>();   // ★プレイヤー化（UEでComponentを付ける感覚）
+                auto* php = e->GetComponent<HPComponent>();
+                if (!php) php = e->AddComponent<HPComponent>();
+                php->hp = php->maxHp;   // フルHPで開始
                 if (auto* m = e->GetComponent<MeshRendererComponent>()) {
                     playPrevFirstPerson = m->firstPerson;
                     m->firstPerson = true;

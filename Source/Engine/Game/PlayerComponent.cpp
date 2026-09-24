@@ -22,6 +22,9 @@ namespace uel {
         if (!t) return;
         const InputState& in = ctx.input;
         float dt = ctx.dt;
+        if (hitMarker > 0.0f) hitMarker -= dt;
+        auto* myHp = self.GetComponent<HPComponent>();
+        bool canAct = in.enabled && !(myHp && myHp->hp <= 0.0f);   // 死亡中は操作不可
 
         // 対象メッシュ取得（assetId空は手続き立方体）
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
@@ -119,6 +122,7 @@ namespace uel {
                 if (RaycastMesh(*mp, gw, eyePos, rd, bestT, tt)) { bestT = tt; hitE = ge; }
             }
             if (hitE) {
+                hitMarker = 0.15f;
                 if (auto* hpc = hitE->GetComponent<HPComponent>()) {
                     hpc->hp -= 34.0f;                                   // ダメージ
                     if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
