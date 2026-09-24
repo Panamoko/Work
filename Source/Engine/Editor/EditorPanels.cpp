@@ -9,6 +9,8 @@
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Scene/HPComponent.h"
+#include "Engine/Game/PlayerComponent.h"
+#include "Engine/Game/OpponentComponent.h"
 #include <memory>
 #include <imgui.h>
 #include <cstdio>
@@ -129,14 +131,55 @@ namespace uel {
                 }
             }
         }
-        if (HPComponent* hpc = e->GetComponent<HPComponent>()) {
-            ImGui::Separator(); ImGui::TextUnformatted("Health");
-            ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
-            ImGui::DragFloat("MaxHP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
+
+        // ---- Game Components（UE風の追加/削除）----
+        ImGui::Separator();
+        ImGui::TextUnformatted("Components");
+
+        // PlayerComponent
+        if (auto* pc = e->GetComponent<PlayerComponent>()) {
+            ImGui::PushID("cmp_player");
+            ImGui::BulletText("PlayerComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<PlayerComponent>();
+            else {
+                ImGui::DragFloat("MoveSpeed##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat("EyeHeight", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
+                ImGui::DragFloat("EyeForward", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
+            }
+            ImGui::PopID();
         }
-        else {
-            if (ImGui::Button("Add Health (make target)"))
-                e->AddComponent<HPComponent>();
+
+        // OpponentComponent
+        if (auto* ec = e->GetComponent<OpponentComponent>()) {
+            ImGui::PushID("cmp_opponent");
+            ImGui::BulletText("OpponentComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<OpponentComponent>();
+            else {
+                ImGui::DragFloat("MoveSpeed##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat("StopRange", &ec->stopRange, 0.1f, 0.0f, 20.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // HPComponent（表示＋削除）
+        if (auto* hpc = e->GetComponent<HPComponent>()) {
+            ImGui::PushID("cmp_hp");
+            ImGui::BulletText("HPComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<HPComponent>();
+            else {
+                ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
+                ImGui::DragFloat("MaxHP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // + Add Component（UEのドロップダウン）
+        if (ImGui::Button("+ Add Component")) ImGui::OpenPopup("AddComponentPopup");
+        if (ImGui::BeginPopup("AddComponentPopup")) {
+            if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem("PlayerComponent")) e->AddComponent<PlayerComponent>();
+            if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem("OpponentComponent"))  e->AddComponent<OpponentComponent>();
+            if (!e->GetComponent<HPComponent>() && ImGui::MenuItem("HPComponent"))      e->AddComponent<HPComponent>();
+            ImGui::EndPopup();
         }
         ImGui::End();
     }

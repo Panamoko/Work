@@ -30,6 +30,13 @@ namespace uel {
                 if (T* t = dynamic_cast<T*>(c.get())) return t;
             return nullptr;
         }
+
+        template<class T>
+        void RemoveComponent() {
+            for (auto it = components.begin(); it != components.end(); ++it)
+                if (dynamic_cast<T*>(it->get())) { components.erase(it); return; }
+        }
+
     };
 
 } // namespace uel

@@ -81,10 +81,17 @@ namespace uel {
                 in.shootClicked = ImGui::IsMouseClicked(0);
                 in.lookActive = io.MouseDown[1];
                 in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
+                float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
 
-                GameContext ctx{ world, *p, cache, device, (io.DeltaTime > 0.0f ? io.DeltaTime : 1.0f / 60.0f), in };
-                pc->Update(ctx);
-                view = pc->GetView();
+                // 全Entityの全ComponentをTick（Play中のGameUpdate）
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    Entity* e = slot.get();
+                    GameContext ctx{ world, *e, cache, device, dt, in };
+                    for (auto& c : e->components) c->Update(ctx);
+                }
+
+                view = pc->GetView();   // プレイヤーのカメラ
             }
             else {
                 view = camera.GetView();

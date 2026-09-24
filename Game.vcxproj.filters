@@ -411,6 +411,9 @@
     <ClInclude Include="Source\Engine\Scene\HPComponent.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\OpponentComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -669,6 +672,9 @@
       <Filter>Source\Engine\Physics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Game\PlayerComponent.cpp">
+      <Filter>Source\Engine\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\OpponentComponent.cpp">
       <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>

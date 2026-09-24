@@ -4,6 +4,7 @@
 #include "Engine/Scene/MeshRendererComponent.h"
 #include "Engine/Game/PlayerComponent.h"
 #include "Engine/Scene/HPComponent.h"
+#include "Engine/Game/OpponentComponent.h"
 namespace uel {
 
     Engine::~Engine()
@@ -47,15 +48,16 @@ namespace uel {
         make("Light", { 2.0f, 1.0f,  0.0f }, { 0.3f,0.3f,0.3f }, true, { 0.95f,0.9f,0.3f,1 });
         if (Entity* e = world.Get(cubeId)) e->AddComponent<HPComponent>();   // ★Cubeを的に
         // GLB 表示のデモ（軽い .glb を指定）
+    // 動く敵（撃つと倒せる的）
         {
-            EntityId id = world.CreateEntity("Crystal");
+            EntityId id = world.CreateEntity("Enemy");
             Entity* e = world.Get(id);
             auto* t = e->AddComponent<TransformComponent>();
-            t->position = { -2.0f, 0.5f, 0.0f };
+            t->position = { 2.0f, 0.0f, 2.0f };
             auto* m = e->AddComponent<MeshRendererComponent>();
-            m->color = { 0.6f, 0.85f, 1.0f, 1.0f };
-            m->assetId = "Data/Model/STAGE GLB format/detail-crystal.glb";
-            e->AddComponent<HPComponent>();   // ★Crystalも的に
+            m->assetId = "Data/Model/GLB format/character-b.glb";
+            e->AddComponent<OpponentComponent>();
+            e->AddComponent<HPComponent>();
         }
         return true;
     }
