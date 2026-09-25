@@ -162,6 +162,7 @@
     <ClInclude Include="Source\Engine\Game\OpponentComponent.h" />
     <ClInclude Include="Source\Engine\Game\PlayerComponent.h" />
     <ClInclude Include="Source\Engine\Graphics\CubeRenderer.h" />
+    <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h" />
     <ClInclude Include="Source\Engine\Graphics\GraphicsDevice.h" />
     <ClInclude Include="Source\Engine\Graphics\Mesh.h" />
     <ClInclude Include="Source\Engine\Graphics\MeshShader.h" />
@@ -253,6 +254,7 @@
     <ClCompile Include="Source\Engine\Game\OpponentComponent.cpp" />
     <ClCompile Include="Source\Engine\Game\PlayerComponent.cpp" />
     <ClCompile Include="Source\Engine\Graphics\CubeRenderer.cpp" />
+    <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp" />
     <ClCompile Include="Source\Engine\Graphics\GraphicsDevice.cpp" />
     <ClCompile Include="Source\Engine\Graphics\Mesh.cpp" />
     <ClCompile Include="Source\Engine\Graphics\MeshShader.cpp" />

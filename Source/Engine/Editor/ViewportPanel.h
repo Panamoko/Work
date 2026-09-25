@@ -7,7 +7,7 @@
 #include "Engine/Scene/EntityId.h"
 #include <DirectXMath.h>
 #include <memory>
-
+#include "Engine/Graphics/EngineSkybox.h" 
 struct ID3D11Device;
 struct ID3D11DeviceContext;
 
@@ -26,6 +26,10 @@ namespace uel {
         RenderTexture rt;
         MeshShader    shader;
         std::shared_ptr<Mesh> cubeMesh;
+
+        EngineSkybox        skybox;
+
+
         int viewWidth = 16;
         int viewHeight = 16;
 

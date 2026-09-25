@@ -414,6 +414,9 @@
     <ClInclude Include="Source\Engine\Game\OpponentComponent.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -676,6 +679,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Game\OpponentComponent.cpp">
       <Filter>Source\Engine\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
