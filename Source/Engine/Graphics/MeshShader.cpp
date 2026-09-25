@@ -14,41 +14,60 @@ namespace uel {
         struct CB {
             XMFLOAT4X4 world;
             XMFLOAT4X4 viewProj;
+            XMFLOAT4X4 lightViewProj;   
             XMFLOAT4   color;
             XMFLOAT4   lightDir;
             XMFLOAT4   lightColor;
-            XMFLOAT4   params;
+            XMFLOAT4   params;          // x=ambient, y=intensity, z=shadowEnabled
         };
 
         const char* kHLSL = R"(
-Texture2D    tex  : register(t0);
-SamplerState samp : register(s0);
+Texture2D    tex        : register(t0);
+Texture2D    shadowMap  : register(t1);
+SamplerState samp       : register(s0);
+SamplerComparisonState shadowSamp : register(s1);
 cbuffer CB : register(b0) {
     float4x4 world;
     float4x4 viewProj;
+    float4x4 lightViewProj;
     float4   color;
     float4   lightDir;
     float4   lightColor;
-    float4   params;        // x=ambient, y=intensity
+    float4   params;
 };
 struct VSIn { float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
-struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
+struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; float3 wpos:WPOS; };
 PSIn VSMain(VSIn i) {
     PSIn o;
-    float4 wpos = mul(float4(i.pos,1.0), world);
-    o.pos = mul(wpos, viewProj);
-    o.nrm = mul(i.nrm, (float3x3)world);
-    o.col = i.col;
-    o.uv  = i.uv;
+    float4 wp = mul(float4(i.pos,1.0), world);
+    o.wpos = wp.xyz;
+    o.pos  = mul(wp, viewProj);
+    o.nrm  = mul(i.nrm, (float3x3)world);
+    o.col  = i.col;
+    o.uv   = i.uv;
     return o;
+}
+float ShadowFactor(float3 wpos) {
+    float4 lp = mul(float4(wpos, 1.0), lightViewProj);
+    lp.xyz /= lp.w;
+    float2 uv = lp.xy * float2(0.5, -0.5) + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 1.0;
+    float depth = lp.z - 0.0025;
+    float texel = 1.0 / 2048.0;
+    float sum = 0.0;
+    [unroll] for (int y = -1; y <= 1; ++y)
+    [unroll] for (int x = -1; x <= 1; ++x)
+        sum += shadowMap.SampleCmpLevelZero(shadowSamp, uv + float2(x, y) * texel, depth);
+    return sum / 9.0;
 }
 float4 PSMain(PSIn i) : SV_TARGET {
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz);
     float  d = saturate(dot(n, l));
+    float  sh = (params.z > 0.5) ? ShadowFactor(i.wpos) : 1.0;
     float4 t = tex.Sample(samp, i.uv);
     float3 base = t.rgb * i.col.rgb * color.rgb;
-    float3 c = base * (params.x + d * params.y) * lightColor.rgb;   // ambient + diffuse
+    float3 c = base * (params.x + d * params.y * sh) * lightColor.rgb;
     return float4(c, 1.0);
 }
 )";
@@ -79,11 +98,12 @@ float4 PSMain(PSIn i) : SV_TARGET {
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
 
         // サンプラ
-        D3D11_SAMPLER_DESC smp = {};
-        smp.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        smp.AddressU = smp.AddressV = smp.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-        smp.MaxLOD = D3D11_FLOAT32_MAX;
-        if (FAILED(device->CreateSamplerState(&smp, sampler.GetAddressOf()))) return false;
+        D3D11_SAMPLER_DESC ssd = {};
+        ssd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        ssd.AddressU = ssd.AddressV = ssd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+        ssd.BorderColor[0] = ssd.BorderColor[1] = ssd.BorderColor[2] = ssd.BorderColor[3] = 1.0f;
+        ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+        if (FAILED(device->CreateSamplerState(&ssd, shadowSampler.GetAddressOf()))) return false;
 
         // 1x1 白テクスチャ（テクスチャ無しメッシュ用）
         uint32_t white = 0xFFFFFFFF;
@@ -113,7 +133,12 @@ float4 PSMain(PSIn i) : SV_TARGET {
         data.color = color;
         data.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
         data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
-        data.params = XMFLOAT4(lightAmbient, lightIntensity, 0.0f, 0.0f);
+        XMStoreFloat4x4(&data.lightViewProj, XMMatrixTranspose(XMLoadFloat4x4(&lightViewProj)));
+        data.color = color;
+        data.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
+        data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
+        data.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
+        context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
 
         context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);   
         context->IASetInputLayout(layout.Get());
@@ -123,6 +148,8 @@ float4 PSMain(PSIn i) : SV_TARGET {
         context->PSSetConstantBuffers(0, 1, cb.GetAddressOf());
         context->RSSetState(raster.Get());
         context->PSSetSamplers(0, 1, sampler.GetAddressOf());
+        context->PSSetShaderResources(1, 1, &shadowSRV);
+        context->PSSetSamplers(1, 1, shadowSampler.GetAddressOf());
 
         mesh.Bind(context);
         const auto& subs = mesh.GetSubmeshes();
@@ -148,6 +175,13 @@ float4 PSMain(PSIn i) : SV_TARGET {
         lightColor = light.color;
         lightAmbient = light.ambient;
         lightIntensity = light.intensity;
+    }
+
+    void MeshShader::SetShadow(ID3D11ShaderResourceView* srv, const XMFLOAT4X4& lvp)
+    {
+        shadowSRV = srv;
+        lightViewProj = lvp;
+        shadowEnabled = (srv != nullptr);
     }
 
 } // namespace uel

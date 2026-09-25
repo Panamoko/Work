@@ -12,6 +12,8 @@
 #include "Engine/Game/PlayerComponent.h"
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Graphics/SceneLighting.h"
+#include "Engine/Scene/SkinnedMeshComponent.h"
+#include "Engine/Assets/SkinnedModelCache.h"
 #include <memory>
 #include <imgui.h>
 #include <cstdio>
@@ -131,6 +133,44 @@ namespace uel {
                     }
                 }
             }
+            if (SkinnedMeshComponent* sk = e->GetComponent<SkinnedMeshComponent>())
+            {
+                ImGui::Separator(); ImGui::TextUnformatted("SkinnedMesh (Animation)");
+                char sbuf[260]; strncpy_s(sbuf, sizeof(sbuf), sk->assetPath.c_str(), _TRUNCATE);
+                if (ImGui::InputText("Skinned GLB", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;
+                ImGui::Checkbox("Visible##sk", &sk->visible);
+                ImGui::ColorEdit4("Tint##sk", &sk->color.x);
+
+                if (!sk->assetPath.empty()) {
+                    auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+                    if (model && model->Valid()) {
+                        const auto& clips = model->Cpu().clips;
+                        ImGui::Text("Bones: %d  Clips: %d",
+                            (int)model->Cpu().skeleton.bones.size(), (int)clips.size());
+                        if (!clips.empty()) {
+                            if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) sk->clipIndex = 0;
+                            const std::string& preview = clips[sk->clipIndex].name;
+                            if (ImGui::BeginCombo("Clip", preview.c_str())) {
+                                for (int i = 0; i < (int)clips.size(); ++i) {
+                                    bool seld = (i == sk->clipIndex);
+                                    std::string label = clips[i].name.empty() ? ("clip " + std::to_string(i)) : clips[i].name;
+                                    if (ImGui::Selectable(label.c_str(), seld)) { sk->clipIndex = i; sk->time = 0.0f; }
+                                    if (seld) ImGui::SetItemDefaultFocus();
+                                }
+                                ImGui::EndCombo();
+                            }
+                            float dur = clips[sk->clipIndex].duration;
+                            ImGui::Checkbox("Play", &sk->playing); ImGui::SameLine();
+                            ImGui::Checkbox("Loop", &sk->loop);
+                            ImGui::DragFloat("Speed", &sk->speed, 0.01f, -4.0f, 4.0f);
+                            ImGui::SliderFloat("Time", &sk->time, 0.0f, dur > 0.0f ? dur : 1.0f, "%.3f s");
+                        }
+                    }
+                    else {
+                        ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), "load failed (skin+mesh の .glb ?)");
+                    }
+                }
+            }
         }
 
         // ---- Game Components（UE風の追加/削除）----
@@ -173,6 +213,8 @@ namespace uel {
             }
             ImGui::PopID();
         }
+
+        if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
 
         // + Add Component（UEのドロップダウン）
         if (ImGui::Button("+ Add Component")) ImGui::OpenPopup("AddComponentPopup");

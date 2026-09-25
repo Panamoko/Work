@@ -22,6 +22,9 @@ namespace uel {
             bool firstPerson = false);
         void SetLight(const SceneLighting& light);
 
+        void SetShadow(ID3D11ShaderResourceView* srv, const DirectX::XMFLOAT4X4& lightViewProj);
+
+
     private:
         Microsoft::WRL::ComPtr<ID3D11VertexShader>    vs;
         Microsoft::WRL::ComPtr<ID3D11PixelShader>     ps;
@@ -35,6 +38,12 @@ namespace uel {
         DirectX::XMFLOAT3 lightColor{ 1.0f,  1.0f, 1.0f };
         float             lightAmbient = 0.25f;
         float             lightIntensity = 1.0f;
+
+        Microsoft::WRL::ComPtr<ID3D11SamplerState>       shadowSampler;
+        ID3D11ShaderResourceView* shadowSRV = nullptr;   // îÒèäóL
+        DirectX::XMFLOAT4X4 lightViewProj{};
+        bool shadowEnabled = false;
+
     };
 
 } // namespace uel

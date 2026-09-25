@@ -103,6 +103,9 @@
     <Filter Include="Source\Engine\Game">
       <UniqueIdentifier>{879b3f8f-e8c9-48ee-b080-3a8550a32fd9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Animation">
+      <UniqueIdentifier>{02cea29b-be3f-4163-8864-6b7247b02b42}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -420,6 +423,36 @@
     <ClInclude Include="Source\Engine\Graphics\SceneLighting.h">
       <Filter>Source\Engine\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\EngineShadowMap.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\Skeleton.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimationClip.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\SkinnedModel.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Assets\GltfSkinnedLoader.h">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimationPose.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\SkinnedRenderModel.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\SkinnedMeshShader.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Assets\SkinnedModelCache.h">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\SkinnedMeshComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -685,6 +718,21 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp">
       <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\EngineShadowMap.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Assets\GltfSkinnedLoader.cpp">
+      <Filter>Source\Engine\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\SkinnedRenderModel.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\SkinnedMeshShader.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Assets\SkinnedModelCache.cpp">
+      <Filter>Source\Engine\Assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

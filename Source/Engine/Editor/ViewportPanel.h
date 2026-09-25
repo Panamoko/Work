@@ -8,6 +8,9 @@
 #include <DirectXMath.h>
 #include <memory>
 #include "Engine/Graphics/EngineSkybox.h" 
+#include "Engine/Graphics/EngineShadowMap.h"
+#include "Engine/Graphics/SkinnedMeshShader.h"
+
 struct ID3D11Device;
 struct ID3D11DeviceContext;
 
@@ -30,7 +33,8 @@ namespace uel {
         std::shared_ptr<Mesh> cubeMesh;
 
         EngineSkybox        skybox;
-
+        EngineShadowMap shadowMap;   
+        SkinnedMeshShader skinnedShader;
 
         int viewWidth = 16;
         int viewHeight = 16;

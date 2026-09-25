@@ -11,6 +11,9 @@
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/InputState.h"
 #include "Engine/Scene/HPComponent.h"
+#include "Engine/Scene/SkinnedMeshComponent.h"
+#include "Engine/Assets/SkinnedModelCache.h"
+#include <cmath>
 #include <d3d11.h>
 #include <imgui.h>
 #include <ImGuizmo.h>
@@ -26,8 +29,10 @@ namespace uel {
         cubeMesh = Mesh::CreateCube(device);
         DirectX::XMStoreFloat4x4(&view, DirectX::XMMatrixIdentity());
         DirectX::XMStoreFloat4x4(&proj, DirectX::XMMatrixIdentity());
-        cubeMesh = Mesh::CreateCube(device);
-        skybox.Initialize(device);        // ★
+        cubeMesh = Mesh::CreateCube(device);       
+        skybox.Initialize(device);
+        shadowMap.Initialize(device, 2048);   
+        skinnedShader.Initialize(device);  
     }
 
     void ViewportPanel::DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history,
@@ -36,7 +41,25 @@ namespace uel {
         ImGuizmo::BeginFrame();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
-
+        // スキニング：クリップ時間を進める（編集/プレイ両方でプレビュー）
+        {
+            float dt = ImGui::GetIO().DeltaTime;
+            for (const auto& slot : world.Slots()) {
+                if (!slot) continue;
+                auto* sk = slot->GetComponent<SkinnedMeshComponent>();
+                if (!sk || !sk->playing || sk->assetPath.empty()) continue;
+                auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+                if (!model) continue;
+                const auto& clips = model->Cpu().clips;
+                if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) continue;
+                float dur = clips[sk->clipIndex].duration;
+                sk->time += dt * sk->speed;
+                if (dur > 0.0f) {
+                    if (sk->loop) { sk->time = fmodf(sk->time, dur); if (sk->time < 0.0f) sk->time += dur; }
+                    else if (sk->time > dur) sk->time = dur;
+                }
+            }
+        }
         if (!playMode) {
             auto modeButton = [&](const char* label, int op) {
                 bool active = (gizmoOp == op);
@@ -69,36 +92,32 @@ namespace uel {
 
         // ビュー行列
         if (playMode) {
-            Entity* p = world.Get(selected);
-            if (p) {
-                auto* pc = p->GetComponent<PlayerComponent>();
-                if (!pc) pc = p->AddComponent<PlayerComponent>();
+            // プレイヤー = PlayerComponent を持つEntity
+            Entity* player = nullptr;
+            for (const auto& slot : world.Slots())
+                if (slot && slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
 
-                ImGuiIO& io = ImGui::GetIO();
-                bool actv = ImGui::IsWindowHovered() || ImGui::IsWindowFocused();
-                InputState in;
-                in.enabled = actv && !io.WantTextInput;
-                in.keyW = ImGui::IsKeyDown('W'); in.keyS = ImGui::IsKeyDown('S');
-                in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
-                in.jumpPressed = ImGui::IsKeyPressed(' ', false);
-                in.shootClicked = ImGui::IsMouseClicked(0);
-                in.lookActive = io.MouseDown[1];
-                in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
-                float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
+            ImGuiIO& io = ImGui::GetIO();
+            bool actv = ImGui::IsWindowHovered() || ImGui::IsWindowFocused();
+            InputState in;
+            in.enabled = actv && !io.WantTextInput;
+            in.keyW = ImGui::IsKeyDown('W'); in.keyS = ImGui::IsKeyDown('S');
+            in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
+            in.jumpPressed = ImGui::IsKeyPressed(' ', false);
+            in.shootClicked = ImGui::IsMouseClicked(0);
+            in.lookActive = io.MouseDown[1];
+            in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
+            float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
 
-                // 全Entityの全ComponentをTick（Play中のGameUpdate）
-                for (const auto& slot : world.Slots()) {
-                    if (!slot) continue;
-                    Entity* e = slot.get();
-                    GameContext ctx{ world, *e, cache, device, dt, in };
-                    for (auto& c : e->components) c->Update(ctx);
-                }
-
-                view = pc->GetView();   // プレイヤーのカメラ
+            for (const auto& slot : world.Slots()) {
+                if (!slot) continue;
+                Entity* e = slot.get();
+                GameContext ctx{ world, *e, cache, device, dt, in };
+                for (auto& c : e->components) c->Update(ctx);
             }
-            else {
-                view = camera.GetView();
-            }
+
+            if (player) { view = player->GetComponent<PlayerComponent>()->GetView(); }
+            else { view = camera.GetView(); }
         }
         else {
             camera.Update(ImGui::IsWindowHovered());
@@ -126,8 +145,11 @@ namespace uel {
             dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
             dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
 
-            Entity* p = world.Get(selected);
+            Entity* p = nullptr;                                  // ★プレイヤーを探す
+            for (const auto& slot : world.Slots())
+                if (slot && slot->GetComponent<PlayerComponent>()) { p = slot.get(); break; }
             PlayerComponent* pc = p ? p->GetComponent<PlayerComponent>() : nullptr;
+
             if (pc && pc->GetHitMarker() > 0.0f) {
                 ImU32 col = IM_COL32(255, 60, 60, 255);
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
@@ -212,18 +234,38 @@ namespace uel {
     void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
         ID3D11Device* device, const SceneLighting& lighting)
     {
+        using namespace DirectX;
+
+        // ライトのview-proj（正射影・原点周りをカバー）
+        XMVECTOR ld = XMVector3Normalize(XMVectorSet(lighting.direction.x, lighting.direction.y, lighting.direction.z, 0));
+        XMVECTOR up = (fabsf(XMVectorGetY(ld)) > 0.99f) ? XMVectorSet(0, 0, 1, 0) : XMVectorSet(0, 1, 0, 0);
+        XMVECTOR lpos = XMVectorScale(ld, -25.0f);
+        XMMATRIX lView = XMMatrixLookAtLH(lpos, XMVectorSet(0, 0, 0, 0), up);
+        XMMATRIX lProj = XMMatrixOrthographicLH(30.0f, 30.0f, 0.1f, 60.0f);
+        XMFLOAT4X4 lightVP; XMStoreFloat4x4(&lightVP, lView * lProj);
+
+        // シャドウパス
+        shadowMap.BeginPass(context, lightVP);
+        RenderSystem::RenderShadow(world, shadowMap, *cubeMesh, cache, device, context);
+
+        // 本描画
         rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
         if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
 
-        using namespace DirectX;
         XMFLOAT4X4 viewProj;
         XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
         XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
         XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
         skybox.Render(context, viewProj, camPos);
-        shader.SetLight(lighting);                                   // ★ライト反映
+        shader.SetLight(lighting);
+        shader.SetShadow(shadowMap.GetSRV(), lightVP);
         RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
+        skinnedShader.SetLight(lighting);
+        RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
+        // シャドウSRVを外す（次フレームのシャドウ書き込みと競合させない）
+        ID3D11ShaderResourceView* nul = nullptr;
+        context->PSSetShaderResources(1, 1, &nul);
     }
 
 } // namespace uel

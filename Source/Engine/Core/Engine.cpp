@@ -6,6 +6,7 @@
 #include "Engine/Scene/HPComponent.h"
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
+#include "Engine/Assets/GltfSkinnedLoader.h"
 
 namespace uel {
 
@@ -81,7 +82,20 @@ namespace uel {
         // 保存済みファイルがあれば読み込む（無ければデモ配置のまま）
         for (auto& s : scenes)
             StageSerializer::Load(s.world, (s.name + ".json").c_str());
-
+        {
+            SkinnedModel sm;
+            if (LoadSkinnedModel("Data/YourRiggedModel.glb", sm)) {
+                char buf[256];
+                sprintf_s(buf, "[Skinned] bones=%zu verts=%zu tris=%zu clips=%zu\n",
+                    sm.skeleton.bones.size(), sm.vertices.size(), sm.indices.size() / 3, sm.clips.size());
+                OutputDebugStringA(buf);
+                for (auto& c : sm.clips) {
+                    sprintf_s(buf, "  clip '%s' dur=%.2f tracks=%zu\n", c.name.c_str(), c.duration, c.tracks.size());
+                    OutputDebugStringA(buf);
+                }
+            }
+            else OutputDebugStringA("[Skinned] load failed\n");
+        }
         return true;
     }
 
@@ -133,11 +147,20 @@ namespace uel {
         mode = EditorMode::Play;
         EditorScene& sc = scenes[activeScene];
         playWorld = sc.world.Clone();
-        if (Entity* e = playWorld.Get(sc.selected)) {
-            e->AddComponent<PlayerComponent>();
-            if (auto* m = e->GetComponent<MeshRendererComponent>()) m->firstPerson = true;
-            auto* php = e->GetComponent<HPComponent>();
-            if (!php) php = e->AddComponent<HPComponent>();
+
+        // プレイヤー = PlayerComponent を持つEntity
+        Entity* player = nullptr;
+        for (const auto& slot : playWorld.Slots())
+            if (slot && slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
+
+        // 無ければ、選択EntityをプレイヤーにするフォールバックW
+        if (!player)
+            if (Entity* e = playWorld.Get(sc.selected)) { e->AddComponent<PlayerComponent>(); player = e; }
+
+        if (player) {
+            if (auto* m = player->GetComponent<MeshRendererComponent>()) m->firstPerson = true;
+            auto* php = player->GetComponent<HPComponent>();
+            if (!php) php = player->AddComponent<HPComponent>();
             php->hp = php->maxHp;
         }
     }

@@ -175,10 +175,10 @@
                 "hiddenSubmesh": [],
                 "submeshRole": []
             },
-            "hasHP": false,
+            "hasHP": true,
             "hp": 100.0,
             "maxHp": 100.0,
-            "hasOpponent": false,
+            "hasOpponent": true,
             "oppMoveSpeed": 2.0,
             "oppStopRange": 1.2000000476837159,
             "hasPlayer": false
@@ -197,9 +197,9 @@
                     "z": 0.0
                 },
                 "scale": {
-                    "x": 0.05000000074505806,
-                    "y": 0.05000000074505806,
-                    "z": 0.05000000074505806
+                    "x": 0.02500000037252903,
+                    "y": 0.02500000037252903,
+                    "z": 0.02500000037252903
                 }
             },
             "hasMesh": true,
