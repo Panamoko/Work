@@ -5,6 +5,8 @@
 namespace uel {
     class PlayerComponent : public Component {
     public:
+        std::unique_ptr<Component> Clone() const override { return std::make_unique<PlayerComponent>(*this); }
+
         void Update(GameContext& ctx) override;
         const DirectX::XMFLOAT4X4& GetView() const { return view; }
         float GetHitMarker() const { return hitMarker; }   // Åö

@@ -2,6 +2,9 @@
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Scene/HPComponent.h"
+#include "Engine/Game/OpponentComponent.h"
+#include "Engine/Game/PlayerComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -37,8 +40,17 @@ namespace uel {
             }
         };
         struct EntityDTO {
-            std::string name; TransformDTO transform; bool hasMesh = false; MeshDTO mesh;
-            template<class A> void serialize(A& ar) { ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh)); }
+            std::string name; TransformDTO transform;
+            bool hasMesh = false; MeshDTO mesh;
+            bool  hasHP = false; float hp = 100.0f; float maxHp = 100.0f;
+            bool  hasOpponent = false; float oppMoveSpeed = 2.0f; float oppStopRange = 1.2f;
+            bool  hasPlayer = false;
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
+                    CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
+                    CEREAL_NVP(hasOpponent), CEREAL_NVP(oppMoveSpeed), CEREAL_NVP(oppStopRange),
+                    CEREAL_NVP(hasPlayer));
+            }
         };
     }
 
@@ -64,12 +76,15 @@ namespace uel {
                 ed.mesh.hiddenSubmesh.assign(m->hiddenSubmesh.begin(), m->hiddenSubmesh.end());
                 ed.mesh.submeshRole.assign(m->submeshRole.begin(), m->submeshRole.end());
             }
+            if (auto* hpc = e->GetComponent<HPComponent>()) { ed.hasHP = true; ed.hp = hpc->hp; ed.maxHp = hpc->maxHp; }
+            if (auto* op = e->GetComponent<OpponentComponent>()) { ed.hasOpponent = true; ed.oppMoveSpeed = op->moveSpeed; ed.oppStopRange = op->stopRange; }
+            if (e->GetComponent<PlayerComponent>()) ed.hasPlayer = true;
             entities.push_back(std::move(ed));
         }
 
         std::ofstream ofs(path);
         if (!ofs) return false;
-        int schemaVersion = 2;
+        int schemaVersion = 3;
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("schemaVersion", schemaVersion),
             cereal::make_nvp("entities", entities));
@@ -111,6 +126,9 @@ namespace uel {
                 m->hiddenSubmesh.assign(ed.mesh.hiddenSubmesh.begin(), ed.mesh.hiddenSubmesh.end());
                 m->submeshRole.assign(ed.mesh.submeshRole.begin(), ed.mesh.submeshRole.end());
             }
+            if (ed.hasHP) { auto* hpc = e->AddComponent<HPComponent>(); hpc->hp = ed.hp; hpc->maxHp = ed.maxHp; }
+            if (ed.hasOpponent) { auto* op = e->AddComponent<OpponentComponent>(); op->moveSpeed = ed.oppMoveSpeed; op->stopRange = ed.oppStopRange; }
+            if (ed.hasPlayer)   e->AddComponent<PlayerComponent>();
         }
         return true;
     }

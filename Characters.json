@@ -1,0 +1,189 @@
+{
+    "schemaVersion": 3,
+    "entities": [
+        {
+            "name": "Floor",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": -0.5,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 8.0,
+                    "y": 0.20000000298023225,
+                    "z": 4.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 0.30000001192092898,
+                    "y": 0.30000001192092898,
+                    "z": 0.33000001311302187,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        },
+        {
+            "name": "Char",
+            "transform": {
+                "position": {
+                    "x": -2.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/GLB format/character-a.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "hasHP": true,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        },
+        {
+            "name": "Char",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/GLB format/character-b.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": true,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        },
+        {
+            "name": "Mr.Incredible.glb",
+            "transform": {
+                "position": {
+                    "x": 2.2723100185394289,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 2.0,
+                    "y": 2.0,
+                    "z": 2.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/Mr.Incredible/Mr.Incredible.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0
+                ]
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        }
+    ]
+}

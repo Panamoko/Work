@@ -194,16 +194,19 @@ namespace uel {
     }
 
     void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
-        bool playing, bool& togglePlayRequested)
+        bool playing, bool& togglePlayRequested,
+        const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested)
     {
-        const char* kPath = "Stage.json";
+        // 現在のSceneごとに保存先を変える
+        std::string kPath = (activeScene >= 0 && activeScene < (int)sceneNames.size())
+            ? (sceneNames[activeScene] + ".json") : std::string("Stage.json");
         bool doSave = false, doLoad = false;
 
         if (ImGui::BeginMainMenuBar())
         {
             if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("Save Stage", "Ctrl+S")) doSave = true;
-                if (ImGui::MenuItem("Load Stage", "Ctrl+L")) doLoad = true;
+                if (ImGui::MenuItem("Save Scene", "Ctrl+S")) doSave = true;
+                if (ImGui::MenuItem("Load Scene", "Ctrl+L")) doLoad = true;
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Edit")) {
@@ -211,8 +214,21 @@ namespace uel {
                 if (ImGui::MenuItem("Redo", "Ctrl+Y", false, history.CanRedo())) history.Redo();
                 ImGui::EndMenu();
             }
-            // Play / Stop
             if (ImGui::MenuItem(playing ? "Stop" : "Play")) togglePlayRequested = true;
+
+            // --- Scene 切替 ---
+            ImGui::Separator();
+            ImGui::TextUnformatted("Scene:"); ImGui::SameLine();
+            ImGui::SetNextItemWidth(150);
+            const char* cur = (activeScene >= 0 && activeScene < (int)sceneNames.size()) ? sceneNames[activeScene].c_str() : "";
+            if (ImGui::BeginCombo("##scene", cur)) {
+                for (int i = 0; i < (int)sceneNames.size(); ++i)
+                    if (ImGui::Selectable(sceneNames[i].c_str(), i == activeScene)) activeScene = i;
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("+Scene")) addSceneRequested = true;
+
             ImGui::EndMainMenuBar();
         }
 
@@ -221,12 +237,8 @@ namespace uel {
             if (ImGui::IsKeyPressed('S')) doSave = true;
             if (ImGui::IsKeyPressed('L')) doLoad = true;
         }
-
-        if (doSave) StageSerializer::Save(world, kPath);
-        if (doLoad && StageSerializer::Load(world, kPath)) {
-            selected = EntityId{};
-            history.Clear();
-        }
+        if (doSave) StageSerializer::Save(world, kPath.c_str());
+        if (doLoad && StageSerializer::Load(world, kPath.c_str())) { selected = EntityId{}; history.Clear(); }
     }
 
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history)

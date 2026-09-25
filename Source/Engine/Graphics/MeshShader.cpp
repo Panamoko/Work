@@ -115,6 +115,7 @@ float4 PSMain(PSIn i) : SV_TARGET {
         data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
         data.params = XMFLOAT4(lightAmbient, lightIntensity, 0.0f, 0.0f);
 
+        context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);   
         context->IASetInputLayout(layout.Get());
         context->VSSetShader(vs.Get(), nullptr, 0);
         context->PSSetShader(ps.Get(), nullptr, 0);

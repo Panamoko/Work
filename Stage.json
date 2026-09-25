@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "entities": [
         {
             "name": "Camera",
@@ -33,347 +33,14 @@
                 "firstPerson": false,
                 "hiddenSubmesh": [],
                 "submeshRole": []
-            }
-        },
-        {
-            "name": "Floor",
-            "transform": {
-                "position": {
-                    "x": 0.0,
-                    "y": -0.5,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 6.0,
-                    "y": 0.20000000298023225,
-                    "z": 6.0
-                }
             },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 0.3499999940395355,
-                    "y": 0.3499999940395355,
-                    "z": 0.3799999952316284,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            }
-        },
-        {
-            "name": "Cube",
-            "transform": {
-                "position": {
-                    "x": 0.0,
-                    "y": 0.5,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 0.8500000238418579,
-                    "y": 0.550000011920929,
-                    "z": 0.25,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            }
-        },
-        {
-            "name": "Light",
-            "transform": {
-                "position": {
-                    "x": 2.0,
-                    "y": 1.0,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 0.30000001192092898,
-                    "y": 0.30000001192092898,
-                    "z": 0.30000001192092898
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 0.949999988079071,
-                    "y": 0.8999999761581421,
-                    "z": 0.30000001192092898,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            }
-        },
-        {
-            "name": "Crystal",
-            "transform": {
-                "position": {
-                    "x": -2.0,
-                    "y": 0.5,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/STAGE GLB format/detail-crystal.glb",
-                "color": {
-                    "x": 0.6000000238418579,
-                    "y": 0.8500000238418579,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            }
-        },
-        {
-            "name": "Stage.glb",
-            "transform": {
-                "position": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/Stage/Stage.glb",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
-            }
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
         },
         {
             "name": "Mannequin_Large.glb",
@@ -381,7 +48,7 @@
                 "position": {
                     "x": 0.0,
                     "y": 0.0,
-                    "z": -11.312385559082032
+                    "z": -3.3388798236846926
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -421,7 +88,163 @@
                     0,
                     0
                 ]
-            }
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": true
+        },
+        {
+            "name": "ExampleStage.glb",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/Stage/ExampleStage.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0
+                ],
+                "submeshRole": [
+                    0
+                ]
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        },
+        {
+            "name": "Light",
+            "transform": {
+                "position": {
+                    "x": 2.0,
+                    "y": 1.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 0.30000001192092898,
+                    "y": 0.30000001192092898,
+                    "z": 0.30000001192092898
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 0.949999988079071,
+                    "y": 0.8999999761581421,
+                    "z": 0.30000001192092898,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
+        },
+        {
+            "name": "Enemy3.glb",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 0.05000000074505806,
+                    "y": 0.05000000074505806,
+                    "z": 0.05000000074505806
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/Character/Enemy3.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "hasHP": true,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": true,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false
         }
     ]
 }

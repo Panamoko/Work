@@ -11,6 +11,9 @@ namespace uel {
 
     class MeshRendererComponent : public Component {
     public:
+
+        std::unique_ptr<Component> Clone() const override { return std::make_unique<MeshRendererComponent>(*this); }
+
         std::string       assetId;
         DirectX::XMFLOAT4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
         bool              visible = true;

@@ -6,6 +6,10 @@ namespace uel {
 
     class TransformComponent : public Component {
     public:
+
+
+        std::unique_ptr<Component> Clone() const override { return std::make_unique<TransformComponent>(*this); }
+
         DirectX::XMFLOAT3 position{ 0.0f, 0.0f, 0.0f };
         DirectX::XMFLOAT3 rotationEuler{ 0.0f, 0.0f, 0.0f }; // “x
         DirectX::XMFLOAT3 scale{ 1.0f, 1.0f, 1.0f };

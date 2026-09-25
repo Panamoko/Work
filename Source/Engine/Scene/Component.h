@@ -1,11 +1,13 @@
 #pragma once
+#include <memory>
+
 namespace uel {
     struct GameContext;
 
-    // データ基底＋ゲームTick（既定は何もしない。UE の ActorComponent 相当）
     class Component {
     public:
         virtual ~Component() = default;
         virtual void Update(GameContext&) {}
+        virtual std::unique_ptr<Component> Clone() const = 0;   // ★複製用（全Componentが実装）
     };
 }

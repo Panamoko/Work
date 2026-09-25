@@ -1,6 +1,9 @@
 #pragma once
 #include <Windows.h>
 #include <memory>
+#include <vector>
+#include <string>
+
 #include "Engine/Platform/Window.h"
 #include "Engine/Graphics/GraphicsDevice.h"
 #include "Engine/Editor/ImGuiLayer.h"
@@ -8,8 +11,8 @@
 #include "Engine/Editor/CommandHistory.h"
 #include "Engine/Editor/TransformEdit.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/SceneLighting.h"
+#include "Engine/Assets/MeshCache.h"
 
 namespace uel {
 
@@ -31,19 +34,20 @@ namespace uel {
         std::unique_ptr<ImGuiLayer>     imgui;
         std::unique_ptr<ViewportPanel>  viewport;
 
-        World                world;
-        EntityId             selected;
+        struct EditorScene {
+            std::string name;
+            World       world;
+            EntityId    selected;
+        };
+        std::vector<EditorScene> scenes;
+        int   activeScene = 0;
+        World playWorld;
+
         CommandHistory       history;
-        TransformEditSession inspectorSession;   // Inspector編集用
+        TransformEditSession inspectorSession;
         MeshCache            meshCache;
+        EditorMode           mode = EditorMode::Edit;
         SceneLighting        lighting;
-
-        EditorMode mode = EditorMode::Edit;
-        EntityId   playViewEntity;
-        bool       playPrevFirstPerson = false;
-        bool           playHadTransform = false;   // ★
-        TransformSnapshot playXform;               // ★開始時の位置を保存して復元
-
     };
 
 } // namespace uel

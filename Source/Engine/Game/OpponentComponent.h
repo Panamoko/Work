@@ -4,6 +4,8 @@
 namespace uel {
     class OpponentComponent : public Component {
     public:
+        std::unique_ptr<Component> Clone() const override { return std::make_unique<OpponentComponent>(*this); }
+
         void Update(GameContext& ctx) override;
         float moveSpeed = 2.0f;
         float stopRange = 1.2f;

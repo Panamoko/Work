@@ -20,6 +20,7 @@ namespace uel {
 
         // 全スロット（nullptr=空き）。UI/System はこれで反復する。
         const std::vector<std::unique_ptr<Entity>>& Slots() const { return entities; }
+        World Clone() const;
 
     private:
         std::vector<std::unique_ptr<Entity>> entities;    // index = EntityId.index

@@ -61,4 +61,24 @@ namespace uel {
         return entities[index].get();
     }
 
+    World World::Clone() const
+    {
+        World w;
+        w.entities.resize(entities.size());
+        w.generations = generations;
+        w.freeList = freeList;
+        for (size_t i = 0; i < entities.size(); ++i) {
+            if (!entities[i]) continue;
+            auto e = std::make_unique<Entity>();
+            e->id = entities[i]->id;
+            e->name = entities[i]->name;
+            e->parent = entities[i]->parent;
+            e->children = entities[i]->children;
+            for (const auto& c : entities[i]->components)
+                e->components.push_back(c->Clone());
+            w.entities[i] = std::move(e);
+        }
+        return w;
+    }
+
 } // namespace uel
