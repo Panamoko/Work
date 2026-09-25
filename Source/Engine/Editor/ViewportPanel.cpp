@@ -209,7 +209,8 @@ namespace uel {
         ImGui::PopStyleVar();
     }
 
-    void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache, ID3D11Device* device)
+    void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
+        ID3D11Device* device, const SceneLighting& lighting)
     {
         rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
         if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
@@ -217,12 +218,11 @@ namespace uel {
         using namespace DirectX;
         XMFLOAT4X4 viewProj;
         XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
-
-        // カメラ位置（ビュー逆行列の平行移動成分）
         XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
         XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
-        skybox.Render(context, viewProj, camPos);                 // ★空を先に
+        skybox.Render(context, viewProj, camPos);
+        shader.SetLight(lighting);                                   // ★ライト反映
         RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
     }
 

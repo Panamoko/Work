@@ -11,7 +11,14 @@ using Microsoft::WRL::ComPtr;
 
 namespace uel {
     namespace {
-        struct CB { XMFLOAT4X4 world; XMFLOAT4X4 viewProj; XMFLOAT4 color; XMFLOAT4 lightDir; };
+        struct CB {
+            XMFLOAT4X4 world;
+            XMFLOAT4X4 viewProj;
+            XMFLOAT4   color;
+            XMFLOAT4   lightDir;
+            XMFLOAT4   lightColor;
+            XMFLOAT4   params;
+        };
 
         const char* kHLSL = R"(
 Texture2D    tex  : register(t0);
@@ -21,6 +28,8 @@ cbuffer CB : register(b0) {
     float4x4 viewProj;
     float4   color;
     float4   lightDir;
+    float4   lightColor;
+    float4   params;        // x=ambient, y=intensity
 };
 struct VSIn { float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
 struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
@@ -36,10 +45,10 @@ PSIn VSMain(VSIn i) {
 float4 PSMain(PSIn i) : SV_TARGET {
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz);
-    float d = saturate(dot(n, l));
+    float  d = saturate(dot(n, l));
     float4 t = tex.Sample(samp, i.uv);
-    float3 base = t.rgb * i.col.rgb * color.rgb;   // テクスチャ×頂点色×ティント
-    float3 c = base * (0.25 + 0.75 * d);
+    float3 base = t.rgb * i.col.rgb * color.rgb;
+    float3 c = base * (params.x + d * params.y) * lightColor.rgb;   // ambient + diffuse
     return float4(c, 1.0);
 }
 )";
@@ -102,8 +111,9 @@ float4 PSMain(PSIn i) : SV_TARGET {
         XMStoreFloat4x4(&data.world, XMMatrixTranspose(XMLoadFloat4x4(&world)));
         XMStoreFloat4x4(&data.viewProj, XMMatrixTranspose(XMLoadFloat4x4(&viewProj)));
         data.color = color;
-        data.lightDir = XMFLOAT4(-0.5f, -1.0f, 0.3f, 0.0f);
-        context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
+        data.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
+        data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
+        data.params = XMFLOAT4(lightAmbient, lightIntensity, 0.0f, 0.0f);
 
         context->IASetInputLayout(layout.Get());
         context->VSSetShader(vs.Get(), nullptr, 0);
@@ -129,6 +139,14 @@ float4 PSMain(PSIn i) : SV_TARGET {
             context->PSSetShaderResources(0, 1, &srv);
             context->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
         }
+    }
+
+    void MeshShader::SetLight(const SceneLighting& light)
+    {
+        lightDir = light.direction;
+        lightColor = light.color;
+        lightAmbient = light.ambient;
+        lightIntensity = light.intensity;
     }
 
 } // namespace uel

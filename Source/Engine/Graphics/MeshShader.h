@@ -4,6 +4,8 @@
 #include <DirectXMath.h>
 #include <vector> 
 #include <cstdint>
+#include "Engine/Graphics/SceneLighting.h"
+
 namespace uel {
     class Mesh;
 
@@ -18,6 +20,7 @@ namespace uel {
             const std::vector<uint8_t>* hiddenSubmesh = nullptr,
             const std::vector<uint8_t>* submeshRole = nullptr,
             bool firstPerson = false);
+        void SetLight(const SceneLighting& light);
 
     private:
         Microsoft::WRL::ComPtr<ID3D11VertexShader>    vs;
@@ -27,6 +30,11 @@ namespace uel {
         Microsoft::WRL::ComPtr<ID3D11RasterizerState> raster;
         Microsoft::WRL::ComPtr<ID3D11SamplerState>       sampler;
         Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> whiteSRV;
+
+        DirectX::XMFLOAT3 lightDir{ -0.4f, -1.0f, 0.35f };
+        DirectX::XMFLOAT3 lightColor{ 1.0f,  1.0f, 1.0f };
+        float             lightAmbient = 0.25f;
+        float             lightIntensity = 1.0f;
     };
 
 } // namespace uel

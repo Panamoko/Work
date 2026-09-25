@@ -14,13 +14,15 @@ struct ID3D11DeviceContext;
 namespace uel {
     class World;
     class MeshCache;   // ëOï˚êÈåæ
+    struct SceneLighting;
 
     class ViewportPanel {
     public:
         void Initialize(ID3D11Device* device);
         void DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history,
             bool playMode, MeshCache& cache);
-        void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache, ID3D11Device* device);
+        void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
+            ID3D11Device* device, const SceneLighting& lighting);
 
     private:
         RenderTexture rt;

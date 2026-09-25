@@ -80,9 +80,11 @@ namespace uel {
             DrawHierarchyPanel(world, selected, history);
             DrawInspectorPanel(world, selected, history, inspectorSession, meshCache, graphics->GetDevice());
             DrawAssetBrowserPanel(world, selected, history);
+            DrawEnvironmentPanel(lighting);
+
             Update();
 
-            viewport->RenderScene(graphics->GetContext(), world, meshCache, graphics->GetDevice());
+            viewport->RenderScene(graphics->GetContext(), world, meshCache, graphics->GetDevice(), lighting);
             graphics->BeginFrame(0.10f, 0.12f, 0.15f, 1.0f);
             imgui->EndFrame();
             graphics->EndFrame();

@@ -11,6 +11,7 @@
 #include "Engine/Scene/HPComponent.h"
 #include "Engine/Game/PlayerComponent.h"
 #include "Engine/Game/OpponentComponent.h"
+#include "Engine/Graphics/SceneLighting.h"
 #include <memory>
 #include <imgui.h>
 #include <cstdio>
@@ -333,4 +334,13 @@ namespace uel {
         ImGui::End();
     }
 
+    void DrawEnvironmentPanel(SceneLighting& light)
+    {
+        ImGui::Begin("Environment");
+        ImGui::DragFloat3("Light Dir", &light.direction.x, 0.02f, -1.0f, 1.0f);
+        ImGui::ColorEdit3("Light Color", &light.color.x);
+        ImGui::DragFloat("Ambient", &light.ambient, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 5.0f);
+        ImGui::End();
+    }
 } // namespace uel

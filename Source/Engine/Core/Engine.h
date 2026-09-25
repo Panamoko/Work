@@ -9,6 +9,7 @@
 #include "Engine/Editor/TransformEdit.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Assets/MeshCache.h"
+#include "Engine/Graphics/SceneLighting.h"
 
 namespace uel {
 
@@ -35,6 +36,7 @@ namespace uel {
         CommandHistory       history;
         TransformEditSession inspectorSession;   // Inspectorï“èWóp
         MeshCache            meshCache;
+        SceneLighting        lighting;
 
         EditorMode mode = EditorMode::Edit;
         EntityId   playViewEntity;

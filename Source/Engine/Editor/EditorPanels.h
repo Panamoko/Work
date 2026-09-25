@@ -16,4 +16,9 @@ namespace uel {
     void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
         bool playing, bool& togglePlayRequested);
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
+
+    struct SceneLighting;   // Åö
+    void DrawEnvironmentPanel(SceneLighting& lighting);
+
+
 }

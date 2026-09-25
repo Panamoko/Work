@@ -167,6 +167,7 @@
     <ClInclude Include="Source\Engine\Graphics\Mesh.h" />
     <ClInclude Include="Source\Engine\Graphics\MeshShader.h" />
     <ClInclude Include="Source\Engine\Graphics\RenderTexture.h" />
+    <ClInclude Include="Source\Engine\Graphics\SceneLighting.h" />
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h" />
     <ClInclude Include="Source\Engine\Platform\Window.h" />
     <ClInclude Include="Source\Engine\Scene\Component.h" />
