@@ -58,7 +58,7 @@ namespace uel {
             auto* sk = e->GetComponent<SkinnedMeshComponent>();
             if (!t || !sk || !sk->visible || sk->assetPath.empty()) continue;
 
-            auto model = cache.GetOrLoad(device, sk->assetPath);
+            auto model = cache.GetOrLoad(device, sk->assetPath, sk->animPath);
             if (!model || !model->Valid()) continue;
 
             const auto& clips = model->Cpu().clips;

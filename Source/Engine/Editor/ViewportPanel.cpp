@@ -48,7 +48,7 @@ namespace uel {
                 if (!slot) continue;
                 auto* sk = slot->GetComponent<SkinnedMeshComponent>();
                 if (!sk || !sk->playing || sk->assetPath.empty()) continue;
-                auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+                auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                 if (!model) continue;
                 const auto& clips = model->Cpu().clips;
                 if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) continue;

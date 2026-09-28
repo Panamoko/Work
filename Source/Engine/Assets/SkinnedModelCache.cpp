@@ -3,17 +3,19 @@
 
 namespace uel {
 
-    std::shared_ptr<SkinnedRenderModel> SkinnedModelCache::GetOrLoad(ID3D11Device* device, const std::string& path)
+    std::shared_ptr<SkinnedRenderModel> SkinnedModelCache::GetOrLoad(ID3D11Device* device, const std::string& meshPath, const std::string& animPath)
     {
-        if (path.empty() || !device) return nullptr;
-        auto it = map.find(path);
+        if (meshPath.empty() || !device) return nullptr;
+        std::string key = meshPath + "|" + animPath;
+        auto it = map.find(key);
         if (it != map.end()) return it->second;
 
         SkinnedModel cpu;
-        if (!LoadSkinnedModel(path, cpu)) { map[path] = nullptr; return nullptr; }
+        if (!LoadSkinnedModel(meshPath, cpu)) { map[key] = nullptr; return nullptr; }
+        if (!animPath.empty()) LoadAnimationsFromFile(animPath, cpu);   // ★別ファイルのアニメを合成
         auto rm = std::make_shared<SkinnedRenderModel>();
-        if (!rm->Upload(device, cpu)) { map[path] = nullptr; return nullptr; }
-        map[path] = rm;
+        if (!rm->Upload(device, cpu)) { map[key] = nullptr; return nullptr; }
+        map[key] = rm;
         return rm;
     }
 

@@ -229,5 +229,48 @@ namespace uel {
 
         return out.Valid();
     }
+    bool LoadAnimationsFromFile(const std::string& path, SkinnedModel& target)
+    {
+        if (target.skeleton.bones.empty()) return false;
+        tinygltf::TinyGLTF loader; tinygltf::Model model; std::string err, warn;
+        if (!loader.LoadBinaryFromFile(&model, &err, &warn, path)) return false;
 
+        bool added = false;
+        for (const auto& anim : model.animations) {
+            AnimationClip clip;
+            clip.name = anim.name.empty() ? ("clip" + std::to_string(target.clips.size())) : anim.name;
+            std::unordered_map<int, int> boneToTrack;
+            float maxT = 0.0f;
+            for (const auto& ch : anim.channels) {
+                if (ch.target_node < 0 || ch.target_node >= (int)model.nodes.size()) continue;
+                int bone = target.skeleton.Find(model.nodes[ch.target_node].name);   // ★ボーン名でリターゲット
+                if (bone < 0) continue;
+                const auto& samp = anim.samplers[ch.sampler];
+                const auto& inAcc = model.accessors[samp.input];
+                const auto& outAcc = model.accessors[samp.output];
+                size_t inStride = 0;  const unsigned char* inData = AccPtr(model, inAcc, inStride);  if (!inStride) inStride = sizeof(float);
+                size_t outStride = 0; const unsigned char* outData = AccPtr(model, outAcc, outStride);
+                size_t elemSize = (ch.target_path == "rotation") ? sizeof(float) * 4 : sizeof(float) * 3;
+                if (outStride == 0) outStride = elemSize;
+
+                int ti;
+                auto itT = boneToTrack.find(bone);
+                if (itT == boneToTrack.end()) { ti = (int)clip.tracks.size(); clip.tracks.push_back({}); clip.tracks[ti].bone = bone; boneToTrack[bone] = ti; }
+                else ti = itT->second;
+                BoneTrack& tr = clip.tracks[ti];
+
+                for (size_t k = 0; k < inAcc.count; ++k) {
+                    float t = *reinterpret_cast<const float*>(inData + inStride * k);
+                    if (t > maxT) maxT = t;
+                    const float* v = reinterpret_cast<const float*>(outData + outStride * k);
+                    if (ch.target_path == "translation") tr.pos.push_back({ t,{ v[0],v[1],v[2] } });
+                    else if (ch.target_path == "scale")   tr.scl.push_back({ t,{ v[0],v[1],v[2] } });
+                    else if (ch.target_path == "rotation")tr.rot.push_back({ t,{ v[0],v[1],v[2],v[3] } });
+                }
+            }
+            clip.duration = maxT;
+            if (!clip.tracks.empty()) { target.clips.push_back(std::move(clip)); added = true; }
+        }
+        return added;
+    }
 } // namespace uel

@@ -10,7 +10,7 @@ namespace uel {
 
     class SkinnedModelCache {
     public:
-        std::shared_ptr<SkinnedRenderModel> GetOrLoad(ID3D11Device* device, const std::string& path);
+        std::shared_ptr<SkinnedRenderModel> GetOrLoad(ID3D11Device* device, const std::string& meshPath, const std::string& animPath = "");
     private:
         std::unordered_map<std::string, std::shared_ptr<SkinnedRenderModel>> map;
     };

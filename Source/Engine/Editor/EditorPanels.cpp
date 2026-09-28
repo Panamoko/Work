@@ -136,13 +136,13 @@ namespace uel {
             if (SkinnedMeshComponent* sk = e->GetComponent<SkinnedMeshComponent>())
             {
                 ImGui::Separator(); ImGui::TextUnformatted("SkinnedMesh (Animation)");
-                char sbuf[260]; strncpy_s(sbuf, sizeof(sbuf), sk->assetPath.c_str(), _TRUNCATE);
-                if (ImGui::InputText("Skinned GLB", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;
+                char abuf[260]; strncpy_s(abuf, sizeof(abuf), sk->animPath.c_str(), _TRUNCATE);
+                if (ImGui::InputText("Anim GLB (option)", abuf, sizeof(abuf))) sk->animPath = abuf;
                 ImGui::Checkbox("Visible##sk", &sk->visible);
                 ImGui::ColorEdit4("Tint##sk", &sk->color.x);
 
                 if (!sk->assetPath.empty()) {
-                    auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+                    auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                     if (model && model->Valid()) {
                         const auto& clips = model->Cpu().clips;
                         ImGui::Text("Bones: %d  Clips: %d",
@@ -406,7 +406,7 @@ namespace uel {
         if (!sk) { ImGui::TextUnformatted("SkinnedMeshComponent を持つEntityを選択"); ImGui::End(); return; }
         if (sk->assetPath.empty()) { ImGui::TextUnformatted("Skinned GLB 未設定"); ImGui::End(); return; }
 
-        auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+        auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
         if (!model || !model->Valid()) { ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), "load failed"); ImGui::End(); return; }
         const auto& clips = model->Cpu().clips;
         if (clips.empty()) { ImGui::TextUnformatted("clips なし"); ImGui::End(); return; }
