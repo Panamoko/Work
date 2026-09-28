@@ -79,6 +79,18 @@ namespace uel {
             }
         }
 
+        // Scene一覧（Scenes.json）から追加Sceneを復元
+        {
+            std::vector<std::string> saved;
+            if (StageSerializer::LoadSceneList(saved, "Scenes.json")) {
+                for (const auto& n : saved) {
+                    bool exists = false;
+                    for (auto& s : scenes) if (s.name == n) { exists = true; break; }
+                    if (!exists) scenes.push_back({ n, World{}, EntityId{} });
+                }
+            }
+        }
+
         // 保存済みファイルがあれば読み込む（無ければデモ配置のまま）
         for (auto& s : scenes)
             StageSerializer::Load(s.world, (s.name + ".json").c_str());
@@ -113,7 +125,13 @@ namespace uel {
             bool togglePlay = false, addScene = false;
             DrawMainMenuBar(scenes[activeScene].world, scenes[activeScene].selected, history,
                 mode == EditorMode::Play, togglePlay, names, activeScene, addScene);
-            if (addScene) scenes.push_back({ "Scene" + std::to_string(scenes.size()), World{}, EntityId{} });
+            if (addScene) {
+                auto taken = [&](const std::string& nm) { for (auto& s : scenes) if (s.name == nm) return true; return false; };
+                int n = (int)scenes.size();
+                std::string nm;
+                do { nm = "Scene" + std::to_string(n++); } while (taken(nm));
+                scenes.push_back({ nm, World{}, EntityId{} });
+            }
             if (togglePlay) { if (mode == EditorMode::Edit) StartPlay(); else StopPlay(); }
 
             // ここで確定（addScene後・activeScene確定後に束縛）
@@ -131,6 +149,7 @@ namespace uel {
             DrawAssetBrowserPanel(world, selected, history);
             DrawEnvironmentPanel(lighting);
             DrawAnimationEditorPanel(world, selected, graphics->GetDevice());
+            DrawNavGridPanel(world);
 
             Update();
 

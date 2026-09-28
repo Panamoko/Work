@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 4,
+    "schemaVersion": 5,
     "entities": [
         {
             "name": "Camera",
@@ -52,67 +52,15 @@
                 "y": 0.0,
                 "z": 0.0,
                 "w": 1.0
-            }
+            },
+            "skAnim": ""
         },
         {
-            "name": "Floor",
+            "name": "ExampleStage.glb",
             "transform": {
                 "position": {
-                    "x": 0.0,
-                    "y": -0.5,
-                    "z": 0.0
-                },
-                "rotationEuler": {
                     "x": 0.0,
                     "y": 0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 6.0,
-                    "y": 0.20000000298023225,
-                    "z": 6.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 0.3499999940395355,
-                    "y": 0.3499999940395355,
-                    "z": 0.3799999952316284,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": false,
-            "skAsset": "",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.0,
-                "w": 1.0
-            }
-        },
-        {
-            "name": "Cube",
-            "transform": {
-                "position": {
-                    "x": 0.0,
-                    "y": 0.5,
                     "z": 0.0
                 },
                 "rotationEuler": {
@@ -128,19 +76,23 @@
             },
             "hasMesh": true,
             "mesh": {
-                "assetId": "",
+                "assetId": "Data/Model/Stage/ExampleStage.glb",
                 "color": {
-                    "x": 0.8500000238418579,
-                    "y": 0.550000011920929,
-                    "z": 0.25,
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
                     "w": 1.0
                 },
                 "visible": true,
                 "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
+                "hiddenSubmesh": [
+                    0
+                ],
+                "submeshRole": [
+                    0
+                ]
             },
-            "hasHP": true,
+            "hasHP": false,
             "hp": 100.0,
             "maxHp": 100.0,
             "hasOpponent": false,
@@ -158,34 +110,35 @@
                 "y": 0.0,
                 "z": 0.0,
                 "w": 1.0
-            }
+            },
+            "skAnim": ""
         },
         {
-            "name": "Light",
+            "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 2.0,
-                    "y": 1.0,
-                    "z": 0.0
+                    "x": 0.2288728803396225,
+                    "y": -9.499490261077881e-7,
+                    "z": -0.001836523413658142
                 },
                 "rotationEuler": {
                     "x": 0.0,
-                    "y": 0.0,
+                    "y": -0.0,
                     "z": 0.0
                 },
                 "scale": {
-                    "x": 0.30000001192092898,
-                    "y": 0.30000001192092898,
-                    "z": 0.30000001192092898
+                    "x": 5.799999237060547,
+                    "y": 5.799999237060547,
+                    "z": 5.799999237060547
                 }
             },
             "hasMesh": true,
             "mesh": {
                 "assetId": "",
                 "color": {
-                    "x": 0.949999988079071,
-                    "y": 0.8999999761581421,
-                    "z": 0.30000001192092898,
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
                     "w": 1.0
                 },
                 "visible": true,
@@ -211,13 +164,14 @@
                 "y": 0.0,
                 "z": 0.0,
                 "w": 1.0
-            }
+            },
+            "skAnim": ""
         },
         {
-            "name": "Mannequin_Large.glb",
+            "name": "Entity",
             "transform": {
                 "position": {
-                    "x": -2.000990629196167,
+                    "x": -10.407469749450684,
                     "y": 0.0,
                     "z": 0.0
                 },
@@ -234,7 +188,75 @@
             },
             "hasMesh": true,
             "mesh": {
-                "assetId": "Data/Model/Character/Mannequin_Large.glb",
+                "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": false,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": true,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": true,
+            "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0,
+                "w": 1.0
+            },
+            "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb"
+        },
+        {
+            "name": "Player",
+            "transform": {
+                "position": {
+                    "x": 2.3724112510681154,
+                    "y": 2.0235061645507814,
+                    "z": -6.542430877685547
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/unitychan/unitychan.glb",
                 "color": {
                     "x": 1.0,
                     "y": 1.0,
@@ -249,9 +271,43 @@
                     0,
                     0,
                     0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
                     0
                 ],
                 "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
                     0,
                     0,
                     0,
@@ -268,7 +324,7 @@
             "oppStopRange": 1.2000000476837159,
             "hasPlayer": true,
             "hasSkinned": true,
-            "skAsset": "Data/Model/Character/Mannequin_Large.glb",
+            "skAsset": "Data/Model/unitychan/unitychan.glbData/Model/unitychan/unitychan.glb",
             "skClip": 0,
             "skSpeed": 1.0,
             "skLoop": true,
@@ -278,74 +334,8 @@
                 "y": 1.0,
                 "z": 1.0,
                 "w": 1.0
-            }
-        },
-        {
-            "name": "Entity",
-            "transform": {
-                "position": {
-                    "x": 1.9886937141418458,
-                    "y": -0.01193895936012268,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 0.5,
-                    "y": 0.5,
-                    "z": 0.5
-                }
             },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/Character/Mannequin_Large.glb",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": true,
-            "skAsset": "Data/Model/Character/Mannequin_Large.glb",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
-                "w": 1.0
-            }
+            "skAnim": "Data/Model/unitychan/unitychan.glb"
         }
     ]
 }

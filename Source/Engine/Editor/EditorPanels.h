@@ -22,6 +22,6 @@ namespace uel {
 
     struct SceneLighting;   // Åö
     void DrawEnvironmentPanel(SceneLighting& lighting);
-
+    void DrawNavGridPanel(World& world);
 
 }

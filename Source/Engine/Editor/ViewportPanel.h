@@ -10,6 +10,7 @@
 #include "Engine/Graphics/EngineSkybox.h" 
 #include "Engine/Graphics/EngineShadowMap.h"
 #include "Engine/Graphics/SkinnedMeshShader.h"
+#include "Engine/AI/EngineNavGrid.h"
 
 struct ID3D11Device;
 struct ID3D11DeviceContext;
@@ -35,6 +36,7 @@ namespace uel {
         EngineSkybox        skybox;
         EngineShadowMap shadowMap;   
         SkinnedMeshShader skinnedShader;
+        EngineNavGrid nav;   
 
         int viewWidth = 16;
         int viewHeight = 16;

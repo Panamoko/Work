@@ -1,6 +1,7 @@
 #pragma once
 #include "Engine/Editor/CommandHistory.h"
 #include "Engine/Scene/EntityId.h"
+#include <string>
 
 namespace uel {
 	class World;
@@ -9,5 +10,6 @@ namespace uel {
 	EntityId EditorCreateEntity(World& world, CommandHistory& history, const char* name);
 	EntityId EditorDuplicateEntity(World& world, CommandHistory& history, EntityId src);
 	void     EditorDeleteEntity(World& world, CommandHistory& history, EntityId id);
-
+	void     EditorRenameEntity(World& world, CommandHistory& history, EntityId id,
+	const std::string& oldName, const std::string& newName);
 } // namespace uel

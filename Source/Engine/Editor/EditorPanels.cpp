@@ -14,6 +14,9 @@
 #include "Engine/Graphics/SceneLighting.h"
 #include "Engine/Scene/SkinnedMeshComponent.h"
 #include "Engine/Assets/SkinnedModelCache.h"
+#include "Engine/AI/EngineNavGrid.h"
+#include "Engine/AI/NavObstacleComponent.h"
+
 #include <memory>
 #include <imgui.h>
 #include <cstdio>
@@ -49,15 +52,49 @@ namespace uel {
         }
         ImGui::Separator();
 
+        static EntityId renamingId{};
+        static char     renameBuf[128] = "";
+        static bool     renameFocus = false;
+
+        // F2：選択中Entityをリネーム（0x71 = VK_F2）
+        if (ImGui::IsWindowFocused() && ImGui::IsKeyPressed(0x71, false)) {
+            if (Entity* se = world.Get(selected)) {
+                renamingId = selected;
+                strncpy_s(renameBuf, sizeof(renameBuf), se->name.c_str(), _TRUNCATE);
+                renameFocus = true;
+            }
+        }
+
         for (const auto& slot : world.Slots())
         {
             if (!slot) continue;
             Entity* e = slot.get();
+
+            if (e->id == renamingId) {                                  // リネーム中の行は入力欄
+                if (renameFocus) { ImGui::SetKeyboardFocusHere(); renameFocus = false; }
+                ImGui::SetNextItemWidth(-1);
+                char rid[32]; snprintf(rid, sizeof(rid), "##rename%u", e->id.index);
+                bool enter = ImGui::InputText(rid, renameBuf, sizeof(renameBuf),
+                    ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+                if (enter || ImGui::IsItemDeactivated()) {              // Enter or 他をクリックで確定（Escは元の名前に戻る）
+                    EditorRenameEntity(world, history, e->id, e->name, renameBuf);
+                    renamingId = EntityId{};
+                }
+                continue;
+            }
+
             bool isSelected = (e->id == selected);
             char label[128];
             snprintf(label, sizeof(label), "%s##%u", e->name.c_str(), e->id.index);
-            if (ImGui::Selectable(label, isSelected))
+            if (ImGui::Selectable(label, isSelected, ImGuiSelectableFlags_AllowDoubleClick)) {
                 selected = e->id;
+                if (ImGui::IsMouseDoubleClicked(0)) {                   // ダブルクリックでリネーム開始
+                    renamingId = e->id;
+                    strncpy_s(renameBuf, sizeof(renameBuf), e->name.c_str(), _TRUNCATE);
+                    renameFocus = true;
+                }
+            }
+        
         }
         ImGui::End();
     }
@@ -69,7 +106,18 @@ namespace uel {
         Entity* e = world.Get(selected);
         if (!e) { ImGui::TextUnformatted("(No selection)"); ImGui::End(); return; }
 
-        ImGui::Text("Name : %s", e->name.c_str());
+        {
+            static std::string renameOld;
+            std::string before = e->name;
+            char nameBuf[128]; strncpy_s(nameBuf, sizeof(nameBuf), e->name.c_str(), _TRUNCATE);
+            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf))) e->name = nameBuf;
+            if (ImGui::IsItemActivated()) renameOld = before;
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+                std::string newName = e->name;
+                e->name = renameOld;                                   // いったん戻してから
+                EditorRenameEntity(world, history, selected, renameOld, newName);   // Undo付きで適用
+            }
+        }
         ImGui::Text("Id   : %u (gen %u)", e->id.index, e->id.generation);
 
         if (TransformComponent* t = e->GetComponent<TransformComponent>())
@@ -136,6 +184,8 @@ namespace uel {
             if (SkinnedMeshComponent* sk = e->GetComponent<SkinnedMeshComponent>())
             {
                 ImGui::Separator(); ImGui::TextUnformatted("SkinnedMesh (Animation)");
+                char sbuf[260]; strncpy_s(sbuf, sizeof(sbuf), sk->assetPath.c_str(), _TRUNCATE);
+                if (ImGui::InputText("Skinned GLB", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;   // ★メッシュ欄を復活
                 char abuf[260]; strncpy_s(abuf, sizeof(abuf), sk->animPath.c_str(), _TRUNCATE);
                 if (ImGui::InputText("Anim GLB (option)", abuf, sizeof(abuf))) sk->animPath = abuf;
                 ImGui::Checkbox("Visible##sk", &sk->visible);
@@ -222,8 +272,18 @@ namespace uel {
             if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem("OpponentComponent"))  e->AddComponent<OpponentComponent>();
             if (!e->GetComponent<HPComponent>() && ImGui::MenuItem("HPComponent"))      e->AddComponent<HPComponent>();
             if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
+            if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem("NavObstacleComponent")) e->AddComponent<NavObstacleComponent>();
             ImGui::EndPopup();
         }
+
+        if (auto* ob = e->GetComponent<NavObstacleComponent>()) {
+            ImGui::PushID("cmp_nav");
+            ImGui::BulletText("NavObstacle"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<NavObstacleComponent>();
+            else { ImGui::DragFloat("HalfX", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat("HalfZ", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
+            ImGui::PopID();
+        }
+
         ImGui::End();
     }
 
@@ -279,7 +339,10 @@ namespace uel {
             if (ImGui::IsKeyPressed('S')) doSave = true;
             if (ImGui::IsKeyPressed('L')) doLoad = true;
         }
-        if (doSave) StageSerializer::Save(world, kPath.c_str());
+        if (doSave) {
+            StageSerializer::Save(world, kPath.c_str());
+            StageSerializer::SaveSceneList(sceneNames, "Scenes.json");   // ★Scene一覧も保存
+        }
         if (doLoad && StageSerializer::Load(world, kPath.c_str())) { selected = EntityId{}; history.Clear(); }
     }
 
@@ -474,6 +537,64 @@ namespace uel {
         dl->AddTriangleFilled(ImVec2(px - 5, p0.y), ImVec2(px + 5, p0.y), ImVec2(px, p0.y + 8), IM_COL32(255, 90, 90, 255));
 
         ImGui::EndChild();
+        ImGui::End();
+    }
+
+    void DrawNavGridPanel(World& world)
+    {
+        static EngineNavGrid nav;
+        static float cell = 1.0f;
+        static int   cols = 40, rows = 40;
+        static float center[3] = { 0.0f, 0.0f, 0.0f };
+
+        ImGui::Begin("NavGrid");
+        ImGui::SetNextItemWidth(120); ImGui::DragFloat("CellSize", &cell, 0.05f, 0.1f, 10.0f);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt("Cols", &cols, 1, 4, 256);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt("Rows", &rows, 1, 4, 256);
+        ImGui::DragFloat3("Center(XYZ)", center, 0.1f);
+
+        nav.Configure({ center[0], center[1], center[2] }, cell, cols, rows);
+        nav.Bake(world);
+
+        // Player(goal) と 最初のOpponent(start) を探す
+        Entity* player = nullptr; Entity* opp = nullptr;
+        for (const auto& slot : world.Slots()) {
+            if (!slot) continue;
+            if (!player && slot->GetComponent<PlayerComponent>()) player = slot.get();
+            if (!opp && slot->GetComponent<OpponentComponent>()) opp = slot.get();
+        }
+        std::vector<DirectX::XMFLOAT3> path;
+        if (player && opp) {
+            auto* pt = player->GetComponent<TransformComponent>();
+            auto* ot = opp->GetComponent<TransformComponent>();
+            if (pt && ot) nav.FindPath(ot->position, pt->position, path);
+        }
+        ImGui::Text("path waypoints: %d", (int)path.size());
+
+        // トップダウン描画
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 p0 = ImGui::GetCursorScreenPos();
+        ImVec2 avail = ImGui::GetContentRegionAvail();
+        float px = min(avail.x / cols, avail.y / rows); if (px < 2.0f) px = 2.0f;
+        ImGui::InvisibleButton("navcanvas", ImVec2(px * cols, px * rows));
+
+        auto cellRect = [&](int cx, int cz, ImU32 col) {
+            ImVec2 a(p0.x + cx * px, p0.y + cz * px);
+            dl->AddRectFilled(a, ImVec2(a.x + px - 1, a.y + px - 1), col);
+            };
+        for (int z = 0; z < rows; ++z)
+            for (int x = 0; x < cols; ++x)
+                cellRect(x, z, nav.Blocked(x, z) ? IM_COL32(180, 60, 60, 255) : IM_COL32(40, 44, 52, 255));
+
+        auto worldToPix = [&](DirectX::XMFLOAT3 w) {
+            int cx, cz; nav.WorldToCell(w, cx, cz);
+            return ImVec2(p0.x + (cx + 0.5f) * px, p0.y + (cz + 0.5f) * px);
+            };
+        for (size_t i = 1; i < path.size(); ++i)
+            dl->AddLine(worldToPix(path[i - 1]), worldToPix(path[i]), IM_COL32(255, 220, 60, 255), 2.0f);
+        if (opp) if (auto* ot = opp->GetComponent<TransformComponent>())    dl->AddCircleFilled(worldToPix(ot->position), 5, IM_COL32(255, 140, 40, 255));
+        if (player) if (auto* pt = player->GetComponent<TransformComponent>()) dl->AddCircleFilled(worldToPix(pt->position), 5, IM_COL32(60, 220, 90, 255));
+
         ImGui::End();
     }
 

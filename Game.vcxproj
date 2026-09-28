@@ -145,6 +145,8 @@
     <ClInclude Include="Source\Core\RenderContext.h" />
     <ClInclude Include="Source\Core\ResourceManager.h" />
     <ClInclude Include="Source\Core\WindowUtils.h" />
+    <ClInclude Include="Source\Engine\AI\EngineNavGrid.h" />
+    <ClInclude Include="Source\Engine\AI\NavObstacleComponent.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationClip.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationPose.h" />
     <ClInclude Include="Source\Engine\Animation\Skeleton.h" />
@@ -254,6 +256,7 @@
     <ClCompile Include="Source\Core\Main.cpp" />
     <ClCompile Include="Source\Core\Mouse.cpp" />
     <ClCompile Include="Source\Core\WindowUtils.cpp" />
+    <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp" />
     <ClCompile Include="Source\Engine\Assets\GltfMeshLoader.cpp" />
     <ClCompile Include="Source\Engine\Assets\GltfSkinnedLoader.cpp" />
     <ClCompile Include="Source\Engine\Assets\MeshCache.cpp" />

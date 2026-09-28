@@ -13,6 +13,8 @@
 #include "Engine/Scene/HPComponent.h"
 #include "Engine/Scene/SkinnedMeshComponent.h"
 #include "Engine/Assets/SkinnedModelCache.h"
+#include "Engine/Game/OpponentComponent.h"
+
 #include <cmath>
 #include <d3d11.h>
 #include <imgui.h>
@@ -94,6 +96,10 @@ namespace uel {
         if (playMode) {
             // ƒvƒŒƒCƒ„[ = PlayerComponent ‚ðŽ‚ÂEntity
             Entity* player = nullptr;
+            // NavGrid‚ðbakeiPlay’†‚ÌŒo˜H’Tõj
+            nav.Configure({ 0.0f, 0.0f, 0.0f }, 1.0f, 60, 60);
+            nav.Bake(world);
+
             for (const auto& slot : world.Slots())
                 if (slot && slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
 
@@ -112,7 +118,8 @@ namespace uel {
             for (const auto& slot : world.Slots()) {
                 if (!slot) continue;
                 Entity* e = slot.get();
-                GameContext ctx{ world, *e, cache, device, dt, in };
+                // NavGrid‚ðbakeiPlay’†‚ÌŒo˜H’Tõj
+                GameContext ctx{ world, *e, cache, device, dt, in, &nav };
                 for (auto& c : e->components) c->Update(ctx);
             }
 
@@ -167,6 +174,34 @@ namespace uel {
                 char hpTxt[32]; snprintf(hpTxt, sizeof(hpTxt), "HP %.0f/%.0f", php->hp, php->maxHp);
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
+            }
+            // “G‚Ì’ÇÕŒo˜H‚ð3D“Š‰e‚Å•\Ž¦
+            {
+                XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
+                auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
+                    XMVECTOR clip = XMVector4Transform(XMVectorSet(wpos.x, wpos.y, wpos.z, 1.0f), vp);
+                    float ww = XMVectorGetW(clip);
+                    if (ww <= 0.0001f) return false;
+                    float ndcX = XMVectorGetX(clip) / ww;
+                    float ndcY = XMVectorGetY(clip) / ww;
+                    out.x = imgPos.x + (ndcX * 0.5f + 0.5f) * viewWidth;
+                    out.y = imgPos.y + (1.0f - (ndcY * 0.5f + 0.5f)) * viewHeight;
+                    return true;
+                    };
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    auto* oc = slot->GetComponent<OpponentComponent>();
+                    if (!oc) continue;
+                    const auto& pth = oc->GetPath();
+                    ImVec2 prev; bool havePrev = false;
+                    for (const auto& wp : pth) {
+                        XMFLOAT3 up = wp; up.y += 0.1f;
+                        ImVec2 s; if (!project(up, s)) { havePrev = false; continue; }
+                        dl->AddCircleFilled(s, 3.0f, IM_COL32(255, 220, 60, 220));
+                        if (havePrev) dl->AddLine(prev, s, IM_COL32(255, 220, 60, 230), 2.0f);
+                        prev = s; havePrev = true;
+                    }
+                }
             }
         }
 

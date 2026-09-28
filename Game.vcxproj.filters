@@ -106,6 +106,9 @@
     <Filter Include="Source\Engine\Animation">
       <UniqueIdentifier>{02cea29b-be3f-4163-8864-6b7247b02b42}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\AI">
+      <UniqueIdentifier>{2c932859-d606-403b-a715-555eddc191dd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -453,6 +456,12 @@
     <ClInclude Include="Source\Engine\Scene\SkinnedMeshComponent.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\AI\NavObstacleComponent.h">
+      <Filter>Source\Engine\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\AI\EngineNavGrid.h">
+      <Filter>Source\Engine\AI</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -733,6 +742,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Assets\SkinnedModelCache.cpp">
       <Filter>Source\Engine\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp">
+      <Filter>Source\Engine\AI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

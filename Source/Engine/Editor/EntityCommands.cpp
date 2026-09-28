@@ -90,5 +90,25 @@ namespace uel {
         world.DestroyEntity(id);
         history.Push(std::make_unique<DeleteEntityCommand>(world, std::move(r)));
     }
+    namespace {
+        class RenameCommand : public Command {
+        public:
+            RenameCommand(World& w, EntityId i, std::string o, std::string n)
+                : world(w), id(i), oldName(std::move(o)), newName(std::move(n)) {
+            }
+            void Undo() override { if (Entity* e = world.Get(id)) e->name = oldName; }
+            void Redo() override { if (Entity* e = world.Get(id)) e->name = newName; }
+        private:
+            World& world; EntityId id; std::string oldName, newName;
+        };
+    }
 
+    void EditorRenameEntity(World& world, CommandHistory& history, EntityId id,
+        const std::string& oldName, const std::string& newName)
+    {
+        Entity* e = world.Get(id);
+        if (!e || newName.empty() || oldName == newName) return;
+        e->name = newName;
+        history.Push(std::make_unique<RenameCommand>(world, id, oldName, newName));
+    }
 } // namespace uel

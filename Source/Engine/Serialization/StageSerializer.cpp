@@ -154,4 +154,26 @@ namespace uel {
         return true;
     }
 
+    bool StageSerializer::SaveSceneList(const std::vector<std::string>& names, const char* path)
+    {
+        std::ofstream ofs(path);
+        if (!ofs) return false;
+        std::vector<std::string> list = names;
+        cereal::JSONOutputArchive ar(ofs);
+        ar(cereal::make_nvp("scenes", list));
+        return true; // ar ”jŠüŽž‚É flush
+    }
+
+    bool StageSerializer::LoadSceneList(std::vector<std::string>& names, const char* path)
+    {
+        std::ifstream ifs(path);
+        if (!ifs) return false;
+        try {
+            cereal::JSONInputArchive ar(ifs);
+            ar(cereal::make_nvp("scenes", names));
+        }
+        catch (...) { return false; }
+        return true;
+    }
+
 } // namespace uel
