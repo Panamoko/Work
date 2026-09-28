@@ -214,7 +214,6 @@ namespace uel {
             ImGui::PopID();
         }
 
-        if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
 
         // + Add Component（UEのドロップダウン）
         if (ImGui::Button("+ Add Component")) ImGui::OpenPopup("AddComponentPopup");
@@ -222,6 +221,7 @@ namespace uel {
             if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem("PlayerComponent")) e->AddComponent<PlayerComponent>();
             if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem("OpponentComponent"))  e->AddComponent<OpponentComponent>();
             if (!e->GetComponent<HPComponent>() && ImGui::MenuItem("HPComponent"))      e->AddComponent<HPComponent>();
+            if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
             ImGui::EndPopup();
         }
         ImGui::End();
@@ -397,4 +397,84 @@ namespace uel {
         ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 5.0f);
         ImGui::End();
     }
+
+    void DrawAnimationEditorPanel(World& world, EntityId selected, ID3D11Device* device)
+    {
+        ImGui::Begin("Animation");
+        Entity* e = world.Get(selected);
+        SkinnedMeshComponent* sk = e ? e->GetComponent<SkinnedMeshComponent>() : nullptr;
+        if (!sk) { ImGui::TextUnformatted("SkinnedMeshComponent を持つEntityを選択"); ImGui::End(); return; }
+        if (sk->assetPath.empty()) { ImGui::TextUnformatted("Skinned GLB 未設定"); ImGui::End(); return; }
+
+        auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath);
+        if (!model || !model->Valid()) { ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), "load failed"); ImGui::End(); return; }
+        const auto& clips = model->Cpu().clips;
+        if (clips.empty()) { ImGui::TextUnformatted("clips なし"); ImGui::End(); return; }
+        if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) sk->clipIndex = 0;
+
+        // 左：クリップ一覧
+        ImGui::BeginChild("clips", ImVec2(170, 0), true);
+        ImGui::TextUnformatted("Clips"); ImGui::Separator();
+        for (int i = 0; i < (int)clips.size(); ++i) {
+            std::string nm = clips[i].name.empty() ? ("clip " + std::to_string(i)) : clips[i].name;
+            char buf[96]; snprintf(buf, sizeof(buf), "%s  (%.2fs)", nm.c_str(), clips[i].duration);
+            if (ImGui::Selectable(buf, i == sk->clipIndex)) { sk->clipIndex = i; sk->time = 0.0f; }
+        }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("timeline", ImVec2(0, 0), false);
+
+        const AnimationClip& clip = clips[sk->clipIndex];
+        float dur = clip.duration > 0.0f ? clip.duration : 1.0f;
+
+        // トランスポート
+        if (ImGui::Button(sk->playing ? "Pause" : "Play")) sk->playing = !sk->playing;
+        ImGui::SameLine();
+        if (ImGui::Button("Stop")) { sk->playing = false; sk->time = 0.0f; }
+        ImGui::SameLine(); ImGui::Checkbox("Loop", &sk->loop);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(120); ImGui::DragFloat("Speed", &sk->speed, 0.01f, -4.0f, 4.0f);
+        ImGui::Text("Time  %.3f / %.3f s    Bones %d",
+            sk->time, dur, (int)model->Cpu().skeleton.bones.size());
+
+        // タイムライン（キーフレーム＋プレイヘッド、ドラッグでスクラブ）
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 p0 = ImGui::GetCursorScreenPos();
+        float w = ImGui::GetContentRegionAvail().x; if (w < 20.0f) w = 20.0f;
+        float h = 64.0f;
+        ImVec2 p1 = ImVec2(p0.x + w, p0.y + h);
+        ImGui::InvisibleButton("tl", ImVec2(w, h));
+        bool active = ImGui::IsItemActive();
+
+        dl->AddRectFilled(p0, p1, IM_COL32(30, 32, 38, 255), 4.0f);
+        dl->AddRect(p0, p1, IM_COL32(80, 84, 92, 255), 4.0f);
+
+        // 目盛り（0.5秒毎）
+        for (float t = 0.0f; t <= dur + 1e-3f; t += 0.5f) {
+            float x = p0.x + (t / dur) * w;
+            dl->AddLine(ImVec2(x, p1.y - 10), ImVec2(x, p1.y), IM_COL32(90, 94, 104, 255));
+            char lbl[16]; snprintf(lbl, sizeof(lbl), "%.1f", t);
+            dl->AddText(ImVec2(x + 2, p0.y + 2), IM_COL32(150, 154, 164, 255), lbl);
+        }
+        // キーフレーム（回転トラックのキー時刻）
+        for (const auto& tr : clip.tracks)
+            for (const auto& k : tr.rot) {
+                float x = p0.x + (k.time / dur) * w;
+                dl->AddCircleFilled(ImVec2(x, p0.y + h * 0.55f), 1.8f, IM_COL32(120, 180, 255, 110));
+            }
+        // スクラブ
+        if (active) {
+            float t = (ImGui::GetIO().MousePos.x - p0.x) / w * dur;
+            if (t < 0) t = 0; if (t > dur) t = dur;
+            sk->time = t; sk->playing = false;
+        }
+        // プレイヘッド
+        float px = p0.x + (sk->time / dur) * w;
+        dl->AddLine(ImVec2(px, p0.y), ImVec2(px, p1.y), IM_COL32(255, 90, 90, 255), 2.0f);
+        dl->AddTriangleFilled(ImVec2(px - 5, p0.y), ImVec2(px + 5, p0.y), ImVec2(px, p0.y + 8), IM_COL32(255, 90, 90, 255));
+
+        ImGui::EndChild();
+        ImGui::End();
+    }
+
 } // namespace uel

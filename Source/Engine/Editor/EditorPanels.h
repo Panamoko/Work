@@ -18,6 +18,7 @@ namespace uel {
         bool playing, bool& togglePlayRequested,
         const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested);
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
+    void DrawAnimationEditorPanel(World& world, EntityId selected, ID3D11Device* device);
 
     struct SceneLighting;   // Åö
     void DrawEnvironmentPanel(SceneLighting& lighting);

@@ -130,6 +130,8 @@ namespace uel {
             DrawInspectorPanel(world, selected, history, inspectorSession, meshCache, graphics->GetDevice());
             DrawAssetBrowserPanel(world, selected, history);
             DrawEnvironmentPanel(lighting);
+            DrawAnimationEditorPanel(world, selected, graphics->GetDevice());
+
             Update();
 
             viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting);

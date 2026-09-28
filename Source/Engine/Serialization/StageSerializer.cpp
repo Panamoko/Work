@@ -5,6 +5,7 @@
 #include "Engine/Scene/HPComponent.h"
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Game/PlayerComponent.h"
+#include "Engine/Scene/SkinnedMeshComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -45,11 +46,15 @@ namespace uel {
             bool  hasHP = false; float hp = 100.0f; float maxHp = 100.0f;
             bool  hasOpponent = false; float oppMoveSpeed = 2.0f; float oppStopRange = 1.2f;
             bool  hasPlayer = false;
+            bool  hasSkinned = false; std::string skAsset; int skClip = 0; float skSpeed = 1.0f;
+            bool  skLoop = true; bool skVisible = true; Vec4DTO skColor;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
                     CEREAL_NVP(hasOpponent), CEREAL_NVP(oppMoveSpeed), CEREAL_NVP(oppStopRange),
-                    CEREAL_NVP(hasPlayer));
+                    CEREAL_NVP(hasPlayer),
+                    CEREAL_NVP(hasSkinned), CEREAL_NVP(skAsset), CEREAL_NVP(skClip), CEREAL_NVP(skSpeed),
+                    CEREAL_NVP(skLoop), CEREAL_NVP(skVisible), CEREAL_NVP(skColor));
             }
         };
     }
@@ -79,12 +84,19 @@ namespace uel {
             if (auto* hpc = e->GetComponent<HPComponent>()) { ed.hasHP = true; ed.hp = hpc->hp; ed.maxHp = hpc->maxHp; }
             if (auto* op = e->GetComponent<OpponentComponent>()) { ed.hasOpponent = true; ed.oppMoveSpeed = op->moveSpeed; ed.oppStopRange = op->stopRange; }
             if (e->GetComponent<PlayerComponent>()) ed.hasPlayer = true;
+            if (auto* sk = e->GetComponent<SkinnedMeshComponent>()) {
+                ed.hasSkinned = true;
+                ed.skAsset = sk->assetPath; ed.skClip = sk->clipIndex; ed.skSpeed = sk->speed;
+                ed.skLoop = sk->loop; ed.skVisible = sk->visible;
+                ed.skColor = { sk->color.x, sk->color.y, sk->color.z, sk->color.w };
+            }
+
             entities.push_back(std::move(ed));
         }
 
         std::ofstream ofs(path);
         if (!ofs) return false;
-        int schemaVersion = 3;
+        int schemaVersion = 4;
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("schemaVersion", schemaVersion),
             cereal::make_nvp("entities", entities));
@@ -129,6 +141,12 @@ namespace uel {
             if (ed.hasHP) { auto* hpc = e->AddComponent<HPComponent>(); hpc->hp = ed.hp; hpc->maxHp = ed.maxHp; }
             if (ed.hasOpponent) { auto* op = e->AddComponent<OpponentComponent>(); op->moveSpeed = ed.oppMoveSpeed; op->stopRange = ed.oppStopRange; }
             if (ed.hasPlayer)   e->AddComponent<PlayerComponent>();
+            if (ed.hasSkinned) {
+                auto* sk = e->AddComponent<SkinnedMeshComponent>();
+                sk->assetPath = ed.skAsset; sk->clipIndex = ed.skClip; sk->speed = ed.skSpeed;
+                sk->loop = ed.skLoop; sk->visible = ed.skVisible;
+                sk->color = { ed.skColor.x, ed.skColor.y, ed.skColor.z, ed.skColor.w };
+            }
         }
         return true;
     }
