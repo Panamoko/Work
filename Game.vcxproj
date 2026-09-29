@@ -173,6 +173,7 @@
     <ClInclude Include="Source\Engine\Game\OpponentComponent.h" />
     <ClInclude Include="Source\Engine\Game\PlayerComponent.h" />
     <ClInclude Include="Source\Engine\Game\ScreenUIComponent.h" />
+    <ClInclude Include="Source\Engine\Game\SpawnerComponent.h" />
     <ClInclude Include="Source\Engine\Graphics\CubeRenderer.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineShadowMap.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h" />
@@ -276,6 +277,7 @@
     <ClCompile Include="Source\Engine\Game\GameRuleComponent.cpp" />
     <ClCompile Include="Source\Engine\Game\OpponentComponent.cpp" />
     <ClCompile Include="Source\Engine\Game\PlayerComponent.cpp" />
+    <ClCompile Include="Source\Engine\Game\SpawnerComponent.cpp" />
     <ClCompile Include="Source\Engine\Graphics\CubeRenderer.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineShadowMap.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp" />

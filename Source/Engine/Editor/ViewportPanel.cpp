@@ -16,6 +16,7 @@
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Game/ScreenUIComponent.h"
 #include "Engine/Game/HitboxComponent.h"
+#include "Engine/Game/SpawnerComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -119,11 +120,12 @@ namespace uel {
             in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
             float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
 
-            for (const auto& slot : world.Slots()) {
-                if (!slot) continue;
-                Entity* e = slot.get();
+            // 添字でループ（Spawnerが更新中にEntityを増やしても壊れないように）
+            for (size_t i = 0; i < world.Slots().size(); ++i) {
+                Entity* e = world.Slots()[i].get();
+                if (!e) continue;
                 GameContext ctx{ world, *e, cache, device, dt, in, &nav, &flow };
-                for (auto& c : e->components) c->Update(ctx);   
+                for (size_t ci = 0; ci < e->components.size(); ++ci) e->components[ci]->Update(ctx);
             }
 
             if (player) { view = player->GetComponent<PlayerComponent>()->GetView(); }
@@ -163,6 +165,7 @@ namespace uel {
                     if (havePrev) hdl->AddLine(prev, s, col, 1.5f);
                     prev = s; havePrev = true;
                 }
+
                 };
             auto line3 = [&](XMFLOAT3 a, XMFLOAT3 b, ImU32 col) {
                 ImVec2 sa, sb; if (proj3(a, sa) && proj3(b, sb)) hdl->AddLine(sa, sb, col, 1.5f);
@@ -188,6 +191,15 @@ namespace uel {
                 for (int k = 0; k < 4; ++k)
                     line3({ ws.bodyA.x + ox[k] * ws.bodyR, ws.bodyA.y, ws.bodyA.z + oz[k] * ws.bodyR },
                         { ws.bodyB.x + ox[k] * ws.bodyR, ws.bodyB.y, ws.bodyB.z + oz[k] * ws.bodyR }, bodyCol);
+                // Spawnerの湧き範囲（編集中に選択している時だけ、黄色の円
+                
+            }
+            if (!playMode) {
+                if (Entity* se = world.Get(selected)) {
+                    auto* t = se->GetComponent<TransformComponent>();
+                    auto* sp = se->GetComponent<SpawnerComponent>();
+                    if (t && sp) circle(t->position, sp->spawnRadius, 0, IM_COL32(255, 210, 60, 230));
+                }
             }
         }
         // Play中のオーバーレイ（照準・ヒットマーカー・HP・敵経路・Title/Result画面）
@@ -222,7 +234,32 @@ namespace uel {
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
+            // ウェーブ表示（Spawnerがある時）
+            {
+                SpawnerComponent* sp = nullptr;
+                int enemies = 0;
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    if (!sp) sp = slot->GetComponent<SpawnerComponent>();
+                    if (slot->GetComponent<OpponentComponent>()) ++enemies;
+                }
+                if (sp) {
+                    char wbuf[96];
+                    if (sp->HasError()) snprintf(wbuf, sizeof(wbuf), "Spawner: prefab not found");
+                    else snprintf(wbuf, sizeof(wbuf), "WAVE %d / %d    ENEMIES %d", sp->CurrentWave(), sp->waveCount, enemies);
+                    ImVec2 ts = ImGui::CalcTextSize(wbuf);
+                    dl->AddText(ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 230), wbuf);
 
+                    if (sp->BannerTime() > 0.0f) {                     // ウェーブ開始の大きな表示
+                        char bbuf[32]; snprintf(bbuf, sizeof(bbuf), "WAVE %d", sp->CurrentWave());
+                        ImFont* font = ImGui::GetFont();
+                        float a = (sp->BannerTime() > 1.0f) ? 1.0f : sp->BannerTime();   // 最後の1秒でフェードアウト
+                        ImVec2 bs = font->CalcTextSizeA(48.0f, FLT_MAX, 0.0f, bbuf);
+                        dl->AddText(font, 48.0f, ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, imgPos.y + viewHeight * 0.25f),
+                            IM_COL32(255, 220, 80, (int)(255 * a)), bbuf);
+                    }
+                }
+            }
             // 敵の追跡経路を3D投影で表示
             {
                 XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);

@@ -20,6 +20,7 @@
 #include "Engine/Game/GameRuleComponent.h"
 #include "Engine/Scene/PrefabInstanceComponent.h"
 #include "Engine/Game/HitboxComponent.h"
+#include "Engine/Game/SpawnerComponent.h"
 
 #include <memory>
 #include <imgui.h>
@@ -346,6 +347,7 @@ namespace uel {
             if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem("ScreenUIComponent")) e->AddComponent<ScreenUIComponent>();
             if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem("GameRuleComponent")) e->AddComponent<GameRuleComponent>();
             if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem("HitboxComponent")) e->AddComponent<HitboxComponent>();
+            if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem("SpawnerComponent")) e->AddComponent<SpawnerComponent>();
 
             ImGui::EndPopup();
         }
@@ -400,6 +402,28 @@ namespace uel {
                 ImGui::DragFloat("Head Height", &hb->headHeight, 0.01f, 0.0f, 10.0f);
                 ImGui::DragFloat("Head Radius", &hb->headRadius, 0.01f, 0.01f, 5.0f);
                 ImGui::DragFloat("Head Multiplier", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
+            }
+            ImGui::PopID();
+        }
+
+        if (auto* sp = e->GetComponent<SpawnerComponent>()) {
+            ImGui::PushID("cmp_spawner");
+            ImGui::BulletText("Spawner (waves)"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<SpawnerComponent>();
+            else {
+                editStr("Prefab", sp->prefabPath);
+                if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
+                    if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+                        if (pl->Data) sp->prefabPath = static_cast<const char*>(pl->Data);
+                    ImGui::EndDragDropTarget();
+                }
+                ImGui::DragInt("Waves", &sp->waveCount, 0.1f, 1, 99);
+                ImGui::DragInt("First Wave Count", &sp->baseCount, 0.1f, 1, 100);
+                ImGui::DragInt("Increase / Wave", &sp->countIncrease, 0.1f, 0, 50);
+                ImGui::DragFloat("Spawn Interval", &sp->spawnInterval, 0.05f, 0.05f, 10.0f);
+                ImGui::DragFloat("First Delay", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat("Wave Delay", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat("Spawn Radius", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
             }
             ImGui::PopID();
         }

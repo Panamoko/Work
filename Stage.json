@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 8,
+    "schemaVersion": 10,
     "entities": [
         {
             "name": "Camera",
@@ -67,7 +67,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
             "name": "ExampleStage.glb",
@@ -139,7 +155,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
             "name": "Entity",
@@ -207,7 +239,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
             "name": "Enemy",
@@ -289,7 +337,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
             "name": "Player",
@@ -405,7 +469,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
             "name": "GameRule",
@@ -473,14 +553,30 @@
             "ruleWin": "Result",
             "ruleLose": "Result",
             "ruleDelay": 2.0,
-            "prefabPath": ""
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         },
         {
-            "name": "Enemy",
+            "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 4.036731243133545,
-                    "y": 0.0,
+                    "x": 5.704342365264893,
+                    "y": 5.364521026611328,
                     "z": 0.0
                 },
                 "rotationEuler": {
@@ -489,141 +585,45 @@
                     "z": 0.0
                 },
                 "scale": {
-                    "x": 0.5,
-                    "y": 0.5,
-                    "z": 0.5
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
                 }
             },
             "hasMesh": true,
             "mesh": {
-                "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
+                "assetId": "",
                 "color": {
                     "x": 1.0,
                     "y": 1.0,
                     "z": 1.0,
                     "w": 1.0
                 },
-                "visible": false,
+                "visible": true,
                 "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
+                "hiddenSubmesh": [],
+                "submeshRole": []
             },
-            "hasHP": true,
-            "hp": 50.0,
-            "maxHp": 100.0,
-            "hasOpponent": true,
-            "oppMoveSpeed": 3.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": true,
-            "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
-                "w": 1.0
-            },
-            "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb",
-            "hasNavObs": false,
-            "navHalfX": 1.0,
-            "navHalfZ": 1.0,
-            "hasUI": false,
-            "uiTitle": "",
-            "uiSub": "",
-            "uiButton": "",
-            "uiNext": "",
-            "uiShowResult": false,
-            "hasRule": false,
-            "ruleWin": "",
-            "ruleLose": "",
-            "ruleDelay": 2.0,
-            "prefabPath": "Data/Prefabs/Enemy.prefab.json"
-        },
-        {
-            "name": "Enemy",
-            "transform": {
-                "position": {
-                    "x": 6.618411064147949,
-                    "y": 0.0,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 0.5,
-                    "y": 0.5,
-                    "z": 0.5
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": false,
-                "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
-            },
-            "hasHP": true,
+            "hasHP": false,
             "hp": 100.0,
             "maxHp": 100.0,
-            "hasOpponent": true,
-            "oppMoveSpeed": 3.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
             "oppStopRange": 1.2000000476837159,
             "hasPlayer": false,
-            "hasSkinned": true,
-            "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
+            "hasSkinned": false,
+            "skAsset": "",
             "skClip": 0,
             "skSpeed": 1.0,
             "skLoop": true,
             "skVisible": true,
             "skColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
                 "w": 1.0
             },
-            "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb",
+            "skAnim": "",
             "hasNavObs": false,
             "navHalfX": 1.0,
             "navHalfZ": 1.0,
@@ -637,7 +637,23 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": "Data/Prefabs/Enemy.prefab.json"
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": true,
+            "spPrefab": "Data/Prefabs/Enemy.prefab.json",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0
         }
     ]
 }

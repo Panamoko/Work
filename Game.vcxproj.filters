@@ -480,6 +480,9 @@
     <ClInclude Include="Source\Engine\Game\HitboxComponent.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\SpawnerComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -769,6 +772,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Physics\HitShapes.cpp">
       <Filter>Source\Engine\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\SpawnerComponent.cpp">
+      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

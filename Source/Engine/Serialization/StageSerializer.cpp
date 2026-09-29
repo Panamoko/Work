@@ -11,6 +11,7 @@
 #include "Engine/Game/GameRuleComponent.h"
 #include "Engine/Scene/PrefabInstanceComponent.h"
 #include "Engine/Game/HitboxComponent.h"
+#include "Engine/Game/SpawnerComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -48,7 +49,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 9;
+        constexpr int kSchemaLatest = 10;
         int g_loadSchema = kSchemaLatest;
 
         struct EntityDTO {
@@ -67,6 +68,9 @@ namespace uel {
             bool  hasHitbox = false;
             float hbBodyBottom = 0.3f, hbBodyTop = 1.3f, hbBodyRadius = 0.35f;
             float hbHeadHeight = 1.6f, hbHeadRadius = 0.22f, hbHeadMul = 2.0f;
+            bool  hasSpawner = false; std::string spPrefab;
+            int   spWaves = 3, spBase = 3, spInc = 2;
+            float spInterval = 0.8f, spFirstDelay = 1.0f, spWaveDelay = 3.0f, spRadius = 2.0f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -85,6 +89,9 @@ namespace uel {
                 if (g_loadSchema >= 9)
                     ar(CEREAL_NVP(hasHitbox), CEREAL_NVP(hbBodyBottom), CEREAL_NVP(hbBodyTop), CEREAL_NVP(hbBodyRadius),
                         CEREAL_NVP(hbHeadHeight), CEREAL_NVP(hbHeadRadius), CEREAL_NVP(hbHeadMul));   // v9
+                if (g_loadSchema >= 10)
+                    ar(CEREAL_NVP(hasSpawner), CEREAL_NVP(spPrefab), CEREAL_NVP(spWaves), CEREAL_NVP(spBase), CEREAL_NVP(spInc),
+                        CEREAL_NVP(spInterval), CEREAL_NVP(spFirstDelay), CEREAL_NVP(spWaveDelay), CEREAL_NVP(spRadius));   // v10
             }
         };
 
@@ -127,6 +134,12 @@ namespace uel {
                 ed.hasHitbox = true;
                 ed.hbBodyBottom = hb->bodyBottom; ed.hbBodyTop = hb->bodyTop; ed.hbBodyRadius = hb->bodyRadius;
                 ed.hbHeadHeight = hb->headHeight; ed.hbHeadRadius = hb->headRadius; ed.hbHeadMul = hb->headMultiplier;
+            }
+            if (auto* sp = e.GetComponent<SpawnerComponent>()) {
+                ed.hasSpawner = true; ed.spPrefab = sp->prefabPath;
+                ed.spWaves = sp->waveCount; ed.spBase = sp->baseCount; ed.spInc = sp->countIncrease;
+                ed.spInterval = sp->spawnInterval; ed.spFirstDelay = sp->firstDelay;
+                ed.spWaveDelay = sp->waveDelay; ed.spRadius = sp->spawnRadius;
             }
             if (auto* pi = e.GetComponent<PrefabInstanceComponent>()) ed.prefabPath = pi->path;
 
@@ -173,6 +186,13 @@ namespace uel {
                 auto* hb = e.AddComponent<HitboxComponent>();
                 hb->bodyBottom = ed.hbBodyBottom; hb->bodyTop = ed.hbBodyTop; hb->bodyRadius = ed.hbBodyRadius;
                 hb->headHeight = ed.hbHeadHeight; hb->headRadius = ed.hbHeadRadius; hb->headMultiplier = ed.hbHeadMul;
+            }
+            if (ed.hasSpawner) {
+                auto* sp = e.AddComponent<SpawnerComponent>();
+                sp->prefabPath = ed.spPrefab;
+                sp->waveCount = ed.spWaves; sp->baseCount = ed.spBase; sp->countIncrease = ed.spInc;
+                sp->spawnInterval = ed.spInterval; sp->firstDelay = ed.spFirstDelay;
+                sp->waveDelay = ed.spWaveDelay; sp->spawnRadius = ed.spRadius;
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
         }
