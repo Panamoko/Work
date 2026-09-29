@@ -2,42 +2,34 @@
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Serialization/StageSerializer.h"
+
 #include <memory>
 #include <string>
-#include <DirectXMath.h>
+#include <vector>
 
 namespace uel {
     namespace {
 
-        // Entity 全体を復元するのに必要なデータ
+        // Entity を丸ごと復元するためのデータ（全コンポーネントの複製を持つ）
         struct EntityRecord {
             EntityId id;
             std::string name;
-            bool hasTransform = false;
-            DirectX::XMFLOAT3 pos{ 0,0,0 }, rot{ 0,0,0 }, scale{ 1,1,1 };
-            bool hasMesh = false;
-            std::string meshAssetId;
-            DirectX::XMFLOAT4 meshColor{ 0.8f,0.8f,0.8f,1 };
-            bool meshVisible = true;
+            std::vector<std::unique_ptr<Component>> comps;
         };
 
-        EntityRecord Capture(Entity* e) {
+        EntityRecord Capture(const Entity* e) {
             EntityRecord r;
             r.id = e->id; r.name = e->name;
-            if (auto* t = e->GetComponent<TransformComponent>()) {
-                r.hasTransform = true; r.pos = t->position; r.rot = t->rotationEuler; r.scale = t->scale;
-            }
-            if (auto* m = e->GetComponent<MeshRendererComponent>()) {
-                r.hasMesh = true; r.meshAssetId = m->assetId; r.meshColor = m->color; r.meshVisible = m->visible;
-            }
+            for (const auto& c : e->components) r.comps.push_back(c->Clone());
             return r;
         }
 
         void Rebuild(World& world, const EntityRecord& r) {
             Entity* e = world.RestoreEntity(r.id, r.name);
             if (!e) return;
-            if (r.hasTransform) { auto* t = e->AddComponent<TransformComponent>(); t->position = r.pos; t->rotationEuler = r.rot; t->scale = r.scale; }
-            if (r.hasMesh) { auto* m = e->AddComponent<MeshRendererComponent>(); m->assetId = r.meshAssetId; m->color = r.meshColor; m->visible = r.meshVisible; }
+            e->components.clear();
+            for (const auto& c : r.comps) e->components.push_back(c->Clone());   // 何度でもUndo/Redoできるよう毎回複製
         }
 
         class CreateEntityCommand : public Command {
@@ -56,6 +48,17 @@ namespace uel {
         private: World& world; EntityRecord rec;
         };
 
+        class RenameCommand : public Command {
+        public:
+            RenameCommand(World& w, EntityId i, std::string o, std::string n)
+                : world(w), id(i), oldName(std::move(o)), newName(std::move(n)) {
+            }
+            void Undo() override { if (Entity* e = world.Get(id)) e->name = oldName; }
+            void Redo() override { if (Entity* e = world.Get(id)) e->name = newName; }
+        private:
+            World& world; EntityId id; std::string oldName, newName;
+        };
+
     } // anonymous
 
     EntityId EditorCreateEntity(World& world, CommandHistory& history, const char* name)
@@ -72,12 +75,10 @@ namespace uel {
     {
         Entity* s = world.Get(src);
         if (!s) return EntityId{};
-        EntityRecord r = Capture(s);
 
-        EntityId id = world.CreateEntity(r.name + " Copy");
+        EntityId id = world.CreateEntity(s->name + " Copy");
         Entity* e = world.Get(id);
-        if (r.hasTransform) { auto* t = e->AddComponent<TransformComponent>(); t->position = r.pos; t->rotationEuler = r.rot; t->scale = r.scale; }
-        if (r.hasMesh) { auto* m = e->AddComponent<MeshRendererComponent>(); m->assetId = r.meshAssetId; m->color = r.meshColor; m->visible = r.meshVisible; }
+        for (const auto& c : s->components) e->components.push_back(c->Clone());   // 全コンポーネントを複製
         history.Push(std::make_unique<CreateEntityCommand>(world, Capture(e)));
         return id;
     }
@@ -90,18 +91,6 @@ namespace uel {
         world.DestroyEntity(id);
         history.Push(std::make_unique<DeleteEntityCommand>(world, std::move(r)));
     }
-    namespace {
-        class RenameCommand : public Command {
-        public:
-            RenameCommand(World& w, EntityId i, std::string o, std::string n)
-                : world(w), id(i), oldName(std::move(o)), newName(std::move(n)) {
-            }
-            void Undo() override { if (Entity* e = world.Get(id)) e->name = oldName; }
-            void Redo() override { if (Entity* e = world.Get(id)) e->name = newName; }
-        private:
-            World& world; EntityId id; std::string oldName, newName;
-        };
-    }
 
     void EditorRenameEntity(World& world, CommandHistory& history, EntityId id,
         const std::string& oldName, const std::string& newName)
@@ -111,4 +100,14 @@ namespace uel {
         e->name = newName;
         history.Push(std::make_unique<RenameCommand>(world, id, oldName, newName));
     }
+
+    EntityId EditorSpawnPrefab(World& world, CommandHistory& history, const std::string& path)
+    {
+        EntityId id;
+        if (!StageSerializer::InstantiatePrefab(world, path.c_str(), id)) return EntityId{};
+        if (Entity* e = world.Get(id))
+            history.Push(std::make_unique<CreateEntityCommand>(world, Capture(e)));   // Undoで消せる
+        return id;
+    }
+
 } // namespace uel

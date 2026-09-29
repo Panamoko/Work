@@ -12,4 +12,5 @@ namespace uel {
 	void     EditorDeleteEntity(World& world, CommandHistory& history, EntityId id);
 	void     EditorRenameEntity(World& world, CommandHistory& history, EntityId id,
 	const std::string& oldName, const std::string& newName);
+	EntityId EditorSpawnPrefab(World& world, CommandHistory& history, const std::string& path);
 } // namespace uel

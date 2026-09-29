@@ -18,6 +18,8 @@
 #include "Engine/AI/NavObstacleComponent.h"
 #include "Engine/Game/ScreenUIComponent.h"
 #include "Engine/Game/GameRuleComponent.h"
+#include "Engine/Scene/PrefabInstanceComponent.h"
+#include "Engine/Game/HitboxComponent.h"
 
 #include <memory>
 #include <imgui.h>
@@ -30,6 +32,23 @@
 #include <cctype>
 #include <map>
 namespace uel {
+
+    namespace {
+        bool        g_assetRescan = false;   // Prefab保存後に Asset Browser を再スキャンさせる
+        std::string g_prefabRefresh;         // Apply されたPrefab（Engineが全Sceneへ反映）
+
+        bool IsPrefabPath(const std::string& p) {
+            const std::string suf = ".prefab.json";
+            return p.size() >= suf.size() && p.compare(p.size() - suf.size(), suf.size(), suf) == 0;
+        }
+    }
+
+    std::string ConsumePrefabRefreshRequest()
+    {
+        std::string p = g_prefabRefresh;
+        g_prefabRefresh.clear();
+        return p;
+    }
 
     void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history)
     {
@@ -86,9 +105,13 @@ namespace uel {
             }
 
             bool isSelected = (e->id == selected);
+            bool isPrefab = (e->GetComponent<PrefabInstanceComponent>() != nullptr);
             char label[128];
             snprintf(label, sizeof(label), "%s##%u", e->name.c_str(), e->id.index);
-            if (ImGui::Selectable(label, isSelected, ImGuiSelectableFlags_AllowDoubleClick)) {
+            if (isPrefab) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.70f, 1.0f, 1.0f));
+            bool clicked = ImGui::Selectable(label, isSelected, ImGuiSelectableFlags_AllowDoubleClick);
+            if (isPrefab) ImGui::PopStyleColor();
+            if (clicked) {
                 selected = e->id;
                 if (ImGui::IsMouseDoubleClicked(0)) {                   // ダブルクリックでリネーム開始
                     renamingId = e->id;
@@ -121,7 +144,52 @@ namespace uel {
             }
         }
         ImGui::Text("Id   : %u (gen %u)", e->id.index, e->id.generation);
+        {
+            static std::string prefabMsg;
+            static float       prefabMsgTimer = 0.0f;
 
+            if (auto* pi = e->GetComponent<PrefabInstanceComponent>()) {
+                // ---- Prefabのインスタンス ----
+                std::string ppath = pi->path;   // Apply/Revertで部品が作り直されるので先にコピー
+                ImGui::TextColored(ImVec4(0.45f, 0.70f, 1.0f, 1.0f), "Prefab: %s", ppath.c_str());
+                if (ImGui::Button("Apply to Prefab")) {
+                    bool ok = StageSerializer::SavePrefab(*e, ppath.c_str());
+                    if (ok) g_prefabRefresh = ppath;                   // 全Sceneの同じPrefabへ反映
+                    prefabMsg = ok ? "Applied" : "Apply failed";
+                    prefabMsgTimer = 3.0f;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Revert")) {
+                    bool ok = StageSerializer::RevertPrefabInstance(*e);
+                    prefabMsg = ok ? "Reverted" : "Revert failed (prefab missing?)";
+                    prefabMsgTimer = 3.0f;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Unpack")) e->RemoveComponent<PrefabInstanceComponent>();
+                ImGui::TextDisabled("Per-instance: Name/Transform only. Apply to keep other changes.");
+            }
+            else if (ImGui::Button("Save as Prefab")) {
+                // ---- 普通のEntity → Prefabとして保存し、このEntityをそのインスタンスにする ----
+                std::string file;
+                for (char ch : e->name)
+                    file += (std::isalnum((unsigned char)ch) || ch == '_' || ch == '-') ? ch : '_';
+                if (file.empty()) file = "Prefab";
+                std::string path = std::string(kAssetRoot) + "/Prefabs/" + file + ".prefab.json";
+                bool ok = StageSerializer::SavePrefab(*e, path.c_str());
+                if (ok) {
+                    e->AddComponent<PrefabInstanceComponent>()->path = path;
+                    g_prefabRefresh = path;                          // 同名Prefabの既存インスタンスも更新
+                }
+                prefabMsg = ok ? ("Saved: " + path) : std::string("Save failed");
+                prefabMsgTimer = 3.0f;
+                g_assetRescan = true;
+            }
+
+            if (prefabMsgTimer > 0.0f) {
+                prefabMsgTimer -= ImGui::GetIO().DeltaTime;
+                ImGui::SameLine(); ImGui::TextUnformatted(prefabMsg.c_str());
+            }
+        }
         if (TransformComponent* t = e->GetComponent<TransformComponent>())
         {
             ImGui::Separator(); ImGui::TextUnformatted("Transform");
@@ -277,7 +345,8 @@ namespace uel {
             if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem("NavObstacleComponent")) e->AddComponent<NavObstacleComponent>();
             if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem("ScreenUIComponent")) e->AddComponent<ScreenUIComponent>();
             if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem("GameRuleComponent")) e->AddComponent<GameRuleComponent>();
-            
+            if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem("HitboxComponent")) e->AddComponent<HitboxComponent>();
+
             ImGui::EndPopup();
         }
 
@@ -316,6 +385,21 @@ namespace uel {
                 editStr("Win Scene", gr->winScene);
                 editStr("Lose Scene", gr->loseScene);
                 ImGui::DragFloat("End Delay", &gr->endDelay, 0.05f, 0.0f, 10.0f);
+            }
+            ImGui::PopID();
+        }
+
+        if (auto* hb = e->GetComponent<HitboxComponent>()) {
+            ImGui::PushID("cmp_hitbox");
+            ImGui::BulletText("Hitbox (body capsule + head)"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<HitboxComponent>();
+            else {
+                ImGui::DragFloat("Body Bottom", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Body Top", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Body Radius", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat("Head Height", &hb->headHeight, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat("Head Radius", &hb->headRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat("Head Multiplier", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
             }
             ImGui::PopID();
         }
@@ -410,8 +494,10 @@ namespace uel {
 
         ImGui::Begin("Asset Browser");
 
-        if (!scanned || ImGui::Button("Rescan"))
+        bool rescanClicked = ImGui::Button("Rescan");
+        if (!scanned || rescanClicked || g_assetRescan)
         {
+            g_assetRescan = false;
             groups.clear();
             total = 0;
             std::error_code ec;
@@ -423,7 +509,8 @@ namespace uel {
                         if (!entry.is_regular_file()) continue;
                         std::string ext = entry.path().extension().string();
                         for (char& c : ext) c = (char)std::tolower((unsigned char)c);
-                        if (ext != ".glb") continue;
+                        std::string fname = entry.path().generic_string();
+                        if (ext != ".glb" && !IsPrefabPath(fname)) continue;
                         std::string full = entry.path().generic_string();
                         std::string dir = full.substr(0, full.find_last_of('/'));
                         groups[dir].push_back(full);
@@ -440,7 +527,8 @@ namespace uel {
         ImGui::InputTextWithHint("##search", "search...", search, sizeof(search));
 
         bool hasPick = !picked.empty();
-        if (ImGui::Button("Assign to Selected") && hasPick) {
+        bool pickIsPrefab = hasPick && IsPrefabPath(picked);
+        if (ImGui::Button("Assign to Selected") && hasPick && !pickIsPrefab) {   // Prefabはメッシュとして割り当てない
             if (Entity* e = world.Get(selected)) {
                 auto* m = e->GetComponent<MeshRendererComponent>();
                 if (!m) m = e->AddComponent<MeshRendererComponent>();
@@ -449,12 +537,18 @@ namespace uel {
         }
         ImGui::SameLine();
         if (ImGui::Button("Create Entity") && hasPick) {
-            std::string name = picked.substr(picked.find_last_of('/') + 1);
-            EntityId id = EditorCreateEntity(world, history, name.c_str());
-            if (Entity* e = world.Get(id))
-                if (auto* m = e->GetComponent<MeshRendererComponent>())
-                    m->assetId = picked;
-            selected = id;
+            if (pickIsPrefab) {
+                EntityId id = EditorSpawnPrefab(world, history, picked);
+                if (id.IsValid()) selected = id;
+            }
+            else {
+                std::string name = picked.substr(picked.find_last_of('/') + 1);
+                EntityId id = EditorCreateEntity(world, history, name.c_str());
+                if (Entity* e = world.Get(id))
+                    if (auto* m = e->GetComponent<MeshRendererComponent>())
+                        m->assetId = picked;
+                selected = id;
+            }
         }
 
         ImGui::Separator();
@@ -485,15 +579,17 @@ namespace uel {
                     std::string name = f.substr(f.find_last_of('/') + 1);
                     if (filtering && name.find(search) == std::string::npos) continue;
 
+                    bool prefab = IsPrefabPath(f);
                     char item[320];
-                    snprintf(item, sizeof(item), "%s##%s", name.c_str(), f.c_str());
+                    snprintf(item, sizeof(item), "%s%s##%s", prefab ? "[Prefab] " : "", name.c_str(), f.c_str());
                     if (ImGui::Selectable(item, f == picked))
                         picked = f;
 
                     if (ImGui::BeginDragDropSource()) {
-                        ImGui::SetDragDropPayload("ASSET_GLB", f.c_str(), f.size() + 1);
+                        ImGui::SetDragDropPayload(prefab ? "ASSET_PREFAB" : "ASSET_GLB", f.c_str(), f.size() + 1);
                         ImGui::TextUnformatted(name.c_str());
                         ImGui::EndDragDropSource();
+                    
                     }
                 }
                 ImGui::TreePop();

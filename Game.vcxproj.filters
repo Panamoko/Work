@@ -471,6 +471,15 @@
     <ClInclude Include="Source\Engine\Game\GameRuleComponent.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\PrefabInstanceComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Physics\HitShapes.h">
+      <Filter>Source\Engine\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\HitboxComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -757,6 +766,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Game\GameRuleComponent.cpp">
       <Filter>Source\Engine\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Physics\HitShapes.cpp">
+      <Filter>Source\Engine\Physics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

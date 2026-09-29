@@ -9,6 +9,8 @@
 #include "Engine/Physics/GroundQuery.h"
 #include "Engine/Scene/HPComponent.h"
 #include "Engine/Scene/SkinnedMeshComponent.h"
+#include "Engine/Game/HitboxComponent.h"
+#include "Engine/Physics/HitShapes.h"
 
 #include <cmath>
 #include <memory>
@@ -110,29 +112,57 @@ namespace uel {
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
         if (in.enabled && in.shootClicked) {
             XMFLOAT3 rd = { cp * sy, sp, cp * cy };
-            Entity* hitE = nullptr; float bestT = 1000.0f;
+            const float baseDamage = 34.0f;
+
+            // (1) ヒットボックス（胴体カプセル＋頭の球）
+            Entity* hbE = nullptr; float hbT = 1000.0f; bool head = false;
             for (const auto& slot : ctx.world.Slots()) {
                 if (!slot) continue; Entity* ge = slot.get();
                 if (ge == &self) continue;
                 auto* gt = ge->GetComponent<TransformComponent>();
+                auto* hb = ge->GetComponent<HitboxComponent>();
+                if (!gt || !hb) continue;
+                auto ws = hb->GetWorldShapes(*gt);
+                float tt;
+                if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
+                if (RayCapsule(eyePos, rd, ws.bodyA, ws.bodyB, ws.bodyR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = false; }
+            }
+
+            // (2) メッシュ（壁・床などの遮蔽物。ヒットボックスを持つものはヒットボックスで判定済みなので除外）
+            Entity* meshE = nullptr; float meshT = 1000.0f;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot) continue; Entity* ge = slot.get();
+                if (ge == &self) continue;
+                if (ge->GetComponent<HitboxComponent>()) continue;
+                auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
                 bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
                 if (!gt || !gm) continue;
-                if (!gm->visible && !skinned) continue;   // スキンドのキャラは非表示メッシュを当たり判定に使う
+                if (!gm->visible && !skinned) continue;
                 auto mp = meshOf(ge);
                 if (!mp || !mp->IsValid()) continue;
                 XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
                 float tt;
-                if (RaycastMesh(*mp, gw, eyePos, rd, bestT, tt)) { bestT = tt; hitE = ge; }
+                if (RaycastMesh(*mp, gw, eyePos, rd, meshT, tt)) { meshT = tt; meshE = ge; }
             }
+
+            // (3) 近いほうに当たる（壁の向こうのヒットボックスには当たらない）
+            Entity* hitE = nullptr; float mul = 1.0f; bool headHit = false;
+            if (hbE && hbT <= meshT) {
+                hitE = hbE; headHit = head;
+                if (head) mul = hbE->GetComponent<HitboxComponent>()->headMultiplier;
+            }
+            else if (meshE) hitE = meshE;
+
             if (hitE) {
-                hitMarker = 0.15f;
                 if (auto* hpc = hitE->GetComponent<HPComponent>()) {
-                    hpc->hp -= 34.0f;                                   // ダメージ
+                    hitMarker = 0.15f;
+                    lastHeadshot = headHit;
+                    hpc->hp -= baseDamage * mul;                        // ダメージ（頭は倍率）
                     if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
                         hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
                     if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
-                        sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // スキンドの見た目にも反映
+                        sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };
                     if (hpc->hp <= 0.0f)
                         ctx.world.DestroyEntity(hitE->id);             // 撃破→消去
                 }

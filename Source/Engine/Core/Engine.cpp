@@ -172,7 +172,10 @@ namespace uel {
             DrawEnvironmentPanel(lighting);
             DrawAnimationEditorPanel(world, selected, graphics->GetDevice());
             DrawNavGridPanel(world);
-
+            // Prefab が Apply されたら、全Sceneの同じPrefabのインスタンスへ反映
+            std::string refreshed = ConsumePrefabRefreshRequest();
+            if (!refreshed.empty())
+                for (auto& s : scenes) StageSerializer::RefreshPrefabInstances(s.world, refreshed.c_str());
             Update();
 
             viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting);

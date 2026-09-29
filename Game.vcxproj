@@ -168,6 +168,7 @@
     <ClInclude Include="Source\Engine\Game\GameContext.h" />
     <ClInclude Include="Source\Engine\Game\GameFlow.h" />
     <ClInclude Include="Source\Engine\Game\GameRuleComponent.h" />
+    <ClInclude Include="Source\Engine\Game\HitboxComponent.h" />
     <ClInclude Include="Source\Engine\Game\InputState.h" />
     <ClInclude Include="Source\Engine\Game\OpponentComponent.h" />
     <ClInclude Include="Source\Engine\Game\PlayerComponent.h" />
@@ -183,12 +184,14 @@
     <ClInclude Include="Source\Engine\Graphics\SkinnedMeshShader.h" />
     <ClInclude Include="Source\Engine\Graphics\SkinnedRenderModel.h" />
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h" />
+    <ClInclude Include="Source\Engine\Physics\HitShapes.h" />
     <ClInclude Include="Source\Engine\Platform\Window.h" />
     <ClInclude Include="Source\Engine\Scene\Component.h" />
     <ClInclude Include="Source\Engine\Scene\Entity.h" />
     <ClInclude Include="Source\Engine\Scene\EntityId.h" />
     <ClInclude Include="Source\Engine\Scene\HPComponent.h" />
     <ClInclude Include="Source\Engine\Scene\MeshRendererComponent.h" />
+    <ClInclude Include="Source\Engine\Scene\PrefabInstanceComponent.h" />
     <ClInclude Include="Source\Engine\Scene\SkinnedMeshComponent.h" />
     <ClInclude Include="Source\Engine\Scene\TransformComponent.h" />
     <ClInclude Include="Source\Engine\Scene\World.h" />
@@ -283,6 +286,7 @@
     <ClCompile Include="Source\Engine\Graphics\SkinnedMeshShader.cpp" />
     <ClCompile Include="Source\Engine\Graphics\SkinnedRenderModel.cpp" />
     <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp" />
+    <ClCompile Include="Source\Engine\Physics\HitShapes.cpp" />
     <ClCompile Include="Source\Engine\Platform\Window.cpp" />
     <ClCompile Include="Source\Engine\Scene\World.cpp" />
     <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp" />

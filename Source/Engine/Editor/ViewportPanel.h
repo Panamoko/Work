@@ -52,6 +52,7 @@ namespace uel {
 
         bool  showGrid = true;
         bool  snapEnabled = false;
+        bool  showHitboxes = false;
         float snapTranslate = 1.0f;
         float snapRotate = 15.0f;
         float snapScale = 0.25f;

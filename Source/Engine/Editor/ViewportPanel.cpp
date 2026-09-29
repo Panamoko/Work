@@ -15,6 +15,7 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Game/ScreenUIComponent.h"
+#include "Engine/Game/HitboxComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -79,6 +80,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapT", &snapTranslate, 0.1f, 0.01f, 100.0f, "T:%.2f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapR", &snapRotate, 1.0f, 1.0f, 180.0f, "R:%.0f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapS", &snapScale, 0.05f, 0.01f, 10.0f, "S:%.2f");
+            ImGui::SameLine(); ImGui::Checkbox("Hitbox", &showHitboxes);
         }
         else {
             ImGui::TextUnformatted("PLAY (RMB:look  WASD:move  Space:jump  LMB:shoot)");
@@ -136,7 +138,58 @@ namespace uel {
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
         if (rt.GetSRV())
             ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
+        // ヒットボックスの表示（編集中は選択中のみ／「Hitbox」チェックで全員。Play中も有効）
+        {
+            XMMATRIX vpM = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
+            ImDrawList* hdl = ImGui::GetWindowDrawList();
+            auto proj3 = [&](XMFLOAT3 p, ImVec2& out) -> bool {
+                XMVECTOR c = XMVector4Transform(XMVectorSet(p.x, p.y, p.z, 1.0f), vpM);
+                float ww = XMVectorGetW(c);
+                if (ww <= 0.0001f) return false;
+                out.x = imgPos.x + (XMVectorGetX(c) / ww * 0.5f + 0.5f) * viewWidth;
+                out.y = imgPos.y + (1.0f - (XMVectorGetY(c) / ww * 0.5f + 0.5f)) * viewHeight;
+                return true;
+                };
+            // 円（plane 0:水平XZ / 1:XY / 2:ZY）
+            auto circle = [&](XMFLOAT3 c, float r, int plane, ImU32 col) {
+                const int N = 24; ImVec2 prev; bool havePrev = false;
+                for (int i = 0; i <= N; ++i) {
+                    float a = 6.2831853f * i / N, ca = cosf(a) * r, sa = sinf(a) * r;
+                    XMFLOAT3 p = c;
+                    if (plane == 0) { p.x += ca; p.z += sa; }
+                    else if (plane == 1) { p.x += ca; p.y += sa; }
+                    else { p.z += ca; p.y += sa; }
+                    ImVec2 s; if (!proj3(p, s)) { havePrev = false; continue; }
+                    if (havePrev) hdl->AddLine(prev, s, col, 1.5f);
+                    prev = s; havePrev = true;
+                }
+                };
+            auto line3 = [&](XMFLOAT3 a, XMFLOAT3 b, ImU32 col) {
+                ImVec2 sa, sb; if (proj3(a, sa) && proj3(b, sb)) hdl->AddLine(sa, sb, col, 1.5f);
+                };
 
+            for (const auto& slot : world.Slots()) {
+                if (!slot) continue;
+                Entity* e = slot.get();
+                bool isSel = (!playMode && e->id == selected);
+                if (!showHitboxes && !isSel) continue;
+                auto* t = e->GetComponent<TransformComponent>();
+                auto* hb = e->GetComponent<HitboxComponent>();
+                if (!t || !hb) continue;
+
+                auto ws = hb->GetWorldShapes(*t);
+                ImU32 bodyCol = IM_COL32(80, 220, 255, 220), headCol = IM_COL32(255, 90, 90, 230);
+                for (int pl = 0; pl < 3; ++pl) {
+                    circle(ws.bodyA, ws.bodyR, pl, bodyCol);
+                    circle(ws.bodyB, ws.bodyR, pl, bodyCol);
+                    circle(ws.headC, ws.headR, pl, headCol);
+                }
+                const float ox[4] = { 1, -1, 0, 0 }, oz[4] = { 0, 0, 1, -1 };
+                for (int k = 0; k < 4; ++k)
+                    line3({ ws.bodyA.x + ox[k] * ws.bodyR, ws.bodyA.y, ws.bodyA.z + oz[k] * ws.bodyR },
+                        { ws.bodyB.x + ox[k] * ws.bodyR, ws.bodyB.y, ws.bodyB.z + oz[k] * ws.bodyR }, bodyCol);
+            }
+        }
         // Play中のオーバーレイ（照準・ヒットマーカー・HP・敵経路・Title/Result画面）
         if (playMode) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -152,7 +205,7 @@ namespace uel {
                 dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
             }
             if (pc && pc->GetHitMarker() > 0.0f) {
-                ImU32 col = IM_COL32(255, 60, 60, 255);
+                ImU32 col = pc->GetHeadshot() ? IM_COL32(255, 60, 60, 255) : IM_COL32(255, 255, 255, 255);   // 頭=赤／胴体=白
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
                 dl->AddLine(ImVec2(c.x + 12, c.y - 12), ImVec2(c.x + 4, c.y - 4), col, 2.0f);
                 dl->AddLine(ImVec2(c.x - 12, c.y + 12), ImVec2(c.x - 4, c.y + 4), col, 2.0f);
@@ -244,6 +297,13 @@ namespace uel {
                         if (Entity* e = world.Get(id))
                             if (auto* m = e->GetComponent<MeshRendererComponent>()) m->assetId = pth;
                         selected = id;
+                    }
+                }
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB")) {
+                    std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
+                    if (!pth.empty()) {
+                        EntityId id = EditorSpawnPrefab(world, history, pth);
+                        if (id.IsValid()) selected = id;
                     }
                 }
                 ImGui::EndDragDropTarget();

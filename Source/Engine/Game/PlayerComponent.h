@@ -10,6 +10,7 @@ namespace uel {
         void Update(GameContext& ctx) override;
         const DirectX::XMFLOAT4X4& GetView() const { return view; }
         float GetHitMarker() const { return hitMarker; }   // ★
+        bool  GetHeadshot() const { return lastHeadshot; }
 
         float moveSpeed = 4.0f;
         float eyeHeight = 1.6f;
@@ -20,6 +21,7 @@ namespace uel {
         float pitch = 0.0f;
         float velY = 0.0f;
         float hitMarker = 0.0f;   // ★命中演出タイマー
+        bool  lastHeadshot = false;
         DirectX::XMFLOAT4X4 view{};
     };
 }

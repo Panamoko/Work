@@ -21,8 +21,12 @@ namespace uel {
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
     void DrawAnimationEditorPanel(World& world, EntityId selected, ID3D11Device* device);
 
-    struct SceneLighting;   // ★
+    struct SceneLighting;   // 前方宣言
     void DrawEnvironmentPanel(SceneLighting& lighting);
     void DrawNavGridPanel(World& world);
+
+    // Inspectorで Apply された Prefab のパス（Engineが全Sceneへ反映する）。取り出すと空に戻る
+    std::string ConsumePrefabRefreshRequest();
+
 
 }
