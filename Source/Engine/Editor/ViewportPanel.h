@@ -11,6 +11,7 @@
 #include "Engine/Graphics/EngineShadowMap.h"
 #include "Engine/Graphics/SkinnedMeshShader.h"
 #include "Engine/AI/EngineNavGrid.h"
+#include "Engine/Game/GameFlow.h"
 
 struct ID3D11Device;
 struct ID3D11DeviceContext;
@@ -27,6 +28,7 @@ namespace uel {
             bool playMode, MeshCache& cache);
         void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
             ID3D11Device* device, const SceneLighting& lighting);
+        GameFlow& GetFlow() { return flow; }
 
     private:
         RenderTexture rt;
@@ -37,6 +39,7 @@ namespace uel {
         EngineShadowMap shadowMap;   
         SkinnedMeshShader skinnedShader;
         EngineNavGrid nav;   
+        GameFlow flow;
 
         int viewWidth = 16;
         int viewHeight = 16;

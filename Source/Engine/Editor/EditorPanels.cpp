@@ -16,6 +16,8 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/AI/EngineNavGrid.h"
 #include "Engine/AI/NavObstacleComponent.h"
+#include "Engine/Game/ScreenUIComponent.h"
+#include "Engine/Game/GameRuleComponent.h"
 
 #include <memory>
 #include <imgui.h>
@@ -273,6 +275,9 @@ namespace uel {
             if (!e->GetComponent<HPComponent>() && ImGui::MenuItem("HPComponent"))      e->AddComponent<HPComponent>();
             if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
             if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem("NavObstacleComponent")) e->AddComponent<NavObstacleComponent>();
+            if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem("ScreenUIComponent")) e->AddComponent<ScreenUIComponent>();
+            if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem("GameRuleComponent")) e->AddComponent<GameRuleComponent>();
+            
             ImGui::EndPopup();
         }
 
@@ -281,6 +286,37 @@ namespace uel {
             ImGui::BulletText("NavObstacle"); ImGui::SameLine();
             if (ImGui::SmallButton("Remove")) e->RemoveComponent<NavObstacleComponent>();
             else { ImGui::DragFloat("HalfX", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat("HalfZ", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
+            ImGui::PopID();
+        }
+
+        auto editStr = [](const char* label, std::string& s) {
+            char b[256]; strncpy_s(b, sizeof(b), s.c_str(), _TRUNCATE);
+            if (ImGui::InputText(label, b, sizeof(b))) s = b;
+            };
+
+        if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
+            ImGui::PushID("cmp_ui");
+            ImGui::BulletText("ScreenUI (Title/Result)"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<ScreenUIComponent>();
+            else {
+                editStr("Title", ui->title);
+                editStr("Subtitle", ui->subtitle);
+                editStr("Button", ui->buttonText);
+                editStr("Next Scene", ui->nextScene);
+                ImGui::Checkbox("Show Result", &ui->showResult);
+            }
+            ImGui::PopID();
+        }
+
+        if (auto* gr = e->GetComponent<GameRuleComponent>()) {
+            ImGui::PushID("cmp_rule");
+            ImGui::BulletText("GameRule (win/lose)"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<GameRuleComponent>();
+            else {
+                editStr("Win Scene", gr->winScene);
+                editStr("Lose Scene", gr->loseScene);
+                ImGui::DragFloat("End Delay", &gr->endDelay, 0.05f, 0.0f, 10.0f);
+            }
             ImGui::PopID();
         }
 
@@ -297,8 +333,10 @@ namespace uel {
 
     void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
         bool playing, bool& togglePlayRequested,
-        const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested)
+        const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested,
+        std::string& renameSceneRequested)
     {
+        static char sceneRenameBuf[64] = "";
         // 現在のSceneごとに保存先を変える
         std::string kPath = (activeScene >= 0 && activeScene < (int)sceneNames.size())
             ? (sceneNames[activeScene] + ".json") : std::string("Stage.json");
@@ -330,7 +368,22 @@ namespace uel {
             }
             ImGui::SameLine();
             if (ImGui::SmallButton("+Scene")) addSceneRequested = true;
-
+            ImGui::SameLine();
+            if (!playing && ImGui::SmallButton("Rename")) {
+                strncpy_s(sceneRenameBuf, sizeof(sceneRenameBuf), cur, _TRUNCATE);
+                ImGui::OpenPopup("RenameScenePopup");
+            }
+            if (ImGui::BeginPopup("RenameScenePopup")) {
+                ImGui::TextUnformatted("New scene name");
+                if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+                bool ok = ImGui::InputText("##scenename", sceneRenameBuf, sizeof(sceneRenameBuf),
+                    ImGuiInputTextFlags_EnterReturnsTrue);
+                if (ImGui::Button("OK")) ok = true;
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+                if (ok) { renameSceneRequested = sceneRenameBuf; ImGui::CloseCurrentPopup(); }
+                ImGui::EndPopup();
+            }
             ImGui::EndMainMenuBar();
         }
 

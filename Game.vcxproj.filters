@@ -462,6 +462,15 @@
     <ClInclude Include="Source\Engine\AI\EngineNavGrid.h">
       <Filter>Source\Engine\AI</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\GameFlow.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\ScreenUIComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\GameRuleComponent.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -745,6 +754,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp">
       <Filter>Source\Engine\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\GameRuleComponent.cpp">
+      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

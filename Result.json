@@ -1,0 +1,161 @@
+{
+    "schemaVersion": 7,
+    "entities": [
+        {
+            "name": "Enemy3.glb",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 0.02500000037252903,
+                    "y": 0.02500000037252903,
+                    "z": 0.02500000037252903
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/Character/Enemy3.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": false,
+            "skAsset": "",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 1.0
+            },
+            "skAnim": "",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0
+        },
+        {
+            "name": "ResultUI",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": false,
+            "skAsset": "",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 1.0
+            },
+            "skAnim": "",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": true,
+            "uiTitle": "RESULT",
+            "uiSub": "",
+            "uiButton": "RETRY",
+            "uiNext": "Title",
+            "uiShowResult": true,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0
+        }
+    ]
+}

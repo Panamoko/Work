@@ -6,6 +6,9 @@
 #include "Engine/Game/OpponentComponent.h"
 #include "Engine/Game/PlayerComponent.h"
 #include "Engine/Scene/SkinnedMeshComponent.h"
+#include "Engine/AI/NavObstacleComponent.h"
+#include "Engine/Game/ScreenUIComponent.h"
+#include "Engine/Game/GameRuleComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -40,22 +43,38 @@ namespace uel {
                     CEREAL_NVP(firstPerson), CEREAL_NVP(hiddenSubmesh), CEREAL_NVP(submeshRole));
             }
         };
+
+        // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
+        constexpr int kSchemaLatest = 7;
+        int g_loadSchema = kSchemaLatest;
+
         struct EntityDTO {
             std::string name; TransformDTO transform;
-            std::string skAnim;
             bool hasMesh = false; MeshDTO mesh;
             bool  hasHP = false; float hp = 100.0f; float maxHp = 100.0f;
             bool  hasOpponent = false; float oppMoveSpeed = 2.0f; float oppStopRange = 1.2f;
             bool  hasPlayer = false;
             bool  hasSkinned = false; std::string skAsset; int skClip = 0; float skSpeed = 1.0f;
             bool  skLoop = true; bool skVisible = true; Vec4DTO skColor;
+            std::string skAnim;
+            bool  hasNavObs = false; float navHalfX = 1.0f; float navHalfZ = 1.0f;
+            bool  hasUI = false; std::string uiTitle, uiSub, uiButton, uiNext; bool uiShowResult = false;
+            bool  hasRule = false; std::string ruleWin, ruleLose; float ruleDelay = 2.0f;
+
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
                     CEREAL_NVP(hasOpponent), CEREAL_NVP(oppMoveSpeed), CEREAL_NVP(oppStopRange),
-                    CEREAL_NVP(hasPlayer),
-                    CEREAL_NVP(hasSkinned), CEREAL_NVP(skAsset), CEREAL_NVP(skClip), CEREAL_NVP(skSpeed),
-                    CEREAL_NVP(skLoop), CEREAL_NVP(skVisible), CEREAL_NVP(skColor), CEREAL_NVP(skAnim));
+                    CEREAL_NVP(hasPlayer));                                                          // v3
+                if (g_loadSchema >= 4)
+                    ar(CEREAL_NVP(hasSkinned), CEREAL_NVP(skAsset), CEREAL_NVP(skClip), CEREAL_NVP(skSpeed),
+                        CEREAL_NVP(skLoop), CEREAL_NVP(skVisible), CEREAL_NVP(skColor));            // v4
+                if (g_loadSchema >= 5) ar(CEREAL_NVP(skAnim));                                       // v5
+                if (g_loadSchema >= 6) ar(CEREAL_NVP(hasNavObs), CEREAL_NVP(navHalfX), CEREAL_NVP(navHalfZ)); // v6
+                if (g_loadSchema >= 7)
+                    ar(CEREAL_NVP(hasUI), CEREAL_NVP(uiTitle), CEREAL_NVP(uiSub), CEREAL_NVP(uiButton),
+                        CEREAL_NVP(uiNext), CEREAL_NVP(uiShowResult),
+                        CEREAL_NVP(hasRule), CEREAL_NVP(ruleWin), CEREAL_NVP(ruleLose), CEREAL_NVP(ruleDelay)); // v7
             }
         };
     }
@@ -67,7 +86,7 @@ namespace uel {
             if (!slot) continue;
             Entity* e = slot.get();
             auto* t = e->GetComponent<TransformComponent>();
-            if (!t) continue; // 最低限 Transform を持つものだけ保存
+            if (!t) continue; // 最低限 Transform があるものだけ保存
             EntityDTO ed;
             ed.name = e->name;
             ed.transform.position = { t->position.x, t->position.y, t->position.z };
@@ -92,13 +111,21 @@ namespace uel {
                 ed.skLoop = sk->loop; ed.skVisible = sk->visible;
                 ed.skColor = { sk->color.x, sk->color.y, sk->color.z, sk->color.w };
             }
-
-            entities.push_back(std::move(ed));
+            if (auto* ob = e->GetComponent<NavObstacleComponent>()) { ed.hasNavObs = true; ed.navHalfX = ob->halfX; ed.navHalfZ = ob->halfZ; }
+            if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
+                ed.hasUI = true; ed.uiTitle = ui->title; ed.uiSub = ui->subtitle;
+                ed.uiButton = ui->buttonText; ed.uiNext = ui->nextScene; ed.uiShowResult = ui->showResult;
+            }
+            if (auto* gr = e->GetComponent<GameRuleComponent>()) {
+                ed.hasRule = true; ed.ruleWin = gr->winScene; ed.ruleLose = gr->loseScene; ed.ruleDelay = gr->endDelay;
+            }
+            entities.push_back(std::move(ed));   // ★全部書き終えてから最後に登録
         }
 
         std::ofstream ofs(path);
         if (!ofs) return false;
-        int schemaVersion = 5;
+        int schemaVersion = kSchemaLatest;
+        g_loadSchema = kSchemaLatest;
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("schemaVersion", schemaVersion),
             cereal::make_nvp("entities", entities));
@@ -114,14 +141,15 @@ namespace uel {
         std::vector<EntityDTO> entities;
         try {
             cereal::JSONInputArchive ar(ifs);
-            ar(cereal::make_nvp("schemaVersion", schemaVersion),
-                cereal::make_nvp("entities", entities));
+            ar(cereal::make_nvp("schemaVersion", schemaVersion));
+            g_loadSchema = schemaVersion;                 // このファイルの版に存在する項目だけ読む
+            ar(cereal::make_nvp("entities", entities));
         }
         catch (...) {
+            g_loadSchema = kSchemaLatest;
             return false; // 壊れたJSON等は失敗扱い
         }
-
-        // 将来：schemaVersion によるMigration（今は v1 のみ）
+        g_loadSchema = kSchemaLatest;
 
         world.Clear();
         for (const auto& ed : entities) {
@@ -149,6 +177,16 @@ namespace uel {
                 sk->animPath = ed.skAnim;
                 sk->loop = ed.skLoop; sk->visible = ed.skVisible;
                 sk->color = { ed.skColor.x, ed.skColor.y, ed.skColor.z, ed.skColor.w };
+            }
+            if (ed.hasNavObs) { auto* ob = e->AddComponent<NavObstacleComponent>(); ob->halfX = ed.navHalfX; ob->halfZ = ed.navHalfZ; }
+            if (ed.hasUI) {
+                auto* ui = e->AddComponent<ScreenUIComponent>();
+                ui->title = ed.uiTitle; ui->subtitle = ed.uiSub; ui->buttonText = ed.uiButton;
+                ui->nextScene = ed.uiNext; ui->showResult = ed.uiShowResult;
+            }
+            if (ed.hasRule) {
+                auto* gr = e->AddComponent<GameRuleComponent>();
+                gr->winScene = ed.ruleWin; gr->loseScene = ed.ruleLose; gr->endDelay = ed.ruleDelay;
             }
         }
         return true;

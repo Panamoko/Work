@@ -8,6 +8,8 @@
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
 #include "Engine/Scene/HPComponent.h"
+#include "Engine/Scene/SkinnedMeshComponent.h"
+
 #include <cmath>
 #include <memory>
 
@@ -114,7 +116,9 @@ namespace uel {
                 if (ge == &self) continue;
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
-                if (!gt || !gm || !gm->visible) continue;
+                bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
+                if (!gt || !gm) continue;
+                if (!gm->visible && !skinned) continue;   // スキンドのキャラは非表示メッシュを当たり判定に使う
                 auto mp = meshOf(ge);
                 if (!mp || !mp->IsValid()) continue;
                 XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
@@ -127,12 +131,10 @@ namespace uel {
                     hpc->hp -= 34.0f;                                   // ダメージ
                     if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
                         hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
+                    if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
+                        sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // スキンドの見た目にも反映
                     if (hpc->hp <= 0.0f)
-                        ctx.world.DestroyEntity(hitE->id);             // 撃破＝消滅
-                }
-                else {
-                    if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
-                        hm->color = { 1.0f, 0.2f, 0.2f, 1.0f };        // HP無しは従来どおり赤く
+                        ctx.world.DestroyEntity(hitE->id);             // 撃破→消去
                 }
             }
         }

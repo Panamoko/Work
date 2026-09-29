@@ -1,6 +1,9 @@
 {
     "scenes": [
         "Stage",
-        "Characters"
+        "Characters",
+        "Scene2",
+        "Title",
+        "Result"
     ]
 }

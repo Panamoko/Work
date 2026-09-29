@@ -28,6 +28,8 @@ namespace uel {
         void Update();
         void StartPlay();
         void StopPlay();
+        bool RenameActiveScene(const std::string& newName);
+        void LoadPlayScene(int index, bool allowSelectedFallback);
 
         std::unique_ptr<Window>         window;
         std::unique_ptr<GraphicsDevice> graphics;
@@ -48,6 +50,8 @@ namespace uel {
         MeshCache            meshCache;
         EditorMode           mode = EditorMode::Edit;
         SceneLighting        lighting;
+        std::wstring         baseTitle;          // 元のウィンドウタイトル
+        float                titleTimer = 0.0f;  // タイトル更新用タイマー
     };
 
 } // namespace uel

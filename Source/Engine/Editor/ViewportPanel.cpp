@@ -14,7 +14,9 @@
 #include "Engine/Scene/SkinnedMeshComponent.h"
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Game/OpponentComponent.h"
+#include "Engine/Game/ScreenUIComponent.h"
 
+#include <cfloat>
 #include <cmath>
 #include <d3d11.h>
 #include <imgui.h>
@@ -118,9 +120,8 @@ namespace uel {
             for (const auto& slot : world.Slots()) {
                 if (!slot) continue;
                 Entity* e = slot.get();
-                // NavGridをbake（Play中の経路探索）
-                GameContext ctx{ world, *e, cache, device, dt, in, &nav };
-                for (auto& c : e->components) c->Update(ctx);
+                GameContext ctx{ world, *e, cache, device, dt, in, &nav, &flow };
+                for (auto& c : e->components) c->Update(ctx);   
             }
 
             if (player) { view = player->GetComponent<PlayerComponent>()->GetView(); }
@@ -136,27 +137,20 @@ namespace uel {
         if (rt.GetSRV())
             ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
 
-        // クロスヘア（Play）
-        if (playMode) {
-            ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
-            dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
-        }
-
-        // 編集時のみ：ドロップ・キー・グリッド・ギズモ
-        // Play時オーバーレイ（クロスヘア＋ヒットマーカー＋HPバー）
+        // Play中のオーバーレイ（照準・ヒットマーカー・HP・敵経路・Title/Result画面）
         if (playMode) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
-            dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
-            dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
 
-            Entity* p = nullptr;                                  // ★プレイヤーを探す
+            Entity* p = nullptr;
             for (const auto& slot : world.Slots())
                 if (slot && slot->GetComponent<PlayerComponent>()) { p = slot.get(); break; }
             PlayerComponent* pc = p ? p->GetComponent<PlayerComponent>() : nullptr;
 
+            if (pc) {   // 照準はプレイヤーがいる時だけ
+                dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
+                dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
+            }
             if (pc && pc->GetHitMarker() > 0.0f) {
                 ImU32 col = IM_COL32(255, 60, 60, 255);
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
@@ -175,6 +169,7 @@ namespace uel {
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
+
             // 敵の追跡経路を3D投影で表示
             {
                 XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
@@ -182,19 +177,16 @@ namespace uel {
                     XMVECTOR clip = XMVector4Transform(XMVectorSet(wpos.x, wpos.y, wpos.z, 1.0f), vp);
                     float ww = XMVectorGetW(clip);
                     if (ww <= 0.0001f) return false;
-                    float ndcX = XMVectorGetX(clip) / ww;
-                    float ndcY = XMVectorGetY(clip) / ww;
-                    out.x = imgPos.x + (ndcX * 0.5f + 0.5f) * viewWidth;
-                    out.y = imgPos.y + (1.0f - (ndcY * 0.5f + 0.5f)) * viewHeight;
+                    out.x = imgPos.x + (XMVectorGetX(clip) / ww * 0.5f + 0.5f) * viewWidth;
+                    out.y = imgPos.y + (1.0f - (XMVectorGetY(clip) / ww * 0.5f + 0.5f)) * viewHeight;
                     return true;
                     };
                 for (const auto& slot : world.Slots()) {
                     if (!slot) continue;
                     auto* oc = slot->GetComponent<OpponentComponent>();
                     if (!oc) continue;
-                    const auto& pth = oc->GetPath();
                     ImVec2 prev; bool havePrev = false;
-                    for (const auto& wp : pth) {
+                    for (const auto& wp : oc->GetPath()) {
                         XMFLOAT3 up = wp; up.y += 0.1f;
                         ImVec2 s; if (!project(up, s)) { havePrev = false; continue; }
                         dl->AddCircleFilled(s, 3.0f, IM_COL32(255, 220, 60, 220));
@@ -203,6 +195,42 @@ namespace uel {
                     }
                 }
             }
+
+            // Title / Result 画面（ScreenUIComponent）
+            for (const auto& slot : world.Slots()) {
+                if (!slot) continue;
+                auto* ui = slot->GetComponent<ScreenUIComponent>();
+                if (!ui) continue;
+
+                dl->AddRectFilled(imgPos, ImVec2(imgPos.x + viewWidth, imgPos.y + viewHeight), IM_COL32(0, 0, 0, 110));
+                ImFont* font = ImGui::GetFont();
+                auto centerText = [&](const std::string& txt, float size, float y, ImU32 col) {
+                    ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, txt.c_str());
+                    dl->AddText(font, size, ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, y), col, txt.c_str());
+                    };
+
+                float y = imgPos.y + viewHeight * 0.28f;
+                centerText(ui->title, 56.0f, y, IM_COL32(255, 255, 255, 255)); y += 72.0f;
+                if (ui->showResult && !flow.lastResult.empty()) {
+                    bool clear = (flow.lastResult == "CLEAR");
+                    centerText(flow.lastResult, 40.0f, y, clear ? IM_COL32(120, 230, 120, 255) : IM_COL32(255, 90, 90, 255)); y += 52.0f;
+                    char tbuf[64]; snprintf(tbuf, sizeof(tbuf), "Time  %.1f s", flow.lastTime);
+                    centerText(tbuf, 22.0f, y, IM_COL32(220, 220, 220, 255)); y += 36.0f;
+                }
+                if (!ui->subtitle.empty()) { centerText(ui->subtitle, 22.0f, y, IM_COL32(200, 200, 200, 255)); y += 40.0f; }
+
+                if (!ui->buttonText.empty() && !ui->nextScene.empty()) {
+                    ImVec2 bs(220.0f, 44.0f);
+                    ImGui::SetCursorScreenPos(ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, y + 10.0f));
+                    ImGui::PushID(slot.get());
+                    bool go = ImGui::Button(ui->buttonText.c_str(), bs);
+                    ImGui::PopID();
+                    if (ImGui::IsKeyPressed(0x0D, false)) go = true;   // Enterでも決定（0x0D = VK_RETURN）
+                    if (go && flow.requestedScene.empty()) flow.requestedScene = ui->nextScene;
+                }
+                break;   // 画面は1つだけ描く
+            }
+        
         }
 
         // 編集時のみ：ドロップ・キー・グリッド・ギズモ（★復元）

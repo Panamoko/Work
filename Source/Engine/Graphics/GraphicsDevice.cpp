@@ -83,7 +83,7 @@ namespace uel {
 
     void GraphicsDevice::EndFrame()
     {
-        swapChain->Present(1, 0); // VSync ON
+        swapChain->Present(0, 0); // VSync ON
     }
 
     void GraphicsDevice::Resize(int w, int h)
