@@ -10,6 +10,8 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Scene/SkinnedMeshComponent.h"
 #include "Engine/Animation/AnimationPose.h"
+#include "Engine/Scene/ShaderComponent.h"
+
 namespace uel {
 
     void RenderSystem::Render(World& world, MeshShader& shader, const Mesh& fallbackMesh,
@@ -29,7 +31,9 @@ namespace uel {
                 std::shared_ptr<Mesh> gm = cache.GetOrLoad(device, m->assetId);
                 if (gm && gm->IsValid()) meshToDraw = gm.get();
             }
-            shader.Draw(context, *meshToDraw, t->GetWorldMatrix(), viewProj, m->color,
+            const ShaderComponent* sc = e->GetComponent<ShaderComponent>();
+            const ShadingParams shading = sc ? sc->params : ShadingParams{};
+            shader.Draw(context, *meshToDraw, t->GetWorldMatrix(), viewProj, m->color, shading,
                 &m->hiddenSubmesh, &m->submeshRole, m->firstPerson);
         }
     }
@@ -66,7 +70,9 @@ namespace uel {
                 (sk->clipIndex >= 0 && sk->clipIndex < (int)clips.size()) ? &clips[sk->clipIndex] : nullptr;
 
             EvaluatePalette(model->Cpu().skeleton, clip, sk->time, palette);
-            shader.Draw(context, *model, t->GetWorldMatrix(), viewProj, sk->color, palette);
+            const ShaderComponent* sc = e->GetComponent<ShaderComponent>();
+            const ShadingParams shading = sc ? sc->params : ShadingParams{};
+            shader.Draw(context, *model, t->GetWorldMatrix(), viewProj, sk->color, shading, palette);
         }
     }
 

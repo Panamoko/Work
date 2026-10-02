@@ -21,6 +21,7 @@
 #include "Engine/Scene/PrefabInstanceComponent.h"
 #include "Engine/Game/HitboxComponent.h"
 #include "Engine/Game/SpawnerComponent.h"
+#include "Engine/Scene/ShaderComponent.h"
 
 #include <memory>
 #include <imgui.h>
@@ -348,6 +349,7 @@ namespace uel {
             if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem("GameRuleComponent")) e->AddComponent<GameRuleComponent>();
             if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem("HitboxComponent")) e->AddComponent<HitboxComponent>();
             if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem("SpawnerComponent")) e->AddComponent<SpawnerComponent>();
+            if (!e->GetComponent<ShaderComponent>() && ImGui::MenuItem("ShaderComponent")) e->AddComponent<ShaderComponent>();
 
             ImGui::EndPopup();
         }
@@ -428,6 +430,18 @@ namespace uel {
             ImGui::PopID();
         }
 
+        if (auto* shc = e->GetComponent<ShaderComponent>()) {
+            ImGui::PushID("cmp_shader");
+            ImGui::BulletText("ShaderComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) e->RemoveComponent<ShaderComponent>();
+            else {
+                const char* modeNames[] = { "Lit", "Unlit" };
+                int mode = (int)shc->params.mode;
+                if (ImGui::Combo("Mode", &mode, modeNames, 2)) shc->params.mode = (ShadingMode)mode;
+                ImGui::Checkbox("Receive Shadow", &shc->params.receiveShadow);
+            }
+            ImGui::PopID();
+        }
         ImGui::End();
     }
 

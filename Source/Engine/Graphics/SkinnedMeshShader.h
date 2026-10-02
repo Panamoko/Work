@@ -3,6 +3,8 @@
 #include <wrl/client.h>
 #include <DirectXMath.h>
 #include <vector>
+
+#include "Engine/Graphics/ShadingParams.h"
 #include "Engine/Graphics/SceneLighting.h"
 
 namespace uel {
@@ -12,11 +14,14 @@ namespace uel {
     class SkinnedMeshShader {
     public:
         bool Initialize(ID3D11Device* device);
+
         void Draw(ID3D11DeviceContext* ctx, const SkinnedRenderModel& model,
             const DirectX::XMFLOAT4X4& world,
             const DirectX::XMFLOAT4X4& viewProj,
             const DirectX::XMFLOAT4& color,
+            const ShadingParams& shading,
             const std::vector<DirectX::XMFLOAT4X4>& palette);
+
         void SetLight(const SceneLighting& light);
         void SetShadow(ID3D11ShaderResourceView* srv, const DirectX::XMFLOAT4X4& lightViewProj);
 

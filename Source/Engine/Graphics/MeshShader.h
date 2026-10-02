@@ -4,8 +4,9 @@
 #include <DirectXMath.h>
 #include <vector> 
 #include <cstdint>
-#include "Engine/Graphics/SceneLighting.h"
 
+#include "Engine/Graphics/SceneLighting.h"
+#include "Engine/Graphics/ShadingParams.h"
 namespace uel {
     class Mesh;
 
@@ -13,15 +14,18 @@ namespace uel {
     class MeshShader {
     public:
         bool Initialize(ID3D11Device* device);
+
         void Draw(ID3D11DeviceContext* context, const Mesh& mesh,
             const DirectX::XMFLOAT4X4& world,
             const DirectX::XMFLOAT4X4& viewProj,
             const DirectX::XMFLOAT4& color,
+            const ShadingParams& shading,
             const std::vector<uint8_t>* hiddenSubmesh = nullptr,
             const std::vector<uint8_t>* submeshRole = nullptr,
             bool firstPerson = false);
-        void SetLight(const SceneLighting& light);
 
+
+        void SetLight(const SceneLighting& light);
         void SetShadow(ID3D11ShaderResourceView* srv, const DirectX::XMFLOAT4X4& lightViewProj);
 
 

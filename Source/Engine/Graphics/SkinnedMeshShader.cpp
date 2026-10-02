@@ -1,8 +1,9 @@
 #include "Engine/Graphics/SkinnedMeshShader.h"
 #include "Engine/Graphics/SkinnedRenderModel.h"
-#include <d3dcompiler.h>
+#include "Engine/Graphics/ShaderCommon.h"
+
+#include <string>
 #include <cstdint>
-#include <cstring>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -12,29 +13,16 @@ using Microsoft::WRL::ComPtr;
 namespace uel {
     namespace {
         constexpr int kMaxBones = 128;
-        struct ObjCB { XMFLOAT4X4 world, viewProj, lightViewProj; XMFLOAT4 color, lightDir, lightColor, params; };
         struct BoneCB { XMFLOAT4X4 bones[kMaxBones]; };
 
-        const char* kHLSL = R"(
-cbuffer Obj : register(b0) {
-    float4x4 world;
-    float4x4 viewProj;
-    float4x4 lightViewProj;
-    float4   color;
-    float4   lightDir;
-    float4   lightColor;
-    float4   params; // x=ambient y=intensity z=shadowEnabled
-};
+        // スキンドメッシュ専用の部分（ボーンの定数バッファと頂点シェーダだけ）。
+        // b0 の定数バッファ・影・ピクセルシェーダは ShaderCommon.h の kShaderCommonHLSL にある。
+        const char* kSkinnedVS = R"(
 cbuffer Bones : register(b1) { float4x4 bones[128]; };
-Texture2D    tex        : register(t0);
-Texture2D    shadowMap  : register(t1);
-SamplerState samp       : register(s0);
-SamplerComparisonState shadowSamp : register(s1);
 struct VSIn {
     float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD;
     uint4 bidx:BLENDINDICES; float4 bw:BLENDWEIGHT;
 };
-struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; float3 wpos:WPOS; };
 PSIn VSMain(VSIn i) {
     PSIn o;
     float4 p = float4(i.pos, 1.0);
@@ -53,37 +41,17 @@ PSIn VSMain(VSIn i) {
     o.col = i.col; o.uv = i.uv;
     return o;
 }
-float ShadowFactor(float3 wpos) {
-    float4 lp = mul(float4(wpos, 1.0), lightViewProj);
-    lp.xyz /= lp.w;
-    float2 uv = lp.xy * float2(0.5, -0.5) + 0.5;
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 1.0;
-    float depth = lp.z - 0.0025;
-    float texel = 1.0 / 2048.0;
-    float sum = 0.0;
-    [unroll] for (int y = -1; y <= 1; ++y)
-    [unroll] for (int x = -1; x <= 1; ++x)
-        sum += shadowMap.SampleCmpLevelZero(shadowSamp, uv + float2(x, y) * texel, depth);
-    return sum / 9.0;
-}
-float4 PSMain(PSIn i) : SV_TARGET {
-    float3 n = normalize(i.nrm);
-    float3 l = normalize(-lightDir.xyz);
-    float  d = saturate(dot(n, l));
-    float  sh = (params.z > 0.5) ? ShadowFactor(i.wpos) : 1.0;
-    float4 t = tex.Sample(samp, i.uv);
-    float3 base = t.rgb * i.col.rgb * color.rgb;
-    float3 c = base * (params.x + d * params.y * sh) * lightColor.rgb;
-    return float4(c, 1.0);
-}
 )";
     }
 
     bool SkinnedMeshShader::Initialize(ID3D11Device* device)
     {
-        ComPtr<ID3DBlob> vsB, psB, err;
-        if (FAILED(D3DCompile(kHLSL, strlen(kHLSL), "skinned", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, vsB.GetAddressOf(), err.GetAddressOf()))) return false;
-        if (FAILED(D3DCompile(kHLSL, strlen(kHLSL), "skinned", nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, psB.GetAddressOf(), err.ReleaseAndGetAddressOf()))) return false;
+        // 共通部分 ＋ 自分の頂点シェーダ、の順に連結する（PSIn が先に宣言されている必要がある）
+        const std::string source = std::string(kShaderCommonHLSL) + kSkinnedVS;
+
+        ComPtr<ID3DBlob> vsB, psB;
+        if (!CompileShaderSource(source, "skinned", "VSMain", "vs_5_0", vsB.GetAddressOf())) return false;
+        if (!CompileShaderSource(source, "skinned", "PSMain", "ps_5_0", psB.GetAddressOf())) return false;
         if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
         if (FAILED(device->CreatePixelShader(psB->GetBufferPointer(), psB->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
 
@@ -97,7 +65,7 @@ float4 PSMain(PSIn i) : SV_TARGET {
         };
         if (FAILED(device->CreateInputLayout(il, 6, vsB->GetBufferPointer(), vsB->GetBufferSize(), layout.GetAddressOf()))) return false;
 
-        D3D11_BUFFER_DESC od = {}; od.Usage = D3D11_USAGE_DEFAULT; od.ByteWidth = sizeof(ObjCB); od.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        D3D11_BUFFER_DESC od = {}; od.Usage = D3D11_USAGE_DEFAULT; od.ByteWidth = sizeof(ObjectCB); od.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(device->CreateBuffer(&od, nullptr, objCB.GetAddressOf()))) return false;
         D3D11_BUFFER_DESC bd = {}; bd.Usage = D3D11_USAGE_DEFAULT; bd.ByteWidth = sizeof(BoneCB); bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(device->CreateBuffer(&bd, nullptr, boneCB.GetAddressOf()))) return false;
@@ -105,12 +73,15 @@ float4 PSMain(PSIn i) : SV_TARGET {
         D3D11_RASTERIZER_DESC rd = {}; rd.FillMode = D3D11_FILL_SOLID; rd.CullMode = D3D11_CULL_NONE; rd.DepthClipEnable = TRUE;
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
 
+        // 通常のサンプラ（s0）。静的メッシュ側と同じ設定。
         D3D11_SAMPLER_DESC sd = {};
         sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
         sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
         if (FAILED(device->CreateSamplerState(&sd, sampler.GetAddressOf()))) return false;
 
-        // 影用の比較サンプラ（静的メッシュ側と同じ設定）
+        // 影用の比較サンプラ（s1）。静的メッシュ側と同じ設定。
         D3D11_SAMPLER_DESC ssd = {};
         ssd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
         ssd.AddressU = ssd.AddressV = ssd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
@@ -118,6 +89,7 @@ float4 PSMain(PSIn i) : SV_TARGET {
         ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
         if (FAILED(device->CreateSamplerState(&ssd, shadowSampler.GetAddressOf()))) return false;
 
+        // 1x1 の白テクスチャ（テクスチャを持たないサブメッシュ用）
         uint32_t white = 0xFFFFFFFF;
         D3D11_TEXTURE2D_DESC wd = {}; wd.Width = wd.Height = 1; wd.MipLevels = 1; wd.ArraySize = 1;
         wd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; wd.SampleDesc.Count = 1; wd.Usage = D3D11_USAGE_IMMUTABLE; wd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -130,11 +102,12 @@ float4 PSMain(PSIn i) : SV_TARGET {
 
     void SkinnedMeshShader::Draw(ID3D11DeviceContext* ctx, const SkinnedRenderModel& model,
         const XMFLOAT4X4& world, const XMFLOAT4X4& viewProj, const XMFLOAT4& color,
+        const ShadingParams& shading,
         const std::vector<XMFLOAT4X4>& palette)
     {
         if (!model.Valid()) return;
 
-        ObjCB o;
+        ObjectCB o;
         XMStoreFloat4x4(&o.world, XMMatrixTranspose(XMLoadFloat4x4(&world)));
         XMStoreFloat4x4(&o.viewProj, XMMatrixTranspose(XMLoadFloat4x4(&viewProj)));
         XMStoreFloat4x4(&o.lightViewProj, XMMatrixTranspose(XMLoadFloat4x4(&lightViewProj)));
@@ -142,6 +115,7 @@ float4 PSMain(PSIn i) : SV_TARGET {
         o.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
         o.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
         o.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
+        FillShading(o, shading);
         ctx->UpdateSubresource(objCB.Get(), 0, nullptr, &o, 0, 0);
 
         BoneCB b;

@@ -12,9 +12,10 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
    - ファイルを読む・検索する・ビルドして原因を調べる、は行ってよい。
    - 誤って編集した場合は、すぐ元に戻して報告する。
 3. **`.vcxproj` の設定を変えない。** 新しいファイルは、ユーザーが Visual Studio のソリューションエクスプローラーから追加する。
-4. **新しいファイル名は、既存（旧コードを含む）と重複させない。**
-   - 同名の `.cpp` があると obj が衝突する（MSB8027 / LNK4042 / LNK2019）。
-   - 提案前に `Source/` 全体を検索して確認する。衝突しそうなら `Engine` を頭に付ける（例：`EngineSkybox`、`EngineShadowMap`、`EngineNavGrid`）。
+4. **新しい `.cpp` のファイル名は、フォルダが違っても重複させない。**
+   - obj は1つのフォルダにまとめて出力されるので、同名の `.cpp` があると衝突する（MSB8027 / LNK4042 / LNK2019）。
+   - 提案前に `Source/` 全体を検索して確認する。
+   - `EngineSkybox`、`EngineShadowMap`、`EngineNavGrid` の `Engine` は、旧コードとの衝突を避けるために付けた名前（旧コードは削除済みだが、名前はそのまま使う）。
 5. **ユーザーが付けた名前を使う。** `PlayerComponent`、`OpponentComponent`、`HPComponent` など。勝手に別名にしない。
 
 ---
@@ -75,16 +76,24 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 
 ## 4. コードの構成
 
-新しいエンジンは `Source/Engine/`（名前空間 `uel`）。
-`Source/` 直下の `AI` `Camera` `Core` `GameObject` `Graphics` `Physics` `Scene` `UI` は**旧コード**で、参照用に残してある（ビルドには入るが使っていない）。旧コードは触らない。
+エンジンは `Source/Engine/`（名前空間 `uel`）。開始点（`wWinMain`）だけ `Source/Core/Main.cpp` にある。
+
+**旧コードは削除済み**（コミット `8781c76`）。昔の実装（BehaviorTree、旧シェーダクラス、SphereCast など）を参考にしたいときは、削除直前のコミット `2df15d7` から読める：
+```
+git show 2df15d7:Source/AI/BehaviorTree.cpp
+```
+
+`Shader/` フォルダ（PBR / Toon / Lambert などの `.hlsl` / `.hlsli`）は**参考用に残してある**。ビルド時にコンパイルされて `Data/CompiledShader/*.cso` が出力されるが、**実行時には使っていない**（今のエンジンは C++ 内の文字列からシェーダをコンパイルしている）。旧エンジンの定数バッファや頂点形式に合わせて書かれているので、そのままでは今のエンジンに載らない。
 
 ```
+Source/Core/Main.cpp   開始点（wWinMain → uel::Engine）
 Source/Engine/
-  Core/          Engine（メインループ、Scene管理、Play開始/停止/Scene遷移）、Main
+  Core/          Engine（メインループ、Scene管理、Play開始/停止/Scene遷移）
   Platform/      Window
   Graphics/      GraphicsDevice, RenderTexture, Mesh, MeshShader, EngineSkybox,
                  EngineShadowMap, SkinnedRenderModel, SkinnedMeshShader, SceneLighting
-  Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache
+  Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache,
+                 TinyGltfImpl（tinygltf / stb_image の実装の埋め込み。プロジェクトで1か所だけ）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズ評価）
   Scene/         EntityId, Entity, World, Component,
                  Transform / MeshRenderer / HP / SkinnedMesh / PrefabInstance の各Component
@@ -210,6 +219,10 @@ Source/Engine/
 
 ## 9. 既知の制限・気づいている問題
 
+- 使われていないファイルが3つ残っている：`Graphics/CubeRenderer.cpp` / `.h`（初期の名残り）、`Editor/TransformSnapshot.h`（`TransformEdit.h` と中身が同じ複製。両方 include すると二重定義になる）。消してよい。
+- `Game.vcxproj` に、存在しないファイル `External\SphereCast\Include\SphereCast.h` の登録が残っている（ビルドには影響しない）。
+- `Data/CompiledShader/*.cso` は Git で管理されているビルド出力。ビルドするたびに「変更あり」になることがある。
+- 外部ライブラリの Tracy / DirectXTex、`imgui_demo.cpp` は、今のエンジンからは使われていない。
 - `MeshShader` の通常サンプラ（`s0`）が**作られないまま**バインドされている（既定の設定で動いているだけ）。シェーダを作り直すときに直す。
 - `GraphicsDevice.cpp` の `Present(0, 0)` は VSync オフだが、横のコメントは「VSync ON」のまま。
 - ヒットボックスは体の中心線に固定。ボーン（頭など）に追従しない。
