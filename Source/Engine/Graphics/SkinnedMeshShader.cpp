@@ -2,6 +2,7 @@
 #include "Engine/Graphics/SkinnedRenderModel.h"
 #include <d3dcompiler.h>
 #include <cstdint>
+#include <cstring>
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -11,26 +12,29 @@ using Microsoft::WRL::ComPtr;
 namespace uel {
     namespace {
         constexpr int kMaxBones = 128;
-        struct ObjCB { XMFLOAT4X4 world, viewProj; XMFLOAT4 color, lightDir, lightColor, params; };
+        struct ObjCB { XMFLOAT4X4 world, viewProj, lightViewProj; XMFLOAT4 color, lightDir, lightColor, params; };
         struct BoneCB { XMFLOAT4X4 bones[kMaxBones]; };
 
         const char* kHLSL = R"(
 cbuffer Obj : register(b0) {
     float4x4 world;
     float4x4 viewProj;
+    float4x4 lightViewProj;
     float4   color;
     float4   lightDir;
     float4   lightColor;
-    float4   params; // x=ambient y=intensity
+    float4   params; // x=ambient y=intensity z=shadowEnabled
 };
 cbuffer Bones : register(b1) { float4x4 bones[128]; };
-Texture2D    tex  : register(t0);
-SamplerState samp : register(s0);
+Texture2D    tex        : register(t0);
+Texture2D    shadowMap  : register(t1);
+SamplerState samp       : register(s0);
+SamplerComparisonState shadowSamp : register(s1);
 struct VSIn {
     float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD;
     uint4 bidx:BLENDINDICES; float4 bw:BLENDWEIGHT;
 };
-struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
+struct PSIn { float4 pos:SV_POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; float3 wpos:WPOS; };
 PSIn VSMain(VSIn i) {
     PSIn o;
     float4 p = float4(i.pos, 1.0);
@@ -43,18 +47,33 @@ PSIn VSMain(VSIn i) {
     }
     if (wsum < 1e-4) { sp = i.pos; sn = i.nrm; }
     float4 wp = mul(float4(sp, 1.0), world);
+    o.wpos = wp.xyz;
     o.pos = mul(wp, viewProj);
     o.nrm = mul(sn, (float3x3)world);
     o.col = i.col; o.uv = i.uv;
     return o;
 }
+float ShadowFactor(float3 wpos) {
+    float4 lp = mul(float4(wpos, 1.0), lightViewProj);
+    lp.xyz /= lp.w;
+    float2 uv = lp.xy * float2(0.5, -0.5) + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 1.0;
+    float depth = lp.z - 0.0025;
+    float texel = 1.0 / 2048.0;
+    float sum = 0.0;
+    [unroll] for (int y = -1; y <= 1; ++y)
+    [unroll] for (int x = -1; x <= 1; ++x)
+        sum += shadowMap.SampleCmpLevelZero(shadowSamp, uv + float2(x, y) * texel, depth);
+    return sum / 9.0;
+}
 float4 PSMain(PSIn i) : SV_TARGET {
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz);
     float  d = saturate(dot(n, l));
+    float  sh = (params.z > 0.5) ? ShadowFactor(i.wpos) : 1.0;
     float4 t = tex.Sample(samp, i.uv);
     float3 base = t.rgb * i.col.rgb * color.rgb;
-    float3 c = base * (params.x + d * params.y) * lightColor.rgb;
+    float3 c = base * (params.x + d * params.y * sh) * lightColor.rgb;
     return float4(c, 1.0);
 }
 )";
@@ -64,7 +83,7 @@ float4 PSMain(PSIn i) : SV_TARGET {
     {
         ComPtr<ID3DBlob> vsB, psB, err;
         if (FAILED(D3DCompile(kHLSL, strlen(kHLSL), "skinned", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, vsB.GetAddressOf(), err.GetAddressOf()))) return false;
-        if (FAILED(D3DCompile(kHLSL, strlen(kHLSL), "skinned", nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, psB.GetAddressOf(), err.GetAddressOf()))) return false;
+        if (FAILED(D3DCompile(kHLSL, strlen(kHLSL), "skinned", nullptr, nullptr, "PSMain", "ps_5_0", 0, 0, psB.GetAddressOf(), err.ReleaseAndGetAddressOf()))) return false;
         if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
         if (FAILED(device->CreatePixelShader(psB->GetBufferPointer(), psB->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
 
@@ -91,6 +110,14 @@ float4 PSMain(PSIn i) : SV_TARGET {
         sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
         if (FAILED(device->CreateSamplerState(&sd, sampler.GetAddressOf()))) return false;
 
+        // 影用の比較サンプラ（静的メッシュ側と同じ設定）
+        D3D11_SAMPLER_DESC ssd = {};
+        ssd.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+        ssd.AddressU = ssd.AddressV = ssd.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+        ssd.BorderColor[0] = ssd.BorderColor[1] = ssd.BorderColor[2] = ssd.BorderColor[3] = 1.0f;
+        ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
+        if (FAILED(device->CreateSamplerState(&ssd, shadowSampler.GetAddressOf()))) return false;
+
         uint32_t white = 0xFFFFFFFF;
         D3D11_TEXTURE2D_DESC wd = {}; wd.Width = wd.Height = 1; wd.MipLevels = 1; wd.ArraySize = 1;
         wd.Format = DXGI_FORMAT_R8G8B8A8_UNORM; wd.SampleDesc.Count = 1; wd.Usage = D3D11_USAGE_IMMUTABLE; wd.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -110,10 +137,11 @@ float4 PSMain(PSIn i) : SV_TARGET {
         ObjCB o;
         XMStoreFloat4x4(&o.world, XMMatrixTranspose(XMLoadFloat4x4(&world)));
         XMStoreFloat4x4(&o.viewProj, XMMatrixTranspose(XMLoadFloat4x4(&viewProj)));
+        XMStoreFloat4x4(&o.lightViewProj, XMMatrixTranspose(XMLoadFloat4x4(&lightViewProj)));
         o.color = color;
         o.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
         o.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
-        o.params = XMFLOAT4(lightAmbient, lightIntensity, 0.0f, 0.0f);
+        o.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
         ctx->UpdateSubresource(objCB.Get(), 0, nullptr, &o, 0, 0);
 
         BoneCB b;
@@ -130,6 +158,8 @@ float4 PSMain(PSIn i) : SV_TARGET {
         ctx->PSSetConstantBuffers(0, 1, cbs);
         ctx->RSSetState(raster.Get());
         ctx->PSSetSamplers(0, 1, sampler.GetAddressOf());
+        ctx->PSSetShaderResources(1, 1, &shadowSRV);
+        ctx->PSSetSamplers(1, 1, shadowSampler.GetAddressOf());
 
         model.Bind(ctx);
         const auto& subs = model.Submeshes();
@@ -146,6 +176,13 @@ float4 PSMain(PSIn i) : SV_TARGET {
     {
         lightDir = light.direction; lightColor = light.color;
         lightAmbient = light.ambient; lightIntensity = light.intensity;
+    }
+
+    void SkinnedMeshShader::SetShadow(ID3D11ShaderResourceView* srv, const XMFLOAT4X4& lvp)
+    {
+        shadowSRV = srv;
+        lightViewProj = lvp;
+        shadowEnabled = (srv != nullptr);
     }
 
 } // namespace uel

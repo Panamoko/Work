@@ -407,7 +407,7 @@ namespace uel {
         // シャドウパス
         shadowMap.BeginPass(context, lightVP);
         RenderSystem::RenderShadow(world, shadowMap, *cubeMesh, cache, device, context);
-
+        RenderSystem::RenderShadowSkinned(world, shadowMap, GlobalSkinnedCache(), device, context);
         // 本描画
         rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
         if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
@@ -422,6 +422,7 @@ namespace uel {
         shader.SetShadow(shadowMap.GetSRV(), lightVP);
         RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
         skinnedShader.SetLight(lighting);
+        skinnedShader.SetShadow(shadowMap.GetSRV(), lightVP);
         RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
         // シャドウSRVを外す（次フレームのシャドウ書き込みと競合させない）
         ID3D11ShaderResourceView* nul = nullptr;

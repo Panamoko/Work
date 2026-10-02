@@ -1,5 +1,6 @@
 #include "Engine/Graphics/EngineShadowMap.h"
 #include "Engine/Graphics/Mesh.h"
+#include "Engine/Graphics/SkinnedRenderModel.h"
 #include <d3dcompiler.h>
 #include <cstring>
 #pragma comment(lib, "d3dcompiler.lib")
@@ -9,11 +10,33 @@ using Microsoft::WRL::ComPtr;
 
 namespace uel {
     namespace {
+        constexpr int kMaxBones = 128;
         struct SCB { XMFLOAT4X4 lightViewProj; XMFLOAT4X4 world; };
+        struct BoneCB { XMFLOAT4X4 bones[kMaxBones]; };
+
         const char* kVS = R"(
 cbuffer CB : register(b0) { float4x4 lightViewProj; float4x4 world; };
 float4 VSMain(float3 pos : POSITION) : SV_POSITION {
     float4 wp = mul(float4(pos, 1.0), world);
+    return mul(wp, lightViewProj);
+}
+)";
+
+        // スキンド用：ボーンで変形してから光の視点へ
+        const char* kSkinnedVS = R"(
+cbuffer CB    : register(b0) { float4x4 lightViewProj; float4x4 world; };
+cbuffer Bones : register(b1) { float4x4 bones[128]; };
+struct VSIn { float3 pos : POSITION; uint4 bidx : BLENDINDICES; float4 bw : BLENDWEIGHT; };
+float4 VSMain(VSIn i) : SV_POSITION {
+    float4 p = float4(i.pos, 1.0);
+    float3 sp = 0; float wsum = 0;
+    [unroll] for (int k = 0; k < 4; ++k) {
+        float w = i.bw[k];
+        sp += w * mul(p, bones[i.bidx[k]]).xyz;
+        wsum += w;
+    }
+    if (wsum < 1e-4) sp = i.pos;
+    float4 wp = mul(float4(sp, 1.0), world);
     return mul(wp, lightViewProj);
 }
 )";
@@ -38,12 +61,12 @@ float4 VSMain(float3 pos : POSITION) : SV_POSITION {
         svd.Format = DXGI_FORMAT_R32_FLOAT; svd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D; svd.Texture2D.MipLevels = 1;
         if (FAILED(device->CreateShaderResourceView(tex.Get(), &svd, srv.GetAddressOf()))) return false;
 
-        // 深度専用VS
+        // 深度専用VS（静的メッシュ）
         ComPtr<ID3DBlob> vsB, err;
         if (FAILED(D3DCompile(kVS, strlen(kVS), "shadow", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, vsB.GetAddressOf(), err.GetAddressOf()))) return false;
         if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
 
-        // POSITIONのみの入力レイアウト（頂点stride 48でも先頭のposを読む）
+        // POSITIONのみの入力レイアウト（頂点の先頭にあるposだけ読む）
         D3D11_INPUT_ELEMENT_DESC il[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
@@ -51,6 +74,22 @@ float4 VSMain(float3 pos : POSITION) : SV_POSITION {
 
         D3D11_BUFFER_DESC cbd = {}; cbd.Usage = D3D11_USAGE_DEFAULT; cbd.ByteWidth = sizeof(SCB); cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(device->CreateBuffer(&cbd, nullptr, cb.GetAddressOf()))) return false;
+
+        // 深度専用VS（スキンドメッシュ）
+        ComPtr<ID3DBlob> svsB;
+        if (FAILED(D3DCompile(kSkinnedVS, strlen(kSkinnedVS), "shadowSkinned", nullptr, nullptr, "VSMain", "vs_5_0", 0, 0, svsB.GetAddressOf(), err.ReleaseAndGetAddressOf()))) return false;
+        if (FAILED(device->CreateVertexShader(svsB->GetBufferPointer(), svsB->GetBufferSize(), nullptr, skinnedVS.GetAddressOf()))) return false;
+
+        // SkinnedVertex（80バイト）のうち、位置・ボーン番号・ウェイトだけ読む
+        D3D11_INPUT_ELEMENT_DESC sil[] = {
+            { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        };
+        if (FAILED(device->CreateInputLayout(sil, 3, svsB->GetBufferPointer(), svsB->GetBufferSize(), skinnedLayout.GetAddressOf()))) return false;
+
+        D3D11_BUFFER_DESC bbd = {}; bbd.Usage = D3D11_USAGE_DEFAULT; bbd.ByteWidth = sizeof(BoneCB); bbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        if (FAILED(device->CreateBuffer(&bbd, nullptr, boneCB.GetAddressOf()))) return false;
         return true;
     }
 
@@ -62,8 +101,6 @@ float4 VSMain(float3 pos : POSITION) : SV_POSITION {
         ctx->ClearDepthStencilView(dsv.Get(), D3D11_CLEAR_DEPTH, 1.0f, 0);
         D3D11_VIEWPORT vp = {}; vp.Width = (float)size; vp.Height = (float)size; vp.MaxDepth = 1.0f;
         ctx->RSSetViewports(1, &vp);
-        ctx->IASetInputLayout(layout.Get());
-        ctx->VSSetShader(vs.Get(), nullptr, 0);
         ctx->PSSetShader(nullptr, nullptr, 0);   // 深度のみ
     }
 
@@ -74,10 +111,40 @@ float4 VSMain(float3 pos : POSITION) : SV_POSITION {
         XMStoreFloat4x4(&d.lightViewProj, XMMatrixTranspose(XMLoadFloat4x4(&lightVP)));
         XMStoreFloat4x4(&d.world, XMMatrixTranspose(XMLoadFloat4x4(&world)));
         ctx->UpdateSubresource(cb.Get(), 0, nullptr, &d, 0, 0);
+
+        ctx->IASetInputLayout(layout.Get());          // 静的とスキンドが混ざるので毎回設定する
+        ctx->VSSetShader(vs.Get(), nullptr, 0);
         ctx->VSSetConstantBuffers(0, 1, cb.GetAddressOf());
 
         mesh.Bind(ctx);
         for (const auto& sm : mesh.GetSubmeshes()) {
+            if (sm.indexCount == 0) continue;
+            ctx->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
+        }
+    }
+
+    void EngineShadowMap::DrawSkinned(ID3D11DeviceContext* ctx, const SkinnedRenderModel& model,
+        const XMFLOAT4X4& world, const std::vector<XMFLOAT4X4>& palette)
+    {
+        if (!model.Valid()) return;
+        SCB d;
+        XMStoreFloat4x4(&d.lightViewProj, XMMatrixTranspose(XMLoadFloat4x4(&lightVP)));
+        XMStoreFloat4x4(&d.world, XMMatrixTranspose(XMLoadFloat4x4(&world)));
+        ctx->UpdateSubresource(cb.Get(), 0, nullptr, &d, 0, 0);
+
+        BoneCB b;
+        int n = (int)palette.size(); if (n > kMaxBones) n = kMaxBones;
+        for (int i = 0; i < n; ++i) XMStoreFloat4x4(&b.bones[i], XMMatrixTranspose(XMLoadFloat4x4(&palette[i])));
+        for (int i = n; i < kMaxBones; ++i) XMStoreFloat4x4(&b.bones[i], XMMatrixIdentity());
+        ctx->UpdateSubresource(boneCB.Get(), 0, nullptr, &b, 0, 0);
+
+        ctx->IASetInputLayout(skinnedLayout.Get());
+        ctx->VSSetShader(skinnedVS.Get(), nullptr, 0);
+        ID3D11Buffer* cbs[2] = { cb.Get(), boneCB.Get() };
+        ctx->VSSetConstantBuffers(0, 2, cbs);
+
+        model.Bind(ctx);
+        for (const auto& sm : model.Submeshes()) {
             if (sm.indexCount == 0) continue;
             ctx->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
         }

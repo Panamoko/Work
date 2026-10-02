@@ -69,4 +69,28 @@ namespace uel {
             shader.Draw(context, *model, t->GetWorldMatrix(), viewProj, sk->color, palette);
         }
     }
+
+    void RenderSystem::RenderShadowSkinned(World& world, EngineShadowMap& shadow, SkinnedModelCache& cache,
+        ID3D11Device* device, ID3D11DeviceContext* context)
+    {
+        std::vector<DirectX::XMFLOAT4X4> palette;
+        for (const auto& slot : world.Slots()) {
+            if (!slot) continue;
+            Entity* e = slot.get();
+            auto* t = e->GetComponent<TransformComponent>();
+            auto* sk = e->GetComponent<SkinnedMeshComponent>();
+            if (!t || !sk || !sk->visible || sk->assetPath.empty()) continue;
+
+            auto model = cache.GetOrLoad(device, sk->assetPath, sk->animPath);
+            if (!model || !model->Valid()) continue;
+
+            const auto& clips = model->Cpu().clips;
+            const AnimationClip* clip =
+                (sk->clipIndex >= 0 && sk->clipIndex < (int)clips.size()) ? &clips[sk->clipIndex] : nullptr;
+
+            EvaluatePalette(model->Cpu().skeleton, clip, sk->time, palette);   // –{•`‰æ‚Æ“¯‚¶Žp¨‚Å‰e‚ð—Ž‚Æ‚·
+            shadow.DrawSkinned(context, *model, t->GetWorldMatrix(), palette);
+        }
+    }
+
 } // namespace uel

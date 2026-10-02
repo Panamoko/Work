@@ -22,7 +22,8 @@ namespace uel {
             MeshCache& cache, ID3D11Device* device, ID3D11DeviceContext* context);
         static void RenderSkinned(World& world, SkinnedMeshShader& shader, SkinnedModelCache& cache,
             ID3D11Device* device, ID3D11DeviceContext* context, const DirectX::XMFLOAT4X4& viewProj);   // Åöí«â¡
-
+        static void RenderShadowSkinned(World& world, EngineShadowMap& shadow, SkinnedModelCache& cache,
+            ID3D11Device* device, ID3D11DeviceContext* context);
 
 
     };
