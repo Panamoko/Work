@@ -169,7 +169,7 @@ namespace uel {
             DrawHierarchyPanel(world, selected, history);                 // パネルは編集World
             DrawInspectorPanel(world, selected, history, inspectorSession, meshCache, graphics->GetDevice());
             DrawAssetBrowserPanel(world, selected, history);
-            DrawEnvironmentPanel(lighting);
+            DrawEnvironmentPanel(lighting, postSettings);
             DrawAnimationEditorPanel(world, selected, graphics->GetDevice());
             DrawNavGridPanel(world);
             // Prefab が Apply されたら、全Sceneの同じPrefabのインスタンスへ反映
@@ -178,7 +178,7 @@ namespace uel {
                 for (auto& s : scenes) StageSerializer::RefreshPrefabInstances(s.world, refreshed.c_str());
             Update();
 
-            viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting);
+            viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting, postSettings);
             graphics->BeginFrame(0.10f, 0.12f, 0.15f, 1.0f);
             imgui->EndFrame();
             graphics->EndFrame();

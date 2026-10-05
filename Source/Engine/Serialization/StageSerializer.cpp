@@ -1,4 +1,4 @@
-#include "Engine/Serialization/StageSerializer.h"
+ï»¿#include "Engine/Serialization/StageSerializer.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include <filesystem>
+#include <cmath>
 #include <cereal/archives/json.hpp>
 #include <cereal/types/vector.hpp>
 #include <cereal/types/string.hpp>
@@ -49,9 +50,18 @@ namespace uel {
             }
         };
 
-        // “Ç‚İ‚İ’†ƒtƒ@ƒCƒ‹‚Ì schemaVersioni•Û‘¶‚ÍÅVjBŒÃ‚¢”Å‚É–³‚¢€–Ú‚Í“Ç‚Ü‚È‚¢
-        constexpr int kSchemaLatest = 14;
+        // èª­ã¿è¾¼ã¿ä¸­ãƒ•ã‚¡ã‚¤ãƒ«ã® schemaVersionï¼ˆä¿å­˜æ™‚ã¯æœ€æ–°ï¼‰ã€‚å¤ã„ç‰ˆã«ç„¡ã„é …ç›®ã¯èª­ã¾ãªã„
+        constexpr int kSchemaLatest = 16;
         int g_loadSchema = kSchemaLatest;
+
+        // ç‰ˆ 12ã€œ15 ã®ãƒ•ã‚¡ã‚¤ãƒ«ã¯ã€ŒSpecular Powerã€ã§ä¿å­˜ã•ã‚Œã¦ã„ã‚‹ã€‚ç‰ˆ 16 ã‹ã‚‰ã® roughness ã«æ›ç®—ã™ã‚‹ã€‚
+        // ã‚·ã‚§ãƒ¼ãƒ€å´ã®å¼ï¼ˆpower = 2 / roughness^4 - 2ï¼‰ã‚’é€†ã«ã—ãŸã‚‚ã®ã€‚Power 32 ãŒ roughness ç´„ 0.49 ã«ãªã‚‹ã€‚
+        float RoughnessFromSpecularPower(float power)
+        {
+            if (power < 0.0f) power = 0.0f;
+            float r = std::pow(2.0f / (power + 2.0f), 0.25f);
+            return (r < 0.05f) ? 0.05f : ((r > 1.0f) ? 1.0f : r);
+        }
 
         struct EntityDTO {
             std::string name; TransformDTO transform;
@@ -65,7 +75,7 @@ namespace uel {
             bool  hasNavObs = false; float navHalfX = 1.0f; float navHalfZ = 1.0f;
             bool  hasUI = false; std::string uiTitle, uiSub, uiButton, uiNext; bool uiShowResult = false;
             bool  hasRule = false; std::string ruleWin, ruleLose; float ruleDelay = 2.0f;
-            std::string prefabPath;   // ‹ó‚Å‚È‚¯‚ê‚ÎPrefab‚ÌƒCƒ“ƒXƒ^ƒ“ƒX
+            std::string prefabPath;   // ç©ºã§ãªã‘ã‚Œã°Prefabã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹
             bool  hasHitbox = false;
             float hbBodyBottom = 0.3f, hbBodyTop = 1.3f, hbBodyRadius = 0.35f;
             float hbHeadHeight = 1.6f, hbHeadRadius = 0.22f, hbHeadMul = 2.0f;
@@ -79,6 +89,9 @@ namespace uel {
             Vec3DTO shToonShade{ 0.6f, 0.6f, 0.7f };
             float shOutlineWidth = 0.0f;
             Vec3DTO shOutlineColor{ 0.05f, 0.05f, 0.05f };
+            float shToonTexSteps = 0.0f, shToonTexSmooth = 0.0f;
+            float shMetallic = 0.0f;
+            float shRoughness = -1.0f;   // ãƒã‚¤ãƒŠã‚¹ã®ã¾ã¾ï¼ãƒ•ã‚¡ã‚¤ãƒ«ã«ç„¡ã‹ã£ãŸï¼ˆç‰ˆ 15 ä»¥å‰ï¼‰ã€‚FromDTO ã§ shSpecPower ã‹ã‚‰æ›ç®—ã™ã‚‹
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -102,15 +115,18 @@ namespace uel {
                         CEREAL_NVP(spInterval), CEREAL_NVP(spFirstDelay), CEREAL_NVP(spWaveDelay), CEREAL_NVP(spRadius));   // v10
                 if (g_loadSchema >= 11) ar(CEREAL_NVP(hasShader), CEREAL_NVP(shMode), CEREAL_NVP(shReceiveShadow)); // v11
                 if (g_loadSchema >= 12)
-                    ar(CEREAL_NVP(shSpecStrength), CEREAL_NVP(shSpecPower),
+                    ar(CEREAL_NVP(shSpecStrength),
                         CEREAL_NVP(shRimStrength), CEREAL_NVP(shRimPower), CEREAL_NVP(shRimColor));             // v12
+                if (g_loadSchema >= 12 && g_loadSchema <= 15) ar(CEREAL_NVP(shSpecPower));                      // v12ã€œ15 ã ã‘ï¼ˆv16 ã§ shRoughness ã«ç½®ãæ›ãˆï¼‰
                 if (g_loadSchema >= 13)
                     ar(CEREAL_NVP(shToonThreshold), CEREAL_NVP(shToonSoftness), CEREAL_NVP(shToonShade));       // v13
                 if (g_loadSchema >= 14) ar(CEREAL_NVP(shOutlineWidth), CEREAL_NVP(shOutlineColor));             // v14
+                if (g_loadSchema >= 15) ar(CEREAL_NVP(shToonTexSteps), CEREAL_NVP(shToonTexSmooth));            // v15
+                if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));                    // v16
             }
         };
 
-        // Entity ¨ •Û‘¶ƒf[ƒ^iScene•Û‘¶‚ÆPrefab•Û‘¶‚Å‹¤—pj
+        // Entity â†’ ä¿å­˜ãƒ‡ãƒ¼ã‚¿ï¼ˆSceneä¿å­˜ã¨Prefabä¿å­˜ã§å…±ç”¨ï¼‰
         EntityDTO ToDTO(const Entity& e, const TransformComponent& t)
         {
             EntityDTO ed;
@@ -160,11 +176,13 @@ namespace uel {
                 ed.hasShader = true;
                 ed.shMode = (int)shc->params.mode;
                 ed.shReceiveShadow = shc->params.receiveShadow;
-                ed.shSpecStrength = shc->params.specularStrength; ed.shSpecPower = shc->params.specularPower;
+                ed.shSpecStrength = shc->params.specularStrength;
+                ed.shMetallic = shc->params.metallic; ed.shRoughness = shc->params.roughness;
                 ed.shRimStrength = shc->params.rimStrength; ed.shRimPower = shc->params.rimPower;
                 ed.shRimColor = { shc->params.rimColor.x, shc->params.rimColor.y, shc->params.rimColor.z };
                 ed.shToonThreshold = shc->params.toonThreshold; ed.shToonSoftness = shc->params.toonSoftness;
                 ed.shToonShade = { shc->params.toonShadeColor.x, shc->params.toonShadeColor.y, shc->params.toonShadeColor.z };
+                ed.shToonTexSteps = shc->params.toonTexSteps; ed.shToonTexSmooth = shc->params.toonTexSmooth;
                 ed.shOutlineWidth = shc->params.outlineWidth;
                 ed.shOutlineColor = { shc->params.outlineColor.x, shc->params.outlineColor.y, shc->params.outlineColor.z };
             }
@@ -173,7 +191,7 @@ namespace uel {
             return ed;
         }
 
-        // •Û‘¶ƒf[ƒ^ ¨ Entity ‚ÉƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ•t‚¯‚éi–¼‘O‚ÍŒÄ‚Ño‚µ‘¤‚Åİ’èÏ‚İj
+        // ä¿å­˜ãƒ‡ãƒ¼ã‚¿ â†’ Entity ã«ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä»˜ã‘ã‚‹ï¼ˆåå‰ã¯å‘¼ã³å‡ºã—å´ã§è¨­å®šæ¸ˆã¿ï¼‰
         void FromDTO(const EntityDTO& ed, Entity& e)
         {
             auto* t = e.AddComponent<TransformComponent>();
@@ -225,18 +243,21 @@ namespace uel {
                 auto* shc = e.AddComponent<ShaderComponent>();
                 shc->params.mode = (ShadingMode)ed.shMode;
                 shc->params.receiveShadow = ed.shReceiveShadow;
-                shc->params.specularStrength = ed.shSpecStrength; shc->params.specularPower = ed.shSpecPower;
+                shc->params.specularStrength = ed.shSpecStrength;
+                shc->params.metallic = ed.shMetallic;
+                shc->params.roughness = (ed.shRoughness >= 0.0f) ? ed.shRoughness : RoughnessFromSpecularPower(ed.shSpecPower);
                 shc->params.rimStrength = ed.shRimStrength; shc->params.rimPower = ed.shRimPower;
                 shc->params.rimColor = { ed.shRimColor.x, ed.shRimColor.y, ed.shRimColor.z };
                 shc->params.toonThreshold = ed.shToonThreshold; shc->params.toonSoftness = ed.shToonSoftness;
                 shc->params.toonShadeColor = { ed.shToonShade.x, ed.shToonShade.y, ed.shToonShade.z };
+                shc->params.toonTexSteps = ed.shToonTexSteps; shc->params.toonTexSmooth = ed.shToonTexSmooth;
                 shc->params.outlineWidth = ed.shOutlineWidth;
                 shc->params.outlineColor = { ed.shOutlineColor.x, ed.shOutlineColor.y, ed.shOutlineColor.z };
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
         }
 
-        // Entity‚Ì¡‚ÌTransformiƒCƒ“ƒXƒ^ƒ“ƒX‚²‚Æ‚Éc‚·’lj
+        // Entityã®ä»Šã®Transformï¼ˆã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã”ã¨ã«æ®‹ã™å€¤ï¼‰
         TransformDTO CurrentTransform(const Entity& e)
         {
             TransformDTO td;
@@ -268,7 +289,7 @@ namespace uel {
             return true;
         }
 
-        // Prefab‚Ì’†g‚ÅEntity‚ğì‚è’¼‚·iTransform‚ÍƒCƒ“ƒXƒ^ƒ“ƒX‘¤‚Ì’l‚ğc‚·j
+        // Prefabã®ä¸­èº«ã§Entityã‚’ä½œã‚Šç›´ã™ï¼ˆTransformã¯ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹å´ã®å€¤ã‚’æ®‹ã™ï¼‰
         void ApplyPrefab(const EntityDTO& prefab, const std::string& path, const TransformDTO& keep, Entity& e)
         {
             EntityDTO d = prefab;
@@ -286,8 +307,8 @@ namespace uel {
             if (!slot) continue;
             const Entity& e = *slot;
             auto* t = e.GetComponent<TransformComponent>();
-            if (!t) continue; // Å’áŒÀ Transform ‚ª‚ ‚é‚à‚Ì‚¾‚¯•Û‘¶
-            entities.push_back(ToDTO(e, *t));   // ƒCƒ“ƒXƒ^ƒ“ƒX‚à‘S“à—e‚ğ•Û‘¶iPrefab‚ª–³‚­‚È‚Á‚½‚Ì•ÛŒ¯j
+            if (!t) continue; // æœ€ä½é™ Transform ãŒã‚ã‚‹ã‚‚ã®ã ã‘ä¿å­˜
+            entities.push_back(ToDTO(e, *t));   // ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚‚å…¨å†…å®¹ã‚’ä¿å­˜ï¼ˆPrefabãŒç„¡ããªã£ãŸæ™‚ã®ä¿é™ºï¼‰
         }
 
         std::ofstream ofs(path);
@@ -297,7 +318,7 @@ namespace uel {
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("schemaVersion", schemaVersion),
             cereal::make_nvp("entities", entities));
-        return true; // ar ”jŠü‚É flush ¨ ofs ƒNƒ[ƒY
+        return true; // ar ç ´æ£„æ™‚ã« flush â†’ ofs ã‚¯ãƒ­ãƒ¼ã‚º
     }
 
     bool StageSerializer::Load(World& world, const char* path)
@@ -310,12 +331,12 @@ namespace uel {
         try {
             cereal::JSONInputArchive ar(ifs);
             ar(cereal::make_nvp("schemaVersion", schemaVersion));
-            g_loadSchema = schemaVersion;                 // ‚±‚Ìƒtƒ@ƒCƒ‹‚Ì”Å‚É‘¶İ‚·‚é€–Ú‚¾‚¯“Ç‚Ş
+            g_loadSchema = schemaVersion;                 // ã“ã®ãƒ•ã‚¡ã‚¤ãƒ«ã®ç‰ˆã«å­˜åœ¨ã™ã‚‹é …ç›®ã ã‘èª­ã‚€
             ar(cereal::make_nvp("entities", entities));
         }
         catch (...) {
             g_loadSchema = kSchemaLatest;
-            return false; // ‰ó‚ê‚½JSON“™‚Í¸”sˆµ‚¢
+            return false; // å£Šã‚ŒãŸJSONç­‰ã¯å¤±æ•—æ‰±ã„
         }
         g_loadSchema = kSchemaLatest;
 
@@ -325,9 +346,9 @@ namespace uel {
             Entity& e = *world.Get(id);
             EntityDTO pd;
             if (!ed.prefabPath.empty() && LoadPrefabDTO(ed.prefabPath, pd))
-                ApplyPrefab(pd, ed.prefabPath, ed.transform, e);   // Prefab‚ÌÅV“à—e{ƒCƒ“ƒXƒ^ƒ“ƒX‚ÌTransform
+                ApplyPrefab(pd, ed.prefabPath, ed.transform, e);   // Prefabã®æœ€æ–°å†…å®¹ï¼‹ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã®Transform
             else
-                FromDTO(ed, e);                                       // ’ÊíEntity^Prefab‚ªŒ©‚Â‚©‚ç‚È‚¢‚Í•Û‘¶“à—e‚Å•œŒ³
+                FromDTO(ed, e);                                       // é€šå¸¸Entityï¼PrefabãŒè¦‹ã¤ã‹ã‚‰ãªã„æ™‚ã¯ä¿å­˜å†…å®¹ã§å¾©å…ƒ
         }
         return true;
     }
@@ -339,7 +360,7 @@ namespace uel {
         std::vector<std::string> list = names;
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("scenes", list));
-        return true; // ar ”jŠü‚É flush
+        return true; // ar ç ´æ£„æ™‚ã« flush
     }
 
     bool StageSerializer::LoadSceneList(std::vector<std::string>& names, const char* path)
@@ -356,14 +377,14 @@ namespace uel {
 
     bool StageSerializer::SavePrefab(const Entity& e, const char* path)
     {
-        TransformComponent identity;                                   // Transform ‚ª–³‚¢Entity—p
+        TransformComponent identity;                                   // Transform ãŒç„¡ã„Entityç”¨
         const TransformComponent* t = e.GetComponent<TransformComponent>();
         EntityDTO ed = ToDTO(e, t ? *t : identity);
-        ed.transform.position = { 0.0f, 0.0f, 0.0f };                  // ˆÊ’u‚Í”z’u‚ÉŒˆ‚ß‚é
-        ed.prefabPath.clear();                                         // Prefab©g‚ÍƒŠƒ“ƒN‚ğ‚½‚È‚¢
+        ed.transform.position = { 0.0f, 0.0f, 0.0f };                  // ä½ç½®ã¯é…ç½®æ™‚ã«æ±ºã‚ã‚‹
+        ed.prefabPath.clear();                                         // Prefabè‡ªèº«ã¯ãƒªãƒ³ã‚¯ã‚’æŒãŸãªã„
 
         std::error_code ec;
-        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);  // Data/Prefabs ‚ğ©“®ì¬
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);  // Data/Prefabs ã‚’è‡ªå‹•ä½œæˆ
 
         std::ofstream ofs(path);
         if (!ofs) return false;
@@ -380,7 +401,7 @@ namespace uel {
         EntityDTO pd;
         if (!LoadPrefabDTO(path, pd)) return false;
         outId = world.CreateEntity(pd.name);
-        ApplyPrefab(pd, path, pd.transform, *world.Get(outId));   // ƒŠƒ“ƒN•t‚«‚Å¶¬iˆÊ’u‚Í0j
+        ApplyPrefab(pd, path, pd.transform, *world.Get(outId));   // ãƒªãƒ³ã‚¯ä»˜ãã§ç”Ÿæˆï¼ˆä½ç½®ã¯0ï¼‰
         return true;
     }
 
@@ -404,7 +425,7 @@ namespace uel {
     {
         auto* pi = e.GetComponent<PrefabInstanceComponent>();
         if (!pi) return false;
-        std::string path = pi->path;           // •”•i‚ğì‚è’¼‚·‚Ì‚Åæ‚ÉƒRƒs[
+        std::string path = pi->path;           // éƒ¨å“ã‚’ä½œã‚Šç›´ã™ã®ã§å…ˆã«ã‚³ãƒ”ãƒ¼
         EntityDTO pd;
         if (!LoadPrefabDTO(path, pd)) return false;
         ApplyPrefab(pd, path, CurrentTransform(e), e);

@@ -275,6 +275,12 @@
     <ClInclude Include="Source\Engine\Scene\ShaderComponent.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\PostProcessSettings.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\PostProcess.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -405,6 +411,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp">
       <Filter>Source\Engine\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\PostProcess.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

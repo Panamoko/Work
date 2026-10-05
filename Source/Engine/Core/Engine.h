@@ -13,6 +13,7 @@
 #include "Engine/Scene/World.h"
 #include "Engine/Graphics/SceneLighting.h"
 #include "Engine/Assets/MeshCache.h"
+#include "Engine/Graphics/PostProcessSettings.h"
 
 namespace uel {
 
@@ -50,6 +51,8 @@ namespace uel {
         MeshCache            meshCache;
         EditorMode           mode = EditorMode::Edit;
         SceneLighting        lighting;
+        PostProcessSettings  postSettings;
+
         std::wstring         baseTitle;          // 元のウィンドウタイトル
         float                titleTimer = 0.0f;  // タイトル更新用タイマー
     };

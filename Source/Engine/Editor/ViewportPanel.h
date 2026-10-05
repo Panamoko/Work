@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Graphics/RenderTexture.h"
+#include "Engine/Graphics/PostProcess.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Graphics/MeshShader.h"
 #include "Engine/Editor/TransformEdit.h"
@@ -27,18 +28,20 @@ namespace uel {
         void DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history,
             bool playMode, MeshCache& cache);
         void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
-            ID3D11Device* device, const SceneLighting& lighting);
+            ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings);
         GameFlow& GetFlow() { return flow; }
 
     private:
-        RenderTexture rt;
+        RenderTexture rt;          // シーンを描く先
+        RenderTexture finalRT;     // ポストプロセス後の画像（Viewport に表示するのはこちら）
+        PostProcess   postProcess;
         MeshShader    shader;
         std::shared_ptr<Mesh> cubeMesh;
 
         EngineSkybox        skybox;
-        EngineShadowMap shadowMap;   
+        EngineShadowMap shadowMap;
         SkinnedMeshShader skinnedShader;
-        EngineNavGrid nav;   
+        EngineNavGrid nav;
         GameFlow flow;
 
         int viewWidth = 16;

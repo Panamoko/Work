@@ -22,6 +22,7 @@
 #include "Engine/Game/HitboxComponent.h"
 #include "Engine/Game/SpawnerComponent.h"
 #include "Engine/Scene/ShaderComponent.h"
+#include "Engine/Graphics/PostProcessSettings.h"
 
 #include <memory>
 #include <imgui.h>
@@ -445,9 +446,13 @@ namespace uel {
                         ImGui::DragFloat("Toon Threshold", &p.toonThreshold, 0.005f, 0.0f, 1.0f);
                         ImGui::DragFloat("Toon Softness", &p.toonSoftness, 0.002f, 0.001f, 0.5f);
                         ImGui::ColorEdit3("Shade Color", &p.toonShadeColor.x);
+                        // Texture simplification. 0 = off for both.
+                        ImGui::DragFloat("Texture Steps", &p.toonTexSteps, 0.05f, 0.0f, 16.0f, "%.0f");
+                        ImGui::DragFloat("Texture Smooth", &p.toonTexSmooth, 0.0005f, 0.0f, 0.05f, "%.4f");
                     }
+                    ImGui::DragFloat("Metallic", &p.metallic, 0.01f, 0.0f, 1.0f);
+                    ImGui::DragFloat("Roughness", &p.roughness, 0.005f, 0.05f, 1.0f);
                     ImGui::DragFloat("Specular Strength", &p.specularStrength, 0.01f, 0.0f, 4.0f);
-                    ImGui::DragFloat("Specular Power", &p.specularPower, 0.5f, 1.0f, 256.0f);
                     ImGui::DragFloat("Rim Strength", &p.rimStrength, 0.01f, 0.0f, 4.0f);
                     ImGui::DragFloat("Rim Power", &p.rimPower, 0.05f, 0.5f, 16.0f);
                     ImGui::ColorEdit3("Rim Color", &p.rimColor.x);
@@ -654,13 +659,29 @@ namespace uel {
         ImGui::End();
     }
 
-    void DrawEnvironmentPanel(SceneLighting& light)
+    void DrawEnvironmentPanel(SceneLighting& light, PostProcessSettings& post)
     {
         ImGui::Begin("Environment");
         ImGui::DragFloat3("Light Dir", &light.direction.x, 0.02f, -1.0f, 1.0f);
         ImGui::ColorEdit3("Light Color", &light.color.x);
         ImGui::DragFloat("Ambient", &light.ambient, 0.01f, 0.0f, 1.0f);
         ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 5.0f);
+
+        ImGui::Separator();
+        ImGui::TextUnformatted("Post Process");
+        ImGui::DragFloat("Saturation", &post.saturation, 0.01f, 0.0f, 2.0f);
+        const char* viewNames[] = { "Final", "Normal", "Depth", "Edge" };   // same order as PostDebugView
+        int view = (int)post.debugView;
+        if (ImGui::Combo("View", &view, viewNames, 4)) post.debugView = (PostDebugView)view;
+
+        ImGui::Checkbox("Edge Outline", &post.edgeEnabled);
+        if (post.edgeEnabled || post.debugView == PostDebugView::Edge) {
+            ImGui::ColorEdit3("Edge Color", post.edgeColor);
+            ImGui::DragFloat("Edge Thickness", &post.edgeThickness, 0.05f, 0.5f, 4.0f);
+            ImGui::DragFloat("Depth Threshold", &post.edgeDepthThreshold, 0.001f, 0.001f, 1.0f, "%.3f");
+            ImGui::DragFloat("Normal Threshold", &post.edgeNormalThreshold, 0.005f, 0.01f, 2.0f);
+            ImGui::DragFloat("Fade Distance", &post.edgeFadeDistance, 0.5f, 1.0f, 100.0f);
+        }
         ImGui::End();
     }
 

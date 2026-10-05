@@ -30,10 +30,10 @@ namespace uel {
         DirectX::XMFLOAT4   lightColor;
         DirectX::XMFLOAT4   params;          // x=ambient, y=intensity, z=shadowEnabled
         DirectX::XMFLOAT4   cameraPos;       // xyz=カメラのワールド位置（各シェーダの Draw で入れる）
-        DirectX::XMFLOAT4   shading;         // x=mode(ShadingMode), y=receiveShadow
-        DirectX::XMFLOAT4   specRim;         // x=specularStrength, y=specularPower, z=rimStrength, w=rimPower
+        DirectX::XMFLOAT4   shading;         // x=mode(ShadingMode), y=receiveShadow, z=metallic
+        DirectX::XMFLOAT4   specRim;         // x=specularStrength, y=roughness, z=rimStrength, w=rimPower
         DirectX::XMFLOAT4   rimColor;        // rgb=リムライトの色
-        DirectX::XMFLOAT4   toon;            // x=threshold, y=softness
+        DirectX::XMFLOAT4   toon;            // x=threshold, y=softness, z=texSteps, w=texSmooth
         DirectX::XMFLOAT4   toonShade;       // rgb=陰の面に掛ける色
         DirectX::XMFLOAT4   outline;         // rgb=アウトラインの色, a=太さ（ワールドの長さ）
     };
@@ -45,10 +45,10 @@ namespace uel {
         cb.shading = DirectX::XMFLOAT4(
             static_cast<float>(static_cast<int>(s.mode)),
             s.receiveShadow ? 1.0f : 0.0f,
-            0.0f, 0.0f);
-        cb.specRim = DirectX::XMFLOAT4(s.specularStrength, s.specularPower, s.rimStrength, s.rimPower);
+            s.metallic, 0.0f);
+        cb.specRim = DirectX::XMFLOAT4(s.specularStrength, s.roughness, s.rimStrength, s.rimPower);
         cb.rimColor = DirectX::XMFLOAT4(s.rimColor.x, s.rimColor.y, s.rimColor.z, 0.0f);
-        cb.toon = DirectX::XMFLOAT4(s.toonThreshold, s.toonSoftness, 0.0f, 0.0f);
+        cb.toon = DirectX::XMFLOAT4(s.toonThreshold, s.toonSoftness, s.toonTexSteps, s.toonTexSmooth);
         cb.toonShade = DirectX::XMFLOAT4(s.toonShadeColor.x, s.toonShadeColor.y, s.toonShadeColor.z, 0.0f);
         cb.outline = DirectX::XMFLOAT4(s.outlineColor.x, s.outlineColor.y, s.outlineColor.z, s.outlineWidth);
     }
@@ -68,10 +68,10 @@ cbuffer ObjectCB : register(b0) {
     float4   lightColor;
     float4   params;      // x=ambient, y=intensity, z=shadowEnabled
     float4   cameraPos;   // xyz=camera world position
-    float4   shading;     // x=mode (0=Lit, 1=Unlit, 2=Toon), y=receiveShadow
-    float4   specRim;     // x=specularStrength, y=specularPower, z=rimStrength, w=rimPower
+    float4   shading;     // x=mode (0=Lit, 1=Unlit, 2=Toon), y=receiveShadow, z=metallic
+    float4   specRim;     // x=specularStrength, y=roughness, z=rimStrength, w=rimPower
     float4   rimColor;    // rgb=rim light color
-    float4   toon;        // x=threshold, y=softness
+    float4   toon;        // x=threshold, y=softness, z=texture steps, w=texture smooth radius (UV)
     float4   toonShade;   // rgb=color multiplied on the shaded side
     float4   outline;     // rgb=outline color, a=width in world units
 };
@@ -123,23 +123,80 @@ float ToonStep(float value, float edge, float width) {
     return smoothstep(edge - width, edge + width, value);
 }
 
-float4 PSMain(PSIn i) : SV_TARGET {
-    float4 t = tex.Sample(samp, i.uv);
-    float3 base = t.rgb * i.col.rgb * color.rgb;
+// Toon only: makes a detailed (photo-like) texture look painted.
+//   1. Smooth : average with 8 neighbours on a circle of radius toon.w (in UV), which removes fine detail.
+//   2. Steps  : round the brightness to toon.z levels. The hue is kept, so colors do not shift.
+// Both are skipped when their value is 0.
+float3 SimplifyTexture(float2 uv, float3 texColor) {
+    float radius = toon.w;
+    if (radius > 0.0) {
+        static const float2 kOffsets[8] = {
+            float2( 1.0,  0.0),   float2(-1.0,  0.0),   float2( 0.0,  1.0),   float2( 0.0, -1.0),
+            float2( 0.707, 0.707), float2(-0.707, 0.707), float2( 0.707,-0.707), float2(-0.707,-0.707)
+        };
+        float3 sum = texColor;
+        [unroll] for (int k = 0; k < 8; ++k)
+            sum += tex.SampleLevel(samp, uv + kOffsets[k] * radius, 0).rgb;
+        texColor = sum / 9.0;
+    }
 
+    float steps = toon.z;
+    if (steps >= 1.5) {
+        float v = max(texColor.r, max(texColor.g, texColor.b));   // brightness
+        if (v > 1e-4) {
+            float q = max(floor(v * steps + 0.5), 1.0) / steps;   // rounded brightness (never fully black)
+            texColor *= q / v;
+        }
+    }
+    return texColor;
+}
+
+// ---- Material: metallic / roughness ----
+// Sky colors used for reflections. Same values as the sky drawn by EngineSkybox.cpp: keep them in sync.
+static const float3 kSkyHorizon = float3(0.55, 0.65, 0.78);
+static const float3 kSkyZenith  = float3(0.13, 0.28, 0.55);
+static const float3 kSkyGround  = float3(0.18, 0.20, 0.23);
+static const float3 kSkyAverage = (kSkyHorizon * 2.0 + kSkyZenith + kSkyGround) * 0.25;
+
+float3 SkyColor(float3 dir) {
+    return (dir.y >= 0.0) ? lerp(kSkyHorizon, kSkyZenith, saturate(dir.y))
+                          : lerp(kSkyHorizon, kSkyGround, saturate(-dir.y));
+}
+
+// Blinn-Phong exponent from roughness (0.5 gives about 30). Smooth = small sharp highlight.
+float SpecularPower(float rough) {
+    float a = max(rough * rough, 0.03);
+    return clamp(2.0 / (a * a) - 2.0, 1.0, 2048.0);
+}
+
+// Color of one pixel of a surface (lighting, toon, material). Used by PSMain below.
+float3 ShadeSurface(PSIn i) {
     // mode must match ShadingMode in ShadingParams.h
     int mode = (int)(shading.x + 0.5);
-    if (mode == 1) return float4(base, 1.0);   // Unlit: texture * color only
+
+    float4 t = tex.Sample(samp, i.uv);
+    if (mode == 2) t.rgb = SimplifyTexture(i.uv, t.rgb);
+    float3 base = t.rgb * i.col.rgb * color.rgb;
+
+    if (mode == 1) return base;   // Unlit: texture * color only
 
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz);            // surface -> light
     float3 v = normalize(cameraPos.xyz - i.wpos);   // surface -> camera
     float3 h = normalize(l + v);
+    float3 r = reflect(-v, n);                      // direction seen in a mirror
+
+    // Material. A metal has no base (diffuse) color of its own:
+    // what you see is the highlight and the reflection, both tinted by the base color.
+    float  metallic   = saturate(shading.z);
+    float  rough      = saturate(specRim.y);
+    float3 diffuseCol = base * (1.0 - metallic);
+    float3 specCol    = lerp(float3(1.0, 1.0, 1.0), base, metallic);
 
     // Values shared by Lit and Toon (all smooth, 0..1 except ndl)
     float ndl     = dot(n, l);
     float sh      = (params.z > 0.5 && shading.y > 0.5) ? ShadowFactor(i.wpos) : 1.0;
-    float specRaw = pow(saturate(dot(n, h)), max(specRim.y, 1.0));          // Blinn-Phong
+    float specRaw = pow(saturate(dot(n, h)), SpecularPower(rough));         // Blinn-Phong
     float rimRaw  = pow(1.0 - saturate(dot(n, v)), max(specRim.w, 0.01));   // bright near the silhouette
 
     float3 c;
@@ -151,31 +208,54 @@ float4 PSMain(PSIn i) : SV_TARGET {
 
         // Brightest value is the same as Lit (ambient + intensity), capped so colors do not blow out.
         float3 lightCol = lightColor.rgb * saturate(params.x + params.y);
-        c = base * lightCol * lerp(toonShade.rgb, float3(1.0, 1.0, 1.0), lit);
+        c = diffuseCol * lightCol * lerp(toonShade.rgb, float3(1.0, 1.0, 1.0), lit);
 
-        // Specular and rim become hard-edged shapes. Power controls their size.
-        c += lightColor.rgb * (ToonStep(specRaw, 0.5, w) * specRim.x * lit);
+        // Specular and rim become hard-edged shapes. Roughness / rim power control their size.
+        c += lightColor.rgb * specCol * (ToonStep(specRaw, 0.5, w) * specRim.x * lit);
         c += rimColor.rgb * (ToonStep(rimRaw, 0.5, w) * specRim.z);
+
+        // Metal reflection, toon style: sky above / ground below with a hard horizon line.
+        // A rough surface blurs that line.
+        float  up  = ToonStep(r.y, 0.0, max(w, rough * 0.5));
+        float3 env = lerp(kSkyGround, lerp(kSkyHorizon, kSkyZenith, 0.5), up);
+        c += base * env * metallic;
     }
     else {
         // ---- Lit: ambient + directional light * shadow ----
         float d = saturate(ndl);
-        c = base * (params.x + d * params.y * sh) * lightColor.rgb;
+        c = diffuseCol * (params.x + d * params.y * sh) * lightColor.rgb;
 
-        // Specular is added on top (not multiplied by the base color).
-        // Hidden in shadow and on faces that the light does not reach.
-        c += lightColor.rgb * (specRaw * specRim.x * smoothstep(0.0, 0.1, d) * sh * params.y);
+        // Specular is added on top. Hidden in shadow and on faces that the light does not reach.
+        c += lightColor.rgb * specCol * (specRaw * specRim.x * smoothstep(0.0, 0.1, d) * sh * params.y);
 
         // Rim depends on the view only, so it also shows in shadow.
         c += rimColor.rgb * (rimRaw * specRim.z);
+
+        // Metal reflection: the sky gradient seen in the mirror direction.
+        // A rough surface blurs it toward the average sky color.
+        float3 env = lerp(SkyColor(r), kSkyAverage, rough);
+        c += base * env * metallic;
     }
-    return float4(c, 1.0);
+    return c;
 }
 
-// Outline pass: a single flat color, no lighting.
-float4 PSOutline(PSIn i) : SV_TARGET {
-    return float4(outline.rgb, 1.0);
+// ---- Pixel shader outputs ----
+// The scene is drawn into two render targets at once:
+//   target 0 = color, target 1 = world normal (read later by the post process to find edges).
+// When only the color target is bound, the second output is simply dropped.
+struct PSOut { float4 color : SV_TARGET0; float4 normal : SV_TARGET1; };
+
+PSOut MakePSOut(float3 c, float3 worldNormal) {
+    PSOut o;
+    o.color  = float4(c, 1.0);
+    o.normal = float4(normalize(worldNormal) * 0.5 + 0.5, 1.0);   // a = 1 marks "something was drawn here"
+    return o;
 }
+
+PSOut PSMain(PSIn i)    { return MakePSOut(ShadeSurface(i), i.nrm); }
+
+// Outline pass: a single flat color, no lighting.
+PSOut PSOutline(PSIn i) { return MakePSOut(outline.rgb, i.nrm); }
 )";
 
     // HLSL をコンパイルする。失敗したら、エラー内容を Visual Studio の「出力」ウィンドウに出して false を返す。

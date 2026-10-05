@@ -30,15 +30,18 @@ namespace uel {
 
     void ViewportPanel::Initialize(ID3D11Device* device)
     {
-        rt.Create(device, viewWidth, viewHeight);
+        rt.Create(device, viewWidth, viewHeight, true);        // シーン用：色＋法線＋深度
+        finalRT.Create(device, viewWidth, viewHeight, false);  // 色だけ
+        postProcess.Initialize(device);
         shader.Initialize(device);
         cubeMesh = Mesh::CreateCube(device);
         DirectX::XMStoreFloat4x4(&view, DirectX::XMMatrixIdentity());
         DirectX::XMStoreFloat4x4(&proj, DirectX::XMMatrixIdentity());
-        cubeMesh = Mesh::CreateCube(device);       
+        cubeMesh = Mesh::CreateCube(device);
         skybox.Initialize(device);
-        shadowMap.Initialize(device, 2048);   
-        skinnedShader.Initialize(device);  
+        shadowMap.Initialize(device, 2048);
+        skinnedShader.Initialize(device);
+
     }
 
     void ViewportPanel::DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history,
@@ -92,6 +95,7 @@ namespace uel {
         if (w > 0 && h > 0 && (w != viewWidth || h != viewHeight)) {
             viewWidth = w; viewHeight = h;
             rt.Resize(device, w, h);
+            finalRT.Resize(device, w, h);
         }
 
         using namespace DirectX;
@@ -138,8 +142,8 @@ namespace uel {
         XMStoreFloat4x4(&proj, XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), aspect, 0.1f, 100.0f));
 
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
-        if (rt.GetSRV())
-            ImGui::Image((ImTextureID)rt.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
+        if (finalRT.GetSRV())
+            ImGui::Image((ImTextureID)finalRT.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
         // ヒットボックスの表示（編集中は選択中のみ／「Hitbox」チェックで全員。Play中も有効）
         {
             XMMATRIX vpM = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
@@ -192,7 +196,7 @@ namespace uel {
                     line3({ ws.bodyA.x + ox[k] * ws.bodyR, ws.bodyA.y, ws.bodyA.z + oz[k] * ws.bodyR },
                         { ws.bodyB.x + ox[k] * ws.bodyR, ws.bodyB.y, ws.bodyB.z + oz[k] * ws.bodyR }, bodyCol);
                 // Spawnerの湧き範囲（編集中に選択している時だけ、黄色の円
-                
+
             }
             if (!playMode) {
                 if (Entity* se = world.Get(selected)) {
@@ -320,7 +324,7 @@ namespace uel {
                 }
                 break;   // 画面は1つだけ描く
             }
-        
+
         }
 
         // 編集時のみ：ドロップ・キー・グリッド・ギズモ（★復元）
@@ -392,7 +396,7 @@ namespace uel {
     }
 
     void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
-        ID3D11Device* device, const SceneLighting& lighting)
+        ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings)
     {
         using namespace DirectX;
 
@@ -418,6 +422,8 @@ namespace uel {
         XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
         skybox.Render(context, viewProj, camPos);
+        // 空は色だけを描く。ここから先（メッシュ）は、色に加えて法線も書き出す
+        rt.BindSceneTargets(context);
         shader.SetLight(lighting);
         shader.SetShadow(shadowMap.GetSRV(), lightVP);
         shader.SetCameraPosition(camPos);
@@ -429,6 +435,10 @@ namespace uel {
         // シャドウSRVを外す（次フレームのシャドウ書き込みと競合させない）
         ID3D11ShaderResourceView* nul = nullptr;
         context->PSSetShaderResources(1, 1, &nul);
+
+        // ポストプロセス：シーンの画像（rt）を読んで、表示用の画像（finalRT）に書き出す
+                // ポストプロセス：シーンの画像（rt の色・法線・深度）を読んで、表示用の画像（finalRT）に書き出す
+        postProcess.Apply(context, rt, finalRT, postSettings, proj);
     }
 
 } // namespace uel

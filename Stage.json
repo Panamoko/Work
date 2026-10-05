@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 14,
+    "schemaVersion": 16,
     "entities": [
         {
             "name": "Camera",
@@ -88,7 +88,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -108,7 +107,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "ExampleStage.glb",
@@ -201,7 +204,6 @@
             "shMode": 1,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -221,7 +223,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": 0.4924790561199188
         },
         {
             "name": "Entity",
@@ -310,7 +316,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -330,7 +335,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "Enemy",
@@ -433,7 +442,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -453,7 +461,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "Player",
@@ -590,7 +602,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -610,7 +621,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "GameRule",
@@ -699,7 +714,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -719,7 +733,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "Entity",
@@ -808,7 +826,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -828,7 +845,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
         },
         {
             "name": "Sphere.glb",
@@ -921,7 +942,6 @@
             "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 107.5,
             "shRimStrength": 1.0,
             "shRimPower": 0.5,
             "shRimColor": {
@@ -941,7 +961,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": 0.36762410402297976
         },
         {
             "name": "Enemy",
@@ -1044,7 +1068,6 @@
             "shMode": 2,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shSpecPower": 32.0,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -1064,7 +1087,11 @@
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
-            }
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": 0.4924790561199188
         }
     ]
 }
