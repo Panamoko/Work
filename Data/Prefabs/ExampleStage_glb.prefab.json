@@ -1,0 +1,94 @@
+{
+    "schemaVersion": 11,
+    "prefab": {
+        "name": "ExampleStage.glb",
+        "transform": {
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "rotationEuler": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "scale": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            }
+        },
+        "hasMesh": true,
+        "mesh": {
+            "assetId": "Data/Model/Stage/ExampleStage.glb",
+            "color": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0,
+                "w": 1.0
+            },
+            "visible": true,
+            "firstPerson": false,
+            "hiddenSubmesh": [
+                0
+            ],
+            "submeshRole": [
+                0
+            ]
+        },
+        "hasHP": false,
+        "hp": 100.0,
+        "maxHp": 100.0,
+        "hasOpponent": false,
+        "oppMoveSpeed": 2.0,
+        "oppStopRange": 1.2000000476837159,
+        "hasPlayer": false,
+        "hasSkinned": false,
+        "skAsset": "",
+        "skClip": 0,
+        "skSpeed": 1.0,
+        "skLoop": true,
+        "skVisible": true,
+        "skColor": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+        },
+        "skAnim": "",
+        "hasNavObs": false,
+        "navHalfX": 1.0,
+        "navHalfZ": 1.0,
+        "hasUI": false,
+        "uiTitle": "",
+        "uiSub": "",
+        "uiButton": "",
+        "uiNext": "",
+        "uiShowResult": false,
+        "hasRule": false,
+        "ruleWin": "",
+        "ruleLose": "",
+        "ruleDelay": 2.0,
+        "prefabPath": "",
+        "hasHitbox": false,
+        "hbBodyBottom": 0.30000001192092898,
+        "hbBodyTop": 1.2999999523162842,
+        "hbBodyRadius": 0.3499999940395355,
+        "hbHeadHeight": 1.600000023841858,
+        "hbHeadRadius": 0.2199999988079071,
+        "hbHeadMul": 2.0,
+        "hasSpawner": false,
+        "spPrefab": "",
+        "spWaves": 3,
+        "spBase": 3,
+        "spInc": 2,
+        "spInterval": 0.800000011920929,
+        "spFirstDelay": 1.0,
+        "spWaveDelay": 3.0,
+        "spRadius": 2.0,
+        "hasShader": true,
+        "shMode": 1,
+        "shReceiveShadow": true
+    }
+}

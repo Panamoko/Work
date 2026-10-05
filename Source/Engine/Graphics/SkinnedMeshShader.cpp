@@ -1,7 +1,6 @@
 #include "Engine/Graphics/SkinnedMeshShader.h"
 #include "Engine/Graphics/SkinnedRenderModel.h"
 #include "Engine/Graphics/ShaderCommon.h"
-
 #include <string>
 #include <cstdint>
 
@@ -17,14 +16,14 @@ namespace uel {
 
         // スキンドメッシュ専用の部分（ボーンの定数バッファと頂点シェーダだけ）。
         // b0 の定数バッファ・影・ピクセルシェーダは ShaderCommon.h の kShaderCommonHLSL にある。
+        // ToWorld でスキニング後のワールド位置と法線を求め、通常用とアウトライン用の両方で使う。
         const char* kSkinnedVS = R"(
 cbuffer Bones : register(b1) { float4x4 bones[128]; };
 struct VSIn {
     float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD;
     uint4 bidx:BLENDINDICES; float4 bw:BLENDWEIGHT;
 };
-PSIn VSMain(VSIn i) {
-    PSIn o;
+void ToWorld(VSIn i, out float3 wpos, out float3 wnrm) {
     float4 p = float4(i.pos, 1.0);
     float3 sp = 0; float3 sn = 0; float wsum = 0;
     [unroll] for (int k = 0; k < 4; ++k) {
@@ -34,13 +33,11 @@ PSIn VSMain(VSIn i) {
         wsum += w;
     }
     if (wsum < 1e-4) { sp = i.pos; sn = i.nrm; }
-    float4 wp = mul(float4(sp, 1.0), world);
-    o.wpos = wp.xyz;
-    o.pos = mul(wp, viewProj);
-    o.nrm = mul(sn, (float3x3)world);
-    o.col = i.col; o.uv = i.uv;
-    return o;
+    wpos = mul(float4(sp, 1.0), world).xyz;
+    wnrm = mul(sn, (float3x3)world);
 }
+PSIn VSMain(VSIn i)    { float3 p; float3 n; ToWorld(i, p, n); return MakePSIn(p, n, i.col, i.uv); }
+PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlinePSIn(p, n, i.col, i.uv); }
 )";
     }
 
@@ -54,6 +51,13 @@ PSIn VSMain(VSIn i) {
         if (!CompileShaderSource(source, "skinned", "PSMain", "ps_5_0", psB.GetAddressOf())) return false;
         if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
         if (FAILED(device->CreatePixelShader(psB->GetBufferPointer(), psB->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
+
+        // アウトライン用（頂点の形は同じなので、入力レイアウトは下の1つを共用する）
+        ComPtr<ID3DBlob> vsOutlineB, psOutlineB;
+        if (!CompileShaderSource(source, "skinned", "VSOutline", "vs_5_0", vsOutlineB.GetAddressOf())) return false;
+        if (!CompileShaderSource(source, "skinned", "PSOutline", "ps_5_0", psOutlineB.GetAddressOf())) return false;
+        if (FAILED(device->CreateVertexShader(vsOutlineB->GetBufferPointer(), vsOutlineB->GetBufferSize(), nullptr, vsOutline.GetAddressOf()))) return false;
+        if (FAILED(device->CreatePixelShader(psOutlineB->GetBufferPointer(), psOutlineB->GetBufferSize(), nullptr, psOutline.GetAddressOf()))) return false;
 
         D3D11_INPUT_ELEMENT_DESC il[] = {
             { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -72,6 +76,10 @@ PSIn VSMain(VSIn i) {
 
         D3D11_RASTERIZER_DESC rd = {}; rd.FillMode = D3D11_FILL_SOLID; rd.CullMode = D3D11_CULL_NONE; rd.DepthClipEnable = TRUE;
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
+
+        // アウトライン用：表面を捨てて裏面だけ描く（時計回りが表。静的メッシュ側と同じ設定）
+        D3D11_RASTERIZER_DESC ord = {}; ord.FillMode = D3D11_FILL_SOLID; ord.CullMode = D3D11_CULL_FRONT; ord.DepthClipEnable = TRUE;
+        if (FAILED(device->CreateRasterizerState(&ord, rasterOutline.GetAddressOf()))) return false;
 
         // 通常のサンプラ（s0）。静的メッシュ側と同じ設定。
         D3D11_SAMPLER_DESC sd = {};
@@ -116,6 +124,7 @@ PSIn VSMain(VSIn i) {
         o.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
         o.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
         FillShading(o, shading);
+        o.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
         ctx->UpdateSubresource(objCB.Get(), 0, nullptr, &o, 0, 0);
 
         BoneCB b;
@@ -137,12 +146,27 @@ PSIn VSMain(VSIn i) {
 
         model.Bind(ctx);
         const auto& subs = model.Submeshes();
+
+        // 本描画
         for (size_t i = 0; i < subs.size(); ++i) {
             if (subs[i].indexCount == 0) continue;
             ID3D11ShaderResourceView* srv = model.TexSRV(subs[i].texture);
             if (!srv) srv = whiteSRV.Get();
             ctx->PSSetShaderResources(0, 1, &srv);
             ctx->DrawIndexed(subs[i].indexCount, subs[i].indexOffset, 0);
+        }
+
+        // アウトライン（背面法）：法線方向に少しふくらませた形の「裏面だけ」を単色で描く。
+        // 元の形より外にはみ出た部分だけが見えるので、輪郭線になる。
+        // 定数バッファ（b0 / b1）は本描画と同じものを使うので、同じ姿勢のままふくらむ。
+        if (shading.outlineWidth > 0.0f) {
+            ctx->VSSetShader(vsOutline.Get(), nullptr, 0);
+            ctx->PSSetShader(psOutline.Get(), nullptr, 0);
+            ctx->RSSetState(rasterOutline.Get());
+            for (size_t i = 0; i < subs.size(); ++i) {
+                if (subs[i].indexCount == 0) continue;
+                ctx->DrawIndexed(subs[i].indexCount, subs[i].indexOffset, 0);
+            }
         }
     }
 

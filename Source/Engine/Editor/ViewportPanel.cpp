@@ -420,9 +420,11 @@ namespace uel {
         skybox.Render(context, viewProj, camPos);
         shader.SetLight(lighting);
         shader.SetShadow(shadowMap.GetSRV(), lightVP);
+        shader.SetCameraPosition(camPos);
         RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
         skinnedShader.SetLight(lighting);
         skinnedShader.SetShadow(shadowMap.GetSRV(), lightVP);
+        skinnedShader.SetCameraPosition(camPos);
         RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
         // シャドウSRVを外す（次フレームのシャドウ書き込みと競合させない）
         ID3D11ShaderResourceView* nul = nullptr;

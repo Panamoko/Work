@@ -13,18 +13,15 @@ namespace uel {
     namespace {
         // 静的メッシュ専用の部分（頂点シェーダだけ）。
         // 定数バッファ・影・ピクセルシェーダは ShaderCommon.h の kShaderCommonHLSL にある。
+        // ToWorld でワールド位置と法線を求め、通常用とアウトライン用の両方で使う。
         const char* kMeshVS = R"(
 struct VSIn { float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
-PSIn VSMain(VSIn i) {
-    PSIn o;
-    float4 wp = mul(float4(i.pos,1.0), world);
-    o.wpos = wp.xyz;
-    o.pos  = mul(wp, viewProj);
-    o.nrm  = mul(i.nrm, (float3x3)world);
-    o.col  = i.col;
-    o.uv   = i.uv;
-    return o;
+void ToWorld(VSIn i, out float3 wpos, out float3 wnrm) {
+    wpos = mul(float4(i.pos, 1.0), world).xyz;
+    wnrm = mul(i.nrm, (float3x3)world);
 }
+PSIn VSMain(VSIn i)    { float3 p; float3 n; ToWorld(i, p, n); return MakePSIn(p, n, i.col, i.uv); }
+PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlinePSIn(p, n, i.col, i.uv); }
 )";
     }
 
@@ -38,6 +35,13 @@ PSIn VSMain(VSIn i) {
         if (!CompileShaderSource(source, "mesh", "PSMain", "ps_5_0", psBlob.GetAddressOf())) return false;
         if (FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
         if (FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
+
+        // アウトライン用（頂点の形は同じなので、入力レイアウトは下の1つを共用する）
+        ComPtr<ID3DBlob> vsOutlineBlob, psOutlineBlob;
+        if (!CompileShaderSource(source, "mesh", "VSOutline", "vs_5_0", vsOutlineBlob.GetAddressOf())) return false;
+        if (!CompileShaderSource(source, "mesh", "PSOutline", "ps_5_0", psOutlineBlob.GetAddressOf())) return false;
+        if (FAILED(device->CreateVertexShader(vsOutlineBlob->GetBufferPointer(), vsOutlineBlob->GetBufferSize(), nullptr, vsOutline.GetAddressOf()))) return false;
+        if (FAILED(device->CreatePixelShader(psOutlineBlob->GetBufferPointer(), psOutlineBlob->GetBufferSize(), nullptr, psOutline.GetAddressOf()))) return false;
 
         D3D11_INPUT_ELEMENT_DESC il[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -54,6 +58,11 @@ PSIn VSMain(VSIn i) {
         D3D11_RASTERIZER_DESC rd = {};
         rd.FillMode = D3D11_FILL_SOLID; rd.CullMode = D3D11_CULL_NONE; rd.DepthClipEnable = TRUE;
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
+
+        // アウトライン用：表面を捨てて裏面だけ描く（時計回りが表。立方体も glTF もこの向き）
+        D3D11_RASTERIZER_DESC ord = {};
+        ord.FillMode = D3D11_FILL_SOLID; ord.CullMode = D3D11_CULL_FRONT; ord.DepthClipEnable = TRUE;
+        if (FAILED(device->CreateRasterizerState(&ord, rasterOutline.GetAddressOf()))) return false;
 
         // 通常のサンプラ（s0）。スキンド側と同じ設定。
         D3D11_SAMPLER_DESC sd = {};
@@ -103,8 +112,9 @@ PSIn VSMain(VSIn i) {
         data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
         data.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
         FillShading(data, shading);
-
+        data.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
         context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
+
         context->IASetInputLayout(layout.Get());
         context->VSSetShader(vs.Get(), nullptr, 0);
         context->PSSetShader(ps.Get(), nullptr, 0);
@@ -117,19 +127,38 @@ PSIn VSMain(VSIn i) {
 
         mesh.Bind(context);
         const auto& subs = mesh.GetSubmeshes();
-        for (size_t i = 0; i < subs.size(); ++i) {
-            const auto& sm = subs[i];
-            if (!sm.visible || sm.indexCount == 0) continue;
 
-            bool hide = false;
-            if (hiddenSubmesh && i < hiddenSubmesh->size() && (*hiddenSubmesh)[i]) hide = true;          // 手動で非表示
-            if (firstPerson && submeshRole && i < submeshRole->size()
-                && (*submeshRole)[i] == (uint8_t)1 /*FirstPersonHidden*/) hide = true;                   // 一人称で非表示
-            if (hide) continue;
+        // 表示するサブメッシュを順に描く。本描画とアウトラインの2回使う。
+        auto drawSubmeshes = [&](bool bindTexture) {
+            for (size_t i = 0; i < subs.size(); ++i) {
+                const auto& sm = subs[i];
+                if (!sm.visible || sm.indexCount == 0) continue;
 
-            ID3D11ShaderResourceView* srv = sm.texture ? sm.texture.Get() : whiteSRV.Get();
-            context->PSSetShaderResources(0, 1, &srv);
-            context->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
+                bool hide = false;
+                if (hiddenSubmesh && i < hiddenSubmesh->size() && (*hiddenSubmesh)[i]) hide = true;          // 手動で非表示
+                if (firstPerson && submeshRole && i < submeshRole->size()
+                    && (*submeshRole)[i] == (uint8_t)1 /*FirstPersonHidden*/) hide = true;                   // 一人称で非表示
+                if (hide) continue;
+
+                if (bindTexture) {
+                    ID3D11ShaderResourceView* srv = sm.texture ? sm.texture.Get() : whiteSRV.Get();
+                    context->PSSetShaderResources(0, 1, &srv);
+                }
+                context->DrawIndexed(sm.indexCount, sm.indexOffset, 0);
+            }
+            };
+
+        // 本描画
+        drawSubmeshes(true);
+
+        // アウトライン（背面法）：法線方向に少しふくらませた形の「裏面だけ」を単色で描く。
+        // 元の形より外にはみ出た部分だけが見えるので、輪郭線になる。
+        // 定数バッファは本描画と同じもの（outline の色と太さも入っている）を使う。
+        if (shading.outlineWidth > 0.0f) {
+            context->VSSetShader(vsOutline.Get(), nullptr, 0);
+            context->PSSetShader(psOutline.Get(), nullptr, 0);
+            context->RSSetState(rasterOutline.Get());
+            drawSubmeshes(false);
         }
     }
 

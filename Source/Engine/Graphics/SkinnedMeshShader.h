@@ -24,6 +24,7 @@ namespace uel {
 
         void SetLight(const SceneLighting& light);
         void SetShadow(ID3D11ShaderResourceView* srv, const DirectX::XMFLOAT4X4& lightViewProj);
+        void SetCameraPosition(const DirectX::XMFLOAT3& pos) { cameraPos = pos; }
 
     private:
         Microsoft::WRL::ComPtr<ID3D11VertexShader>       vs;
@@ -43,6 +44,12 @@ namespace uel {
         ID3D11ShaderResourceView* shadowSRV = nullptr;   // 非所有
         DirectX::XMFLOAT4X4 lightViewProj{};
         bool shadowEnabled = false;
+        DirectX::XMFLOAT3 cameraPos{ 0.0f, 0.0f, 0.0f };
+
+        // アウトライン用（ふくらませた形の裏面だけを描く）
+        Microsoft::WRL::ComPtr<ID3D11VertexShader>    vsOutline;
+        Microsoft::WRL::ComPtr<ID3D11PixelShader>     psOutline;
+        Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterOutline;
     };
 
 } // namespace uel

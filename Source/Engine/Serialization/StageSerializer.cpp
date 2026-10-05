@@ -12,6 +12,7 @@
 #include "Engine/Scene/PrefabInstanceComponent.h"
 #include "Engine/Game/HitboxComponent.h"
 #include "Engine/Game/SpawnerComponent.h"
+#include "Engine/Scene/ShaderComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -49,7 +50,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 10;
+        constexpr int kSchemaLatest = 14;
         int g_loadSchema = kSchemaLatest;
 
         struct EntityDTO {
@@ -71,6 +72,13 @@ namespace uel {
             bool  hasSpawner = false; std::string spPrefab;
             int   spWaves = 3, spBase = 3, spInc = 2;
             float spInterval = 0.8f, spFirstDelay = 1.0f, spWaveDelay = 3.0f, spRadius = 2.0f;
+            bool  hasShader = false; int shMode = 0; bool shReceiveShadow = true;
+            float shSpecStrength = 0.0f, shSpecPower = 32.0f, shRimStrength = 0.0f, shRimPower = 3.0f;
+            Vec3DTO shRimColor{ 1.0f, 1.0f, 1.0f };
+            float shToonThreshold = 0.5f, shToonSoftness = 0.02f;
+            Vec3DTO shToonShade{ 0.6f, 0.6f, 0.7f };
+            float shOutlineWidth = 0.0f;
+            Vec3DTO shOutlineColor{ 0.05f, 0.05f, 0.05f };
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -92,6 +100,13 @@ namespace uel {
                 if (g_loadSchema >= 10)
                     ar(CEREAL_NVP(hasSpawner), CEREAL_NVP(spPrefab), CEREAL_NVP(spWaves), CEREAL_NVP(spBase), CEREAL_NVP(spInc),
                         CEREAL_NVP(spInterval), CEREAL_NVP(spFirstDelay), CEREAL_NVP(spWaveDelay), CEREAL_NVP(spRadius));   // v10
+                if (g_loadSchema >= 11) ar(CEREAL_NVP(hasShader), CEREAL_NVP(shMode), CEREAL_NVP(shReceiveShadow)); // v11
+                if (g_loadSchema >= 12)
+                    ar(CEREAL_NVP(shSpecStrength), CEREAL_NVP(shSpecPower),
+                        CEREAL_NVP(shRimStrength), CEREAL_NVP(shRimPower), CEREAL_NVP(shRimColor));             // v12
+                if (g_loadSchema >= 13)
+                    ar(CEREAL_NVP(shToonThreshold), CEREAL_NVP(shToonSoftness), CEREAL_NVP(shToonShade));       // v13
+                if (g_loadSchema >= 14) ar(CEREAL_NVP(shOutlineWidth), CEREAL_NVP(shOutlineColor));             // v14
             }
         };
 
@@ -140,6 +155,18 @@ namespace uel {
                 ed.spWaves = sp->waveCount; ed.spBase = sp->baseCount; ed.spInc = sp->countIncrease;
                 ed.spInterval = sp->spawnInterval; ed.spFirstDelay = sp->firstDelay;
                 ed.spWaveDelay = sp->waveDelay; ed.spRadius = sp->spawnRadius;
+            }
+            if (auto* shc = e.GetComponent<ShaderComponent>()) {
+                ed.hasShader = true;
+                ed.shMode = (int)shc->params.mode;
+                ed.shReceiveShadow = shc->params.receiveShadow;
+                ed.shSpecStrength = shc->params.specularStrength; ed.shSpecPower = shc->params.specularPower;
+                ed.shRimStrength = shc->params.rimStrength; ed.shRimPower = shc->params.rimPower;
+                ed.shRimColor = { shc->params.rimColor.x, shc->params.rimColor.y, shc->params.rimColor.z };
+                ed.shToonThreshold = shc->params.toonThreshold; ed.shToonSoftness = shc->params.toonSoftness;
+                ed.shToonShade = { shc->params.toonShadeColor.x, shc->params.toonShadeColor.y, shc->params.toonShadeColor.z };
+                ed.shOutlineWidth = shc->params.outlineWidth;
+                ed.shOutlineColor = { shc->params.outlineColor.x, shc->params.outlineColor.y, shc->params.outlineColor.z };
             }
             if (auto* pi = e.GetComponent<PrefabInstanceComponent>()) ed.prefabPath = pi->path;
 
@@ -193,6 +220,18 @@ namespace uel {
                 sp->waveCount = ed.spWaves; sp->baseCount = ed.spBase; sp->countIncrease = ed.spInc;
                 sp->spawnInterval = ed.spInterval; sp->firstDelay = ed.spFirstDelay;
                 sp->waveDelay = ed.spWaveDelay; sp->spawnRadius = ed.spRadius;
+            }
+            if (ed.hasShader) {
+                auto* shc = e.AddComponent<ShaderComponent>();
+                shc->params.mode = (ShadingMode)ed.shMode;
+                shc->params.receiveShadow = ed.shReceiveShadow;
+                shc->params.specularStrength = ed.shSpecStrength; shc->params.specularPower = ed.shSpecPower;
+                shc->params.rimStrength = ed.shRimStrength; shc->params.rimPower = ed.shRimPower;
+                shc->params.rimColor = { ed.shRimColor.x, ed.shRimColor.y, ed.shRimColor.z };
+                shc->params.toonThreshold = ed.shToonThreshold; shc->params.toonSoftness = ed.shToonSoftness;
+                shc->params.toonShadeColor = { ed.shToonShade.x, ed.shToonShade.y, ed.shToonShade.z };
+                shc->params.outlineWidth = ed.shOutlineWidth;
+                shc->params.outlineColor = { ed.shOutlineColor.x, ed.shOutlineColor.y, ed.shOutlineColor.z };
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
         }

@@ -435,10 +435,26 @@ namespace uel {
             ImGui::BulletText("ShaderComponent"); ImGui::SameLine();
             if (ImGui::SmallButton("Remove")) e->RemoveComponent<ShaderComponent>();
             else {
-                const char* modeNames[] = { "Lit", "Unlit" };
-                int mode = (int)shc->params.mode;
-                if (ImGui::Combo("Mode", &mode, modeNames, 2)) shc->params.mode = (ShadingMode)mode;
-                ImGui::Checkbox("Receive Shadow", &shc->params.receiveShadow);
+                ShadingParams& p = shc->params;
+                const char* modeNames[] = { "Lit", "Unlit", "Toon" };   // same order as ShadingMode
+                int mode = (int)p.mode;
+                if (ImGui::Combo("Mode", &mode, modeNames, 3)) p.mode = (ShadingMode)mode;
+                if (p.mode != ShadingMode::Unlit) {   // Unlit has no lighting, so these do nothing there
+                    ImGui::Checkbox("Receive Shadow", &p.receiveShadow);
+                    if (p.mode == ShadingMode::Toon) {
+                        ImGui::DragFloat("Toon Threshold", &p.toonThreshold, 0.005f, 0.0f, 1.0f);
+                        ImGui::DragFloat("Toon Softness", &p.toonSoftness, 0.002f, 0.001f, 0.5f);
+                        ImGui::ColorEdit3("Shade Color", &p.toonShadeColor.x);
+                    }
+                    ImGui::DragFloat("Specular Strength", &p.specularStrength, 0.01f, 0.0f, 4.0f);
+                    ImGui::DragFloat("Specular Power", &p.specularPower, 0.5f, 1.0f, 256.0f);
+                    ImGui::DragFloat("Rim Strength", &p.rimStrength, 0.01f, 0.0f, 4.0f);
+                    ImGui::DragFloat("Rim Power", &p.rimPower, 0.05f, 0.5f, 16.0f);
+                    ImGui::ColorEdit3("Rim Color", &p.rimColor.x);
+                }
+                // Outline works in every mode. Width 0 = off.
+                ImGui::DragFloat("Outline Width", &p.outlineWidth, 0.001f, 0.0f, 0.2f, "%.3f");
+                ImGui::ColorEdit3("Outline Color", &p.outlineColor.x);
             }
             ImGui::PopID();
         }

@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 10,
+    "schemaVersion": 14,
     "entities": [
         {
             "name": "Camera",
@@ -83,7 +83,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "ExampleStage.glb",
@@ -155,7 +180,7 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": "",
+            "prefabPath": "Data/Prefabs/ExampleStage_glb.prefab.json",
             "hasHitbox": false,
             "hbBodyBottom": 0.30000001192092898,
             "hbBodyTop": 1.2999999523162842,
@@ -171,7 +196,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": true,
+            "shMode": 1,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "Entity",
@@ -255,7 +305,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "Enemy",
@@ -353,7 +428,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "Player",
@@ -485,7 +585,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "GameRule",
@@ -569,7 +694,32 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         },
         {
             "name": "Entity",
@@ -653,7 +803,268 @@
             "spInterval": 0.800000011920929,
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
-            "spRadius": 2.0
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
+        },
+        {
+            "name": "Sphere.glb",
+            "transform": {
+                "position": {
+                    "x": 3.048041820526123,
+                    "y": 1.7723215818405152,
+                    "z": 0.0
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/Shape/Sphere.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0
+                ],
+                "submeshRole": [
+                    0
+                ]
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": false,
+            "skAsset": "",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 1.0
+            },
+            "skAnim": "",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0,
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0,
+            "hasShader": true,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 107.5,
+            "shRimStrength": 1.0,
+            "shRimPower": 0.5,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
+        },
+        {
+            "name": "Enemy",
+            "transform": {
+                "position": {
+                    "x": 2.759186267852783,
+                    "y": 0.0,
+                    "z": -1.9258813858032227
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 0.5,
+                    "y": 0.5,
+                    "z": 0.5
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": false,
+                "firstPerson": false,
+                "hiddenSubmesh": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "submeshRole": [
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
+            },
+            "hasHP": true,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": true,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": true,
+            "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0,
+                "w": 1.0
+            },
+            "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0,
+            "prefabPath": "Data/Prefabs/Enemy.prefab.json",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0,
+            "hasShader": true,
+            "shMode": 2,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shSpecPower": 32.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.019999999552965165,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            }
         }
     ]
 }

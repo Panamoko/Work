@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 8,
+    "schemaVersion": 14,
     "prefab": {
         "name": "Enemy",
         "transform": {
@@ -51,7 +51,7 @@
         "hp": 100.0,
         "maxHp": 100.0,
         "hasOpponent": true,
-        "oppMoveSpeed": 3.0,
+        "oppMoveSpeed": 2.0,
         "oppStopRange": 1.2000000476837159,
         "hasPlayer": false,
         "hasSkinned": true,
@@ -80,6 +80,47 @@
         "ruleWin": "",
         "ruleLose": "",
         "ruleDelay": 2.0,
-        "prefabPath": ""
+        "prefabPath": "",
+        "hasHitbox": false,
+        "hbBodyBottom": 0.30000001192092898,
+        "hbBodyTop": 1.2999999523162842,
+        "hbBodyRadius": 0.3499999940395355,
+        "hbHeadHeight": 1.600000023841858,
+        "hbHeadRadius": 0.2199999988079071,
+        "hbHeadMul": 2.0,
+        "hasSpawner": false,
+        "spPrefab": "",
+        "spWaves": 3,
+        "spBase": 3,
+        "spInc": 2,
+        "spInterval": 0.800000011920929,
+        "spFirstDelay": 1.0,
+        "spWaveDelay": 3.0,
+        "spRadius": 2.0,
+        "hasShader": true,
+        "shMode": 2,
+        "shReceiveShadow": true,
+        "shSpecStrength": 0.0,
+        "shSpecPower": 32.0,
+        "shRimStrength": 0.0,
+        "shRimPower": 3.0,
+        "shRimColor": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "shToonThreshold": 0.5,
+        "shToonSoftness": 0.019999999552965165,
+        "shToonShade": {
+            "x": 0.6000000238418579,
+            "y": 0.6000000238418579,
+            "z": 0.699999988079071
+        },
+        "shOutlineWidth": 0.019999999552965165,
+        "shOutlineColor": {
+            "x": 0.05000000074505806,
+            "y": 0.05000000074505806,
+            "z": 0.05000000074505806
+        }
     }
 }
