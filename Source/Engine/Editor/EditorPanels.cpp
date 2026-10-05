@@ -681,6 +681,7 @@ namespace uel {
             ImGui::DragFloat("Depth Threshold", &post.edgeDepthThreshold, 0.001f, 0.001f, 1.0f, "%.3f");
             ImGui::DragFloat("Normal Threshold", &post.edgeNormalThreshold, 0.005f, 0.01f, 2.0f);
             ImGui::DragFloat("Fade Distance", &post.edgeFadeDistance, 0.5f, 1.0f, 100.0f);
+            ImGui::DragFloat("Shadow Range", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
         }
         ImGui::End();
     }

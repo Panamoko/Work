@@ -400,12 +400,30 @@ namespace uel {
     {
         using namespace DirectX;
 
-        // ライトのview-proj（正射影・原点周りをカバー）
+        // ---- ライトの view-proj（平行投影）。影が出る範囲を、カメラの前方に追従させる ----
         XMVECTOR ld = XMVector3Normalize(XMVectorSet(lighting.direction.x, lighting.direction.y, lighting.direction.z, 0));
         XMVECTOR up = (fabsf(XMVectorGetY(ld)) > 0.99f) ? XMVectorSet(0, 0, 1, 0) : XMVectorSet(0, 1, 0, 0);
-        XMVECTOR lpos = XMVectorScale(ld, -25.0f);
-        XMMATRIX lView = XMMatrixLookAtLH(lpos, XMVectorSet(0, 0, 0, 0), up);
-        XMMATRIX lProj = XMMatrixOrthographicLH(30.0f, 30.0f, 0.1f, 60.0f);
+
+        // 範囲の中心：カメラの位置から、水平な前方へ少し進めた点（後ろより前を広く取る）
+        const float range = (lighting.shadowRange > 1.0f) ? lighting.shadowRange : 1.0f;   // 影が出る正方形の一辺（m）
+        XMMATRIX camWorld = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));               // r[3]=カメラ位置, r[2]=前方
+        XMVECTOR forward = XMVectorSetY(camWorld.r[2], 0.0f);
+        if (XMVectorGetX(XMVector3LengthSq(forward)) > 1e-6f) forward = XMVector3Normalize(forward);
+        else forward = XMVectorZero();                                                     // 真上・真下を向いているとき
+        XMVECTOR center = XMVectorAdd(camWorld.r[3], XMVectorScale(forward, range * 0.35f));
+
+        // 中心を「シャドウマップ1画素ぶん」の刻みに丸める。
+        // 丸めないと、カメラが少し動くたびに影の縁がちらつく（画素の区切りの位置が毎フレームずれるため）。
+        XMMATRIX lightRot = XMMatrixLookAtLH(XMVectorZero(), ld, up);                      // 向きだけのライト行列
+        const float texel = range / (float)shadowMap.GetSize();
+        XMFLOAT3 c; XMStoreFloat3(&c, XMVector3TransformCoord(center, lightRot));          // ライトから見た座標へ
+        c.x = floorf(c.x / texel) * texel;
+        c.y = floorf(c.y / texel) * texel;
+        center = XMVector3TransformCoord(XMLoadFloat3(&c), XMMatrixInverse(nullptr, lightRot));   // ワールドへ戻す
+
+        XMVECTOR lpos = XMVectorSubtract(center, XMVectorScale(ld, 25.0f));                // 中心から光と逆向きに 25m
+        XMMATRIX lView = XMMatrixLookAtLH(lpos, center, up);
+        XMMATRIX lProj = XMMatrixOrthographicLH(range, range, 0.1f, 60.0f);
         XMFLOAT4X4 lightVP; XMStoreFloat4x4(&lightVP, lView * lProj);
 
         // シャドウパス

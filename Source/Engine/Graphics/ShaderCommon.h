@@ -102,19 +102,24 @@ PSIn MakeOutlinePSIn(float3 wpos, float3 wnrm, float4 col, float2 uv) {
     return MakePSIn(wpos + n * outline.a, n, col, uv);
 }
 
-// ---- Pixel shader ----
 float ShadowFactor(float3 wpos) {
     float4 lp = mul(float4(wpos, 1.0), lightViewProj);
     lp.xyz /= lp.w;
     float2 uv = lp.xy * float2(0.5, -0.5) + 0.5;
-    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return 1.0;
+    // Outside the shadow map (to the side, or outside its depth range): treat as lit.
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || lp.z < 0.0 || lp.z > 1.0) return 1.0;
     float depth = lp.z - 0.0025;
     float texel = 1.0 / 2048.0;
     float sum = 0.0;
     [unroll] for (int y = -1; y <= 1; ++y)
     [unroll] for (int x = -1; x <= 1; ++x)
         sum += shadowMap.SampleCmpLevelZero(shadowSamp, uv + float2(x, y) * texel, depth);
-    return sum / 9.0;
+    float shadow = sum / 9.0;
+
+    // The shadow map covers a square that follows the camera. Fade the shadows out near its border,
+    // so that they do not end in a straight line.
+    float border = max(abs(lp.x), abs(lp.y));   // 0 at the center of the square, 1 at its border
+    return lerp(shadow, 1.0, smoothstep(0.85, 1.0, border));
 }
 
 // Turns a smooth 0..1 value into "almost 0 or 1" around the edge value.

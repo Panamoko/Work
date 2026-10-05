@@ -16,6 +16,7 @@ namespace uel {
         void DrawSkinned(ID3D11DeviceContext* context, const SkinnedRenderModel& model,
             const DirectX::XMFLOAT4X4& world, const std::vector<DirectX::XMFLOAT4X4>& palette);
         ID3D11ShaderResourceView* GetSRV() const { return srv.Get(); }
+        int GetSize() const { return size; }
 
     private:
         int size = 2048;
