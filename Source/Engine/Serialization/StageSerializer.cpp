@@ -15,6 +15,7 @@
 #include "Engine/Scene/ShaderComponent.h"
 #include "Engine/Graphics/SceneLighting.h"
 #include "Engine/Graphics/PostProcessSettings.h"
+#include "Engine/Scene/AnimatorComponent.h"
 
 #include <fstream>
 #include <vector>
@@ -53,7 +54,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 16;
+        constexpr int kSchemaLatest = 17;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -94,6 +95,7 @@ namespace uel {
             float shToonTexSteps = 0.0f, shToonTexSmooth = 0.0f;
             float shMetallic = 0.0f;
             float shRoughness = -1.0f;   // マイナスのまま＝ファイルに無かった（版 15 以前）。FromDTO で shSpecPower から換算する
+            bool  hasAnimator = false; int anClip = 0; float anSpeed = 1.0f; bool anLoop = true; float anBlendTime = 0.2f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -124,7 +126,9 @@ namespace uel {
                     ar(CEREAL_NVP(shToonThreshold), CEREAL_NVP(shToonSoftness), CEREAL_NVP(shToonShade));       // v13
                 if (g_loadSchema >= 14) ar(CEREAL_NVP(shOutlineWidth), CEREAL_NVP(shOutlineColor));             // v14
                 if (g_loadSchema >= 15) ar(CEREAL_NVP(shToonTexSteps), CEREAL_NVP(shToonTexSmooth));            // v15
-                if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));                    // v16
+                if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));   
+                if (g_loadSchema >= 17)
+                    ar(CEREAL_NVP(hasAnimator), CEREAL_NVP(anClip), CEREAL_NVP(anSpeed), CEREAL_NVP(anLoop), CEREAL_NVP(anBlendTime)); // v17// v16
             }
         };
 
@@ -189,6 +193,10 @@ namespace uel {
                 ed.shOutlineColor = { shc->params.outlineColor.x, shc->params.outlineColor.y, shc->params.outlineColor.z };
             }
             if (auto* pi = e.GetComponent<PrefabInstanceComponent>()) ed.prefabPath = pi->path;
+            if (auto* an = e.GetComponent<AnimatorComponent>()) {
+                ed.hasAnimator = true;
+                ed.anClip = an->clipIndex; ed.anSpeed = an->speed; ed.anLoop = an->loop; ed.anBlendTime = an->blendTime;
+            }
 
             return ed;
         }
@@ -257,6 +265,10 @@ namespace uel {
                 shc->params.outlineColor = { ed.shOutlineColor.x, ed.shOutlineColor.y, ed.shOutlineColor.z };
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
+            if (ed.hasAnimator) {
+                auto* an = e.AddComponent<AnimatorComponent>();
+                an->clipIndex = ed.anClip; an->speed = ed.anSpeed; an->loop = ed.anLoop; an->blendTime = ed.anBlendTime;
+            }
         }
 
         // Entityの今のTransform（インスタンスごとに残す値）

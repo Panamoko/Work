@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 16,
+    "schemaVersion": 17,
     "entities": [
         {
             "name": "Camera",
@@ -111,7 +111,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0
+            "shRoughness": -1.0,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225
         },
         {
             "name": "ExampleStage.glb",
@@ -227,7 +232,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": 0.4924790561199188
+            "shRoughness": 0.4924790561199188,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225
         },
         {
             "name": "Enemy",
@@ -353,7 +363,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0
+            "shRoughness": -1.0,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225
         },
         {
             "name": "GameRule",
@@ -465,7 +480,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0
+            "shRoughness": -1.0,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225
         },
         {
             "name": "Entity",
@@ -577,7 +597,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0
+            "shRoughness": -1.0,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225
         },
         {
             "name": "Entity",
@@ -689,7 +714,12 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0
+            "shRoughness": -1.0,
+            "hasAnimator": true,
+            "anClip": 6,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.5
         }
     ]
 }
