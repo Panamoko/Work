@@ -281,6 +281,12 @@
     <ClInclude Include="Source\Engine\Graphics\PostProcess.h">
       <Filter>Source\Engine\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Systems\AnimationSystem.h">
+      <Filter>Source\Engine\Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Scene\AnimatorComponent.h">
+      <Filter>Source\Engine\Scene</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -414,6 +420,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Graphics\PostProcess.cpp">
       <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Systems\AnimationSystem.cpp">
+      <Filter>Source\Engine\Systems</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

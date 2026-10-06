@@ -51,10 +51,25 @@ namespace uel {
             shadow.DrawMesh(context, *mesh, t->GetWorldMatrix());
         }
     }
+
+    namespace {
+        // AnimationSystem が計算した姿勢があればそれを使う。
+        // まだ無いとき（ジョイントの数が合わないとき）だけ、その場で計算する。
+        const std::vector<DirectX::XMFLOAT4X4>& PaletteOf(const SkinnedMeshComponent& sk, const SkinnedModel& cpu,
+            std::vector<DirectX::XMFLOAT4X4>& fallback)
+        {
+            if (!sk.palette.empty() && sk.palette.size() == cpu.skeleton.joints.size()) return sk.palette;
+            const AnimationClip* clip =
+                (sk.clipIndex >= 0 && sk.clipIndex < (int)cpu.clips.size()) ? &cpu.clips[sk.clipIndex] : nullptr;
+            EvaluatePalette(cpu.skeleton, clip, sk.time, fallback);
+            return fallback;
+        }
+    }
+
     void RenderSystem::RenderSkinned(World& world, SkinnedMeshShader& shader, SkinnedModelCache& cache,
         ID3D11Device* device, ID3D11DeviceContext* context, const DirectX::XMFLOAT4X4& viewProj)
     {
-        std::vector<DirectX::XMFLOAT4X4> palette;
+        std::vector<DirectX::XMFLOAT4X4> fallback;
         for (const auto& slot : world.Slots()) {
             if (!slot) continue;
             Entity* e = slot.get();
@@ -65,11 +80,7 @@ namespace uel {
             auto model = cache.GetOrLoad(device, sk->assetPath, sk->animPath);
             if (!model || !model->Valid()) continue;
 
-            const auto& clips = model->Cpu().clips;
-            const AnimationClip* clip =
-                (sk->clipIndex >= 0 && sk->clipIndex < (int)clips.size()) ? &clips[sk->clipIndex] : nullptr;
-
-            EvaluatePalette(model->Cpu().skeleton, clip, sk->time, palette);
+            const auto& palette = PaletteOf(*sk, model->Cpu(), fallback);
             const ShaderComponent* sc = e->GetComponent<ShaderComponent>();
             const ShadingParams shading = sc ? sc->params : ShadingParams{};
             shader.Draw(context, *model, t->GetWorldMatrix(), viewProj, sk->color, shading, palette);
@@ -79,7 +90,7 @@ namespace uel {
     void RenderSystem::RenderShadowSkinned(World& world, EngineShadowMap& shadow, SkinnedModelCache& cache,
         ID3D11Device* device, ID3D11DeviceContext* context)
     {
-        std::vector<DirectX::XMFLOAT4X4> palette;
+        std::vector<DirectX::XMFLOAT4X4> fallback;
         for (const auto& slot : world.Slots()) {
             if (!slot) continue;
             Entity* e = slot.get();
@@ -90,13 +101,10 @@ namespace uel {
             auto model = cache.GetOrLoad(device, sk->assetPath, sk->animPath);
             if (!model || !model->Valid()) continue;
 
-            const auto& clips = model->Cpu().clips;
-            const AnimationClip* clip =
-                (sk->clipIndex >= 0 && sk->clipIndex < (int)clips.size()) ? &clips[sk->clipIndex] : nullptr;
-
-            EvaluatePalette(model->Cpu().skeleton, clip, sk->time, palette);   // 本描画と同じ姿勢で影を落とす
-            shadow.DrawSkinned(context, *model, t->GetWorldMatrix(), palette);
+            // 本描画と同じ姿勢で影を落とす（計算はしない。AnimationSystem の結果を読むだけ）
+            shadow.DrawSkinned(context, *model, t->GetWorldMatrix(), PaletteOf(*sk, model->Cpu(), fallback));
         }
     }
+
 
 } // namespace uel

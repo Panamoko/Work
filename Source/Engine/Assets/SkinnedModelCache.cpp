@@ -12,7 +12,11 @@ namespace uel {
 
         SkinnedModel cpu;
         if (!LoadSkinnedModel(meshPath, cpu)) { map[key] = nullptr; return nullptr; }
-        if (!animPath.empty()) LoadAnimationsFromFile(animPath, cpu);   // ★別ファイルのアニメを合成
+        if (!animPath.empty()) {
+            const size_t before = cpu.clips.size();
+            LoadAnimationsFromFile(animPath, cpu);
+            cpu.clipsFromAnimFile = (int)(cpu.clips.size() - before);
+        }
         auto rm = std::make_shared<SkinnedRenderModel>();
         if (!rm->Upload(device, cpu)) { map[key] = nullptr; return nullptr; }
         map[key] = rm;

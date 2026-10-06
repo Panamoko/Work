@@ -17,6 +17,7 @@ namespace uel {
         float    weights[4];
     };
 
+
     struct SkinnedTexture { int width = 0, height = 0; std::vector<uint8_t> rgba; };
     struct SkinnedSubmesh { uint32_t indexOffset = 0, indexCount = 0; std::string name; int texture = -1; };
 
@@ -27,6 +28,7 @@ namespace uel {
         std::vector<uint32_t>       indices;
         std::vector<SkinnedSubmesh> submeshes;
         std::vector<SkinnedTexture> textures;   // ②-2でSRV化
+        int clipsFromAnimFile = 0;              // Anim GLB（別ファイル）から追加されたクリップの数
         bool Valid() const { return !vertices.empty() && !indices.empty(); }
     };
 

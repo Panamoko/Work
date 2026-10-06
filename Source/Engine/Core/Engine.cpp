@@ -8,6 +8,8 @@
 #include "Engine/Serialization/StageSerializer.h"
 #include "Engine/Assets/GltfSkinnedLoader.h"
 #include "Engine/Game/ScreenUIComponent.h"
+#include "Engine/Systems/AnimationSystem.h"
+#include "Engine/Assets/SkinnedModelCache.h"
 
 #include <filesystem>
 #include <imgui.h>
@@ -179,7 +181,7 @@ namespace uel {
             if (!refreshed.empty())
                 for (auto& s : scenes) StageSerializer::RefreshPrefabInstances(s.world, refreshed.c_str());
             Update();
-
+            AnimationSystem::Update(aw, ImGui::GetIO().DeltaTime, GlobalSkinnedCache(), graphics->GetDevice());
             viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting, postSettings);
             graphics->BeginFrame(0.10f, 0.12f, 0.15f, 1.0f);
             imgui->EndFrame();

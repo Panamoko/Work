@@ -356,124 +356,12 @@
             "shRoughness": -1.0
         },
         {
-            "name": "Entity",
-            "transform": {
-                "position": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": -1.1701328754425049
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": false,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": true,
-            "skAsset": "Data/Model/Mr.Incredible/Player.glb",
-            "skClip": 5,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
-                "w": 1.0
-            },
-            "skAnim": "Data/Model/Mr.Incredible/Player.glb",
-            "hasNavObs": false,
-            "navHalfX": 1.0,
-            "navHalfZ": 1.0,
-            "hasUI": false,
-            "uiTitle": "",
-            "uiSub": "",
-            "uiButton": "",
-            "uiNext": "",
-            "uiShowResult": false,
-            "hasRule": false,
-            "ruleWin": "",
-            "ruleLose": "",
-            "ruleDelay": 2.0,
-            "prefabPath": "",
-            "hasHitbox": false,
-            "hbBodyBottom": 0.30000001192092898,
-            "hbBodyTop": 1.2999999523162842,
-            "hbBodyRadius": 0.3499999940395355,
-            "hbHeadHeight": 1.600000023841858,
-            "hbHeadRadius": 0.2199999988079071,
-            "hbHeadMul": 2.0,
-            "hasSpawner": false,
-            "spPrefab": "",
-            "spWaves": 3,
-            "spBase": 3,
-            "spInc": 2,
-            "spInterval": 0.800000011920929,
-            "spFirstDelay": 1.0,
-            "spWaveDelay": 3.0,
-            "spRadius": 2.0,
-            "hasShader": false,
-            "shMode": 0,
-            "shReceiveShadow": true,
-            "shSpecStrength": 0.0,
-            "shRimStrength": 0.0,
-            "shRimPower": 3.0,
-            "shRimColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0
-            },
-            "shToonThreshold": 0.5,
-            "shToonSoftness": 0.019999999552965165,
-            "shToonShade": {
-                "x": 0.6000000238418579,
-                "y": 0.6000000238418579,
-                "z": 0.699999988079071
-            },
-            "shOutlineWidth": 0.0,
-            "shOutlineColor": {
-                "x": 0.05000000074505806,
-                "y": 0.05000000074505806,
-                "z": 0.05000000074505806
-            },
-            "shToonTexSteps": 0.0,
-            "shToonTexSmooth": 0.0,
-            "shMetallic": 0.0,
-            "shRoughness": -1.0
-        },
-        {
             "name": "GameRule",
             "transform": {
                 "position": {
-                    "x": 0.0,
-                    "y": -0.891842782497406,
-                    "z": 0.0
+                    "x": 2.4254539012908937,
+                    "y": 2.992614507675171,
+                    "z": 6.7085747718811039
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -541,6 +429,118 @@
             "hbHeadHeight": 1.600000023841858,
             "hbHeadRadius": 0.2199999988079071,
             "hbHeadMul": 2.0,
+            "hasSpawner": true,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0
+        },
+        {
+            "name": "Entity",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 1.6269606351852418
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": true,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0,
+                    "w": 1.0
+                },
+                "visible": false,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": true,
+            "skAsset": "Data/Model/Character/steampunk_robot_-_police_enforcer_variant.glb",
+            "skClip": 0,
+            "skSpeed": 1.0700000524520875,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0,
+                "w": 1.0
+            },
+            "skAnim": "Data/Model/Character/steampunk_robot_-_police_enforcer_variant.glb",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0,
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
             "hasSpawner": false,
             "spPrefab": "",
             "spWaves": 3,
@@ -580,64 +580,50 @@
             "shRoughness": -1.0
         },
         {
-            "name": "Enemy",
+            "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 2.759186267852783,
+                    "x": 0.0,
                     "y": 0.0,
-                    "z": -1.9258813858032227
+                    "z": 0.0
                 },
                 "rotationEuler": {
                     "x": 0.0,
-                    "y": -0.0,
+                    "y": 0.0,
                     "z": 0.0
                 },
                 "scale": {
-                    "x": 0.5,
-                    "y": 0.5,
-                    "z": 0.5
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
-                "color": {
                     "x": 1.0,
                     "y": 1.0,
-                    "z": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": false,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
                     "w": 1.0
                 },
-                "visible": false,
+                "visible": true,
                 "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
+                "hiddenSubmesh": [],
+                "submeshRole": []
             },
-            "hasHP": true,
+            "hasHP": false,
             "hp": 100.0,
             "maxHp": 100.0,
-            "hasOpponent": true,
+            "hasOpponent": false,
             "oppMoveSpeed": 2.0,
             "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
+            "hasPlayer": true,
             "hasSkinned": true,
-            "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
-            "skClip": 0,
+            "skAsset": "Data/Model/GLB format/character-a.glb",
+            "skClip": 1,
             "skSpeed": 1.0,
-            "skLoop": false,
+            "skLoop": true,
             "skVisible": true,
             "skColor": {
                 "x": 1.0,
@@ -645,7 +631,7 @@
                 "z": 1.0,
                 "w": 1.0
             },
-            "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb",
+            "skAnim": "Data/Model/Character/Mannequin_Large.glb",
             "hasNavObs": false,
             "navHalfX": 1.0,
             "navHalfZ": 1.0,
@@ -659,7 +645,7 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": "Data/Prefabs/Enemy.prefab.json",
+            "prefabPath": "",
             "hasHitbox": false,
             "hbBodyBottom": 0.30000001192092898,
             "hbBodyTop": 1.2999999523162842,
@@ -676,8 +662,8 @@
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
             "spRadius": 2.0,
-            "hasShader": true,
-            "shMode": 2,
+            "hasShader": false,
+            "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
             "shRimStrength": 0.0,
@@ -703,7 +689,7 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": 0.4924790561199188
+            "shRoughness": -1.0
         }
     ]
 }

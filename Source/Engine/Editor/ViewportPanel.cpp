@@ -50,25 +50,7 @@ namespace uel {
         ImGuizmo::BeginFrame();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
-        // スキニング：クリップ時間を進める（編集/プレイ両方でプレビュー）
-        {
-            float dt = ImGui::GetIO().DeltaTime;
-            for (const auto& slot : world.Slots()) {
-                if (!slot) continue;
-                auto* sk = slot->GetComponent<SkinnedMeshComponent>();
-                if (!sk || !sk->playing || sk->assetPath.empty()) continue;
-                auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
-                if (!model) continue;
-                const auto& clips = model->Cpu().clips;
-                if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) continue;
-                float dur = clips[sk->clipIndex].duration;
-                sk->time += dt * sk->speed;
-                if (dur > 0.0f) {
-                    if (sk->loop) { sk->time = fmodf(sk->time, dur); if (sk->time < 0.0f) sk->time += dur; }
-                    else if (sk->time > dur) sk->time = dur;
-                }
-            }
-        }
+
         if (!playMode) {
             auto modeButton = [&](const char* label, int op) {
                 bool active = (gizmoOp == op);

@@ -172,6 +172,7 @@
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h" />
     <ClInclude Include="Source\Engine\Physics\HitShapes.h" />
     <ClInclude Include="Source\Engine\Platform\Window.h" />
+    <ClInclude Include="Source\Engine\Scene\AnimatorComponent.h" />
     <ClInclude Include="Source\Engine\Scene\Component.h" />
     <ClInclude Include="Source\Engine\Scene\Entity.h" />
     <ClInclude Include="Source\Engine\Scene\EntityId.h" />
@@ -183,6 +184,7 @@
     <ClInclude Include="Source\Engine\Scene\TransformComponent.h" />
     <ClInclude Include="Source\Engine\Scene\World.h" />
     <ClInclude Include="Source\Engine\Serialization\StageSerializer.h" />
+    <ClInclude Include="Source\Engine\Systems\AnimationSystem.h" />
     <ClInclude Include="Source\Engine\Systems\RenderSystem.h" />
   </ItemGroup>
   <ItemGroup>
@@ -229,6 +231,7 @@
     <ClCompile Include="Source\Engine\Platform\Window.cpp" />
     <ClCompile Include="Source\Engine\Scene\World.cpp" />
     <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp" />
+    <ClCompile Include="Source\Engine\Systems\AnimationSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\RenderSystem.cpp" />
   </ItemGroup>
   <ItemGroup>

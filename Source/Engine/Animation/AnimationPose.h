@@ -106,4 +106,20 @@ namespace uel {
         BuildPalette(skel, global, palette);
     }
 
+    // a のポーズから b のポーズへ、alpha（0 = a、1 = b）で混ぜる。out は a や b と同じ変数でもよい。
+// 位置とスケールは線形補間、回転は球面線形補間（近い側を回る）。
+    inline void BlendPose(const LocalPose& a, const LocalPose& b, float alpha, LocalPose& out)
+    {
+        using namespace DirectX;
+        const size_t n = (a.size() < b.size()) ? a.size() : b.size();
+        out.resize(n);
+        for (size_t i = 0; i < n; ++i) {
+            XMVECTOR t = XMVectorLerp(XMLoadFloat3(&a[i].t), XMLoadFloat3(&b[i].t), alpha);
+            XMVECTOR r = XMQuaternionNormalize(XMQuaternionSlerp(XMLoadFloat4(&a[i].r), XMLoadFloat4(&b[i].r), alpha));
+            XMVECTOR s = XMVectorLerp(XMLoadFloat3(&a[i].s), XMLoadFloat3(&b[i].s), alpha);
+            XMStoreFloat3(&out[i].t, t); XMStoreFloat4(&out[i].r, r); XMStoreFloat3(&out[i].s, s);
+        }
+    }
+
+
 } // namespace uel
