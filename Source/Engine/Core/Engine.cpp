@@ -94,6 +94,7 @@ namespace uel {
         // 保存済みファイルがあれば読み込む（無ければデモ配置のまま）
         for (auto& s : scenes)
             StageSerializer::Load(s.world, (s.name + ".json").c_str());
+            StageSerializer::LoadEnvironment(lighting, postSettings, "Environment.json");   // 無ければ既定値のまま
         {
             SkinnedModel sm;
             if (LoadSkinnedModel("Data/YourRiggedModel.glb", sm)) {
@@ -133,10 +134,11 @@ namespace uel {
             std::vector<std::string> names; names.reserve(scenes.size());
             for (auto& s : scenes) names.push_back(s.name);
 
-            bool togglePlay = false, addScene = false;
+            bool togglePlay = false, addScene = false, sceneSaved = false;
             std::string renameScene;
             DrawMainMenuBar(scenes[activeScene].world, scenes[activeScene].selected, history,
-                mode == EditorMode::Play, togglePlay, names, activeScene, addScene, renameScene);
+                mode == EditorMode::Play, togglePlay, names, activeScene, addScene, renameScene, sceneSaved);
+            if (sceneSaved) StageSerializer::SaveEnvironment(lighting, postSettings, "Environment.json");
             if (addScene) {
                 auto taken = [&](const std::string& nm) { for (auto& s : scenes) if (s.name == nm) return true; return false; };
                 int n = (int)scenes.size();

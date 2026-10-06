@@ -17,7 +17,7 @@ namespace uel {
     void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
         bool playing, bool& togglePlayRequested,
         const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested,
-        std::string& renameSceneRequested);
+        std::string& renameSceneRequested, bool& sceneSaved);
     void DrawAssetBrowserPanel(World& world, EntityId& selected, CommandHistory& history);
     void DrawAnimationEditorPanel(World& world, EntityId selected, ID3D11Device* device);
 

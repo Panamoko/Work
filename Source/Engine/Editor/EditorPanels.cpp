@@ -477,7 +477,7 @@ namespace uel {
     void DrawMainMenuBar(World& world, EntityId& selected, CommandHistory& history,
         bool playing, bool& togglePlayRequested,
         const std::vector<std::string>& sceneNames, int& activeScene, bool& addSceneRequested,
-        std::string& renameSceneRequested)
+        std::string& renameSceneRequested, bool& sceneSaved)
     {
         static char sceneRenameBuf[64] = "";
         // 現在のSceneごとに保存先を変える
@@ -538,6 +538,7 @@ namespace uel {
         if (doSave) {
             StageSerializer::Save(world, kPath.c_str());
             StageSerializer::SaveSceneList(sceneNames, "Scenes.json");   // ★Scene一覧も保存
+            sceneSaved = true;   // Engine saves Environment.json when it sees this
         }
         if (doLoad && StageSerializer::Load(world, kPath.c_str())) { selected = EntityId{}; history.Clear(); }
     }
@@ -666,6 +667,7 @@ namespace uel {
         ImGui::ColorEdit3("Light Color", &light.color.x);
         ImGui::DragFloat("Ambient", &light.ambient, 0.01f, 0.0f, 1.0f);
         ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 5.0f);
+        ImGui::DragFloat("Shadow Range", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
 
         ImGui::Separator();
         ImGui::TextUnformatted("Post Process");
@@ -681,8 +683,10 @@ namespace uel {
             ImGui::DragFloat("Depth Threshold", &post.edgeDepthThreshold, 0.001f, 0.001f, 1.0f, "%.3f");
             ImGui::DragFloat("Normal Threshold", &post.edgeNormalThreshold, 0.005f, 0.01f, 2.0f);
             ImGui::DragFloat("Fade Distance", &post.edgeFadeDistance, 0.5f, 1.0f, 100.0f);
-            ImGui::DragFloat("Shadow Range", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
         }
+
+        ImGui::Separator();
+        ImGui::TextDisabled("Saved to Environment.json by Save Scene (Ctrl+S)");
         ImGui::End();
     }
 

@@ -1,9 +1,8 @@
-#pragma once
+﻿#pragma once
 #include "Engine/Animation/Skeleton.h"
 #include "Engine/Animation/AnimationClip.h"
 #include <DirectXMath.h>
 #include <vector>
-#include <functional>
 
 namespace uel {
 
@@ -38,50 +37,73 @@ namespace uel {
         return keys.back().value;
     }
 
-    // clip==nullptr �Ȃ� bind �|�[�Y�Bpalette[i] = inverseBind[i] * globalPose[i]�i�s�x�N�g���`���j
-    inline void EvaluatePalette(const Skeleton& skel, const AnimationClip* clip,
-        float time, std::vector<DirectX::XMFLOAT4X4>& palette)
+    // ボーン1本ぶんのローカル姿勢。ブレンドはこの形のまま混ぜる（行列にしてからでは混ぜられない）。
+    struct BoneTRS {
+        DirectX::XMFLOAT3 t{ 0,0,0 };
+        DirectX::XMFLOAT4 r{ 0,0,0,1 };
+        DirectX::XMFLOAT3 s{ 1,1,1 };
+    };
+    using LocalPose = std::vector<BoneTRS>;     // skeleton.bones と同じ並び
+
+    // 1) クリップを時刻 time でサンプルして、ローカル姿勢を作る。
+    //    clip == nullptr、またはトラックの無いボーンは bind ポーズのまま。
+    inline void SampleLocalPose(const Skeleton& skel, const AnimationClip* clip, float time, LocalPose& pose)
+    {
+        const int n = (int)skel.bones.size();
+        pose.resize(n);
+        for (int i = 0; i < n; ++i) {
+            pose[i].t = skel.bones[i].t; pose[i].r = skel.bones[i].r; pose[i].s = skel.bones[i].s;
+        }
+        if (!clip) return;
+        for (const BoneTrack& tr : clip->tracks) {
+            if (tr.bone < 0 || tr.bone >= n) continue;
+            BoneTRS& b = pose[tr.bone];
+            b.t = SampleVec3(tr.pos, time, b.t);
+            b.r = SampleQuat(tr.rot, time, b.r);
+            b.s = SampleVec3(tr.scl, time, b.s);
+        }
+    }
+
+    // 2) ローカル姿勢を親から順に掛けて、モデル空間の行列にする（行ベクトル形式： 子 = ローカル * 親）。
+    //    bones は親が先に並んでいるので、前から1回なめるだけでよい。
+    inline void ComputeGlobalPose(const Skeleton& skel, const LocalPose& pose, std::vector<DirectX::XMFLOAT4X4>& global)
     {
         using namespace DirectX;
         const int n = (int)skel.bones.size();
-        palette.assign(n, XMFLOAT4X4());
-        if (n == 0) return;
-
-        std::vector<int> boneToTrack(n, -1);
-        if (clip) for (int ti = 0; ti < (int)clip->tracks.size(); ++ti) {
-            int b = clip->tracks[ti].bone;
-            if (b >= 0 && b < n) boneToTrack[b] = ti;
-        }
-
-        std::vector<XMMATRIX> local(n), global(n);
-        std::vector<char> done(n, 0);
-
+        global.resize(n);
         for (int i = 0; i < n; ++i) {
-            XMFLOAT3 t = skel.bones[i].t; XMFLOAT4 r = skel.bones[i].r; XMFLOAT3 s = skel.bones[i].s;
-            if (clip && boneToTrack[i] >= 0) {
-                const BoneTrack& tr = clip->tracks[boneToTrack[i]];
-                t = SampleVec3(tr.pos, time, t);
-                r = SampleQuat(tr.rot, time, r);
-                s = SampleVec3(tr.scl, time, s);
-            }
-            local[i] = XMMatrixScalingFromVector(XMLoadFloat3(&s))
-                * XMMatrixRotationQuaternion(XMLoadFloat4(&r))
-                * XMMatrixTranslationFromVector(XMLoadFloat3(&t));
+            XMMATRIX local = XMMatrixScalingFromVector(XMLoadFloat3(&pose[i].s))
+                * XMMatrixRotationQuaternion(XMLoadFloat4(&pose[i].r))
+                * XMMatrixTranslationFromVector(XMLoadFloat3(&pose[i].t));
+            const int p = skel.bones[i].parent;
+            XMMATRIX g = (p >= 0 && p < i) ? local * XMLoadFloat4x4(&global[p]) : local;
+            XMStoreFloat4x4(&global[i], g);
         }
+    }
 
-        std::function<XMMATRIX(int)> resolve = [&](int i) -> XMMATRIX {
-            if (done[i]) return global[i];
-            int p = skel.bones[i].parent;
-            global[i] = (p >= 0 && p < n) ? local[i] * resolve(p) : local[i];
-            done[i] = 1;
-            return global[i];
-            };
-        for (int i = 0; i < n; ++i) resolve(i);
-
-        for (int i = 0; i < n; ++i) {
-            XMMATRIX P = XMLoadFloat4x4(&skel.bones[i].inverseBind) * global[i];
-            XMStoreFloat4x4(&palette[i], P);
+    // 3) スキニング用のパレットを作る。palette[j] = inverseBind[j] * global[joints[j].bone]
+    inline void BuildPalette(const Skeleton& skel, const std::vector<DirectX::XMFLOAT4X4>& global,
+        std::vector<DirectX::XMFLOAT4X4>& palette)
+    {
+        using namespace DirectX;
+        const int n = (int)skel.joints.size();
+        palette.resize(n);
+        for (int j = 0; j < n; ++j) {
+            const SkinJoint& sj = skel.joints[j];
+            XMMATRIX g = (sj.bone >= 0 && sj.bone < (int)global.size()) ? XMLoadFloat4x4(&global[sj.bone]) : XMMatrixIdentity();
+            XMStoreFloat4x4(&palette[j], XMLoadFloat4x4(&sj.inverseBind) * g);
         }
+    }
+
+    // 1) 〜 3) をまとめて行う（クリップ1つをそのまま再生するとき用）。
+    inline void EvaluatePalette(const Skeleton& skel, const AnimationClip* clip,
+        float time, std::vector<DirectX::XMFLOAT4X4>& palette)
+    {
+        LocalPose pose;
+        std::vector<DirectX::XMFLOAT4X4> global;
+        SampleLocalPose(skel, clip, time, pose);
+        ComputeGlobalPose(skel, pose, global);
+        BuildPalette(skel, global, palette);
     }
 
 } // namespace uel

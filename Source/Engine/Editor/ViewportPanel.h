@@ -53,7 +53,7 @@ namespace uel {
         TransformEditSession gizmoSession;
         EditorCamera camera;
 
-        bool  showGrid = true;
+        bool  showGrid = false;
         bool  snapEnabled = false;
         bool  showHitboxes = false;
         float snapTranslate = 1.0f;

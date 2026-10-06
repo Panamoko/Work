@@ -230,118 +230,6 @@
             "shRoughness": 0.4924790561199188
         },
         {
-            "name": "Entity",
-            "transform": {
-                "position": {
-                    "x": -2.5056002140045168,
-                    "y": -9.499490261077881e-7,
-                    "z": -0.001836523413658142
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 5.799999237060547,
-                    "y": 5.799999237060547,
-                    "z": 5.799999237060547
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": true,
-            "skAsset": "",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
-                "w": 1.0
-            },
-            "skAnim": "",
-            "hasNavObs": true,
-            "navHalfX": 1.0,
-            "navHalfZ": 1.0,
-            "hasUI": false,
-            "uiTitle": "",
-            "uiSub": "",
-            "uiButton": "",
-            "uiNext": "",
-            "uiShowResult": false,
-            "hasRule": false,
-            "ruleWin": "",
-            "ruleLose": "",
-            "ruleDelay": 2.0,
-            "prefabPath": "",
-            "hasHitbox": false,
-            "hbBodyBottom": 0.30000001192092898,
-            "hbBodyTop": 1.2999999523162842,
-            "hbBodyRadius": 0.3499999940395355,
-            "hbHeadHeight": 1.600000023841858,
-            "hbHeadRadius": 0.2199999988079071,
-            "hbHeadMul": 2.0,
-            "hasSpawner": false,
-            "spPrefab": "",
-            "spWaves": 3,
-            "spBase": 3,
-            "spInc": 2,
-            "spInterval": 0.800000011920929,
-            "spFirstDelay": 1.0,
-            "spWaveDelay": 3.0,
-            "spRadius": 2.0,
-            "hasShader": false,
-            "shMode": 0,
-            "shReceiveShadow": true,
-            "shSpecStrength": 0.0,
-            "shRimStrength": 0.0,
-            "shRimPower": 3.0,
-            "shRimColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0
-            },
-            "shToonThreshold": 0.5,
-            "shToonSoftness": 0.019999999552965165,
-            "shToonShade": {
-                "x": 0.6000000238418579,
-                "y": 0.6000000238418579,
-                "z": 0.699999988079071
-            },
-            "shOutlineWidth": 0.0,
-            "shOutlineColor": {
-                "x": 0.05000000074505806,
-                "y": 0.05000000074505806,
-                "z": 0.05000000074505806
-            },
-            "shToonTexSteps": 0.0,
-            "shToonTexSmooth": 0.0,
-            "shMetallic": 0.0,
-            "shRoughness": -1.0
-        },
-        {
             "name": "Enemy",
             "transform": {
                 "position": {
@@ -468,12 +356,12 @@
             "shRoughness": -1.0
         },
         {
-            "name": "Player",
+            "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 2.3724112510681154,
-                    "y": 2.0235061645507814,
-                    "z": -6.542430877685547
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": -1.1701328754425049
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -488,65 +376,17 @@
             },
             "hasMesh": true,
             "mesh": {
-                "assetId": "Data/Model/unitychan/unitychan.glb",
+                "assetId": "",
                 "color": {
                     "x": 1.0,
                     "y": 1.0,
                     "z": 1.0,
                     "w": 1.0
                 },
-                "visible": true,
+                "visible": false,
                 "firstPerson": false,
-                "hiddenSubmesh": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "submeshRole": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ]
+                "hiddenSubmesh": [],
+                "submeshRole": []
             },
             "hasHP": false,
             "hp": 100.0,
@@ -554,10 +394,10 @@
             "hasOpponent": false,
             "oppMoveSpeed": 2.0,
             "oppStopRange": 1.2000000476837159,
-            "hasPlayer": true,
+            "hasPlayer": false,
             "hasSkinned": true,
-            "skAsset": "Data/Model/unitychan/unitychan.glbData/Model/unitychan/unitychan.glb",
-            "skClip": 0,
+            "skAsset": "Data/Model/Mr.Incredible/Player.glb",
+            "skClip": 5,
             "skSpeed": 1.0,
             "skLoop": true,
             "skVisible": true,
@@ -567,7 +407,7 @@
                 "z": 1.0,
                 "w": 1.0
             },
-            "skAnim": "Data/Model/unitychan/unitychan.glb",
+            "skAnim": "Data/Model/Mr.Incredible/Player.glb",
             "hasNavObs": false,
             "navHalfX": 1.0,
             "navHalfZ": 1.0,
@@ -632,12 +472,12 @@
             "transform": {
                 "position": {
                     "x": 0.0,
-                    "y": 0.0,
+                    "y": -0.891842782497406,
                     "z": 0.0
                 },
                 "rotationEuler": {
                     "x": 0.0,
-                    "y": 0.0,
+                    "y": -0.0,
                     "z": 0.0
                 },
                 "scale": {
@@ -740,234 +580,6 @@
             "shRoughness": -1.0
         },
         {
-            "name": "Entity",
-            "transform": {
-                "position": {
-                    "x": 5.704342365264893,
-                    "y": 5.364521026611328,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [],
-                "submeshRole": []
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": false,
-            "skAsset": "",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.0,
-                "w": 1.0
-            },
-            "skAnim": "",
-            "hasNavObs": false,
-            "navHalfX": 1.0,
-            "navHalfZ": 1.0,
-            "hasUI": false,
-            "uiTitle": "",
-            "uiSub": "",
-            "uiButton": "",
-            "uiNext": "",
-            "uiShowResult": false,
-            "hasRule": false,
-            "ruleWin": "",
-            "ruleLose": "",
-            "ruleDelay": 2.0,
-            "prefabPath": "",
-            "hasHitbox": false,
-            "hbBodyBottom": 0.30000001192092898,
-            "hbBodyTop": 1.2999999523162842,
-            "hbBodyRadius": 0.3499999940395355,
-            "hbHeadHeight": 1.600000023841858,
-            "hbHeadRadius": 0.2199999988079071,
-            "hbHeadMul": 2.0,
-            "hasSpawner": true,
-            "spPrefab": "Data/Prefabs/Enemy.prefab.json",
-            "spWaves": 3,
-            "spBase": 3,
-            "spInc": 2,
-            "spInterval": 0.800000011920929,
-            "spFirstDelay": 1.0,
-            "spWaveDelay": 3.0,
-            "spRadius": 2.0,
-            "hasShader": false,
-            "shMode": 0,
-            "shReceiveShadow": true,
-            "shSpecStrength": 0.0,
-            "shRimStrength": 0.0,
-            "shRimPower": 3.0,
-            "shRimColor": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0
-            },
-            "shToonThreshold": 0.5,
-            "shToonSoftness": 0.019999999552965165,
-            "shToonShade": {
-                "x": 0.6000000238418579,
-                "y": 0.6000000238418579,
-                "z": 0.699999988079071
-            },
-            "shOutlineWidth": 0.0,
-            "shOutlineColor": {
-                "x": 0.05000000074505806,
-                "y": 0.05000000074505806,
-                "z": 0.05000000074505806
-            },
-            "shToonTexSteps": 0.0,
-            "shToonTexSmooth": 0.0,
-            "shMetallic": 0.0,
-            "shRoughness": -1.0
-        },
-        {
-            "name": "Sphere.glb",
-            "transform": {
-                "position": {
-                    "x": 3.048041820526123,
-                    "y": 1.7723215818405152,
-                    "z": 0.0
-                },
-                "rotationEuler": {
-                    "x": 0.0,
-                    "y": -0.0,
-                    "z": 0.0
-                },
-                "scale": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
-                }
-            },
-            "hasMesh": true,
-            "mesh": {
-                "assetId": "Data/Model/Shape/Sphere.glb",
-                "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
-                    "w": 1.0
-                },
-                "visible": true,
-                "firstPerson": false,
-                "hiddenSubmesh": [
-                    0
-                ],
-                "submeshRole": [
-                    0
-                ]
-            },
-            "hasHP": false,
-            "hp": 100.0,
-            "maxHp": 100.0,
-            "hasOpponent": false,
-            "oppMoveSpeed": 2.0,
-            "oppStopRange": 1.2000000476837159,
-            "hasPlayer": false,
-            "hasSkinned": false,
-            "skAsset": "",
-            "skClip": 0,
-            "skSpeed": 1.0,
-            "skLoop": true,
-            "skVisible": true,
-            "skColor": {
-                "x": 0.0,
-                "y": 0.0,
-                "z": 0.0,
-                "w": 1.0
-            },
-            "skAnim": "",
-            "hasNavObs": false,
-            "navHalfX": 1.0,
-            "navHalfZ": 1.0,
-            "hasUI": false,
-            "uiTitle": "",
-            "uiSub": "",
-            "uiButton": "",
-            "uiNext": "",
-            "uiShowResult": false,
-            "hasRule": false,
-            "ruleWin": "",
-            "ruleLose": "",
-            "ruleDelay": 2.0,
-            "prefabPath": "",
-            "hasHitbox": false,
-            "hbBodyBottom": 0.30000001192092898,
-            "hbBodyTop": 1.2999999523162842,
-            "hbBodyRadius": 0.3499999940395355,
-            "hbHeadHeight": 1.600000023841858,
-            "hbHeadRadius": 0.2199999988079071,
-            "hbHeadMul": 2.0,
-            "hasSpawner": false,
-            "spPrefab": "",
-            "spWaves": 3,
-            "spBase": 3,
-            "spInc": 2,
-            "spInterval": 0.800000011920929,
-            "spFirstDelay": 1.0,
-            "spWaveDelay": 3.0,
-            "spRadius": 2.0,
-            "hasShader": true,
-            "shMode": 0,
-            "shReceiveShadow": true,
-            "shSpecStrength": 0.0,
-            "shRimStrength": 1.0,
-            "shRimPower": 0.5,
-            "shRimColor": {
-                "x": 1.0,
-                "y": 0.0,
-                "z": 0.0
-            },
-            "shToonThreshold": 0.5,
-            "shToonSoftness": 0.019999999552965165,
-            "shToonShade": {
-                "x": 0.6000000238418579,
-                "y": 0.6000000238418579,
-                "z": 0.699999988079071
-            },
-            "shOutlineWidth": 0.0,
-            "shOutlineColor": {
-                "x": 0.05000000074505806,
-                "y": 0.05000000074505806,
-                "z": 0.05000000074505806
-            },
-            "shToonTexSteps": 0.0,
-            "shToonTexSmooth": 0.0,
-            "shMetallic": 0.0,
-            "shRoughness": 0.36762410402297976
-        },
-        {
             "name": "Enemy",
             "transform": {
                 "position": {
@@ -1025,7 +637,7 @@
             "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
             "skClip": 0,
             "skSpeed": 1.0,
-            "skLoop": true,
+            "skLoop": false,
             "skVisible": true,
             "skColor": {
                 "x": 1.0,
@@ -1082,7 +694,7 @@
                 "y": 0.6000000238418579,
                 "z": 0.699999988079071
             },
-            "shOutlineWidth": 0.019999999552965165,
+            "shOutlineWidth": 0.0,
             "shOutlineColor": {
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,

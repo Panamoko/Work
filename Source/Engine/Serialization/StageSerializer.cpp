@@ -13,6 +13,8 @@
 #include "Engine/Game/HitboxComponent.h"
 #include "Engine/Game/SpawnerComponent.h"
 #include "Engine/Scene/ShaderComponent.h"
+#include "Engine/Graphics/SceneLighting.h"
+#include "Engine/Graphics/PostProcessSettings.h"
 
 #include <fstream>
 #include <vector>
@@ -431,5 +433,85 @@ namespace uel {
         ApplyPrefab(pd, path, CurrentTransform(e), e);
         return true;
     }
+
+    // ---- Environment（ライトとポストプロセスの設定）----
+    namespace {
+        // 設定ファイルの版。項目を足したら +1 して、serialize に「if (g_envSchema >= N) ar(...);」を足す（Scene と同じ方式）。
+        constexpr int kEnvSchemaLatest = 1;
+        int g_envSchema = kEnvSchemaLatest;
+
+        struct EnvironmentDTO {
+            // ライト
+            Vec3DTO lightDir{ -0.4f, -1.0f, 0.35f };
+            Vec3DTO lightColor{ 1.0f, 0.98f, 0.92f };
+            float   ambient = 0.25f, intensity = 1.0f, shadowRange = 30.0f;
+            // ポストプロセス（確認用の表示モード debugView は保存しない。起動時はいつも Final）
+            float   saturation = 1.0f;
+            bool    edgeEnabled = false;
+            Vec3DTO edgeColor{ 0.05f, 0.05f, 0.05f };
+            float   edgeThickness = 1.0f, edgeDepthThreshold = 0.02f, edgeNormalThreshold = 0.3f, edgeFadeDistance = 60.0f;
+
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(lightDir), CEREAL_NVP(lightColor), CEREAL_NVP(ambient), CEREAL_NVP(intensity), CEREAL_NVP(shadowRange),
+                    CEREAL_NVP(saturation),
+                    CEREAL_NVP(edgeEnabled), CEREAL_NVP(edgeColor), CEREAL_NVP(edgeThickness),
+                    CEREAL_NVP(edgeDepthThreshold), CEREAL_NVP(edgeNormalThreshold), CEREAL_NVP(edgeFadeDistance));   // v1
+            }
+        };
+    }
+
+    bool StageSerializer::SaveEnvironment(const SceneLighting& light, const PostProcessSettings& post, const char* path)
+    {
+        EnvironmentDTO d;
+        d.lightDir = { light.direction.x, light.direction.y, light.direction.z };
+        d.lightColor = { light.color.x, light.color.y, light.color.z };
+        d.ambient = light.ambient; d.intensity = light.intensity; d.shadowRange = light.shadowRange;
+        d.saturation = post.saturation;
+        d.edgeEnabled = post.edgeEnabled;
+        d.edgeColor = { post.edgeColor[0], post.edgeColor[1], post.edgeColor[2] };
+        d.edgeThickness = post.edgeThickness; d.edgeDepthThreshold = post.edgeDepthThreshold;
+        d.edgeNormalThreshold = post.edgeNormalThreshold; d.edgeFadeDistance = post.edgeFadeDistance;
+
+        std::ofstream ofs(path);
+        if (!ofs) return false;
+        int schemaVersion = kEnvSchemaLatest;
+        g_envSchema = kEnvSchemaLatest;
+        cereal::JSONOutputArchive ar(ofs);
+        ar(cereal::make_nvp("schemaVersion", schemaVersion),
+            cereal::make_nvp("environment", d));
+        return true; // ar 破棄時に flush
+    }
+
+    bool StageSerializer::LoadEnvironment(SceneLighting& light, PostProcessSettings& post, const char* path)
+    {
+        std::ifstream ifs(path);
+        if (!ifs) return false;   // ファイルが無い：既定値のまま
+
+        EnvironmentDTO d;
+        int schemaVersion = 0;
+        try {
+            cereal::JSONInputArchive ar(ifs);
+            ar(cereal::make_nvp("schemaVersion", schemaVersion));
+            g_envSchema = schemaVersion;
+            ar(cereal::make_nvp("environment", d));
+        }
+        catch (...) {
+            g_envSchema = kEnvSchemaLatest;
+            return false;         // 壊れている：light / post には何も書かない
+        }
+        g_envSchema = kEnvSchemaLatest;
+
+        // 最後まで読めたときだけ反映する
+        light.direction = { d.lightDir.x, d.lightDir.y, d.lightDir.z };
+        light.color = { d.lightColor.x, d.lightColor.y, d.lightColor.z };
+        light.ambient = d.ambient; light.intensity = d.intensity; light.shadowRange = d.shadowRange;
+        post.saturation = d.saturation;
+        post.edgeEnabled = d.edgeEnabled;
+        post.edgeColor[0] = d.edgeColor.x; post.edgeColor[1] = d.edgeColor.y; post.edgeColor[2] = d.edgeColor.z;
+        post.edgeThickness = d.edgeThickness; post.edgeDepthThreshold = d.edgeDepthThreshold;
+        post.edgeNormalThreshold = d.edgeNormalThreshold; post.edgeFadeDistance = d.edgeFadeDistance;
+        return true;
+    }
+
 
 } // namespace uel
