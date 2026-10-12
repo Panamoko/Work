@@ -12,11 +12,26 @@ namespace uel {
 
         SkinnedModel cpu;
         if (!LoadSkinnedModel(meshPath, cpu)) { map[key] = nullptr; return nullptr; }
-        if (!animPath.empty()) {
+
+        // 別ファイルのアニメを、書かれた順に足していく
+        for (const std::string& file : SplitAnimPaths(animPath)) {
             const size_t before = cpu.clips.size();
-            LoadAnimationsFromFile(animPath, cpu);
-            cpu.clipsFromAnimFile = (int)(cpu.clips.size() - before);
+            LoadAnimationsFromFile(file, cpu);
+
+            // すでに同じ名前のクリップがあれば、後から来たほうを捨てる。
+            // グラフはクリップを名前で探すので、同じ名前が2つあっても先のものしか使われない（T-Pose など）。
+            for (size_t i = before; i < cpu.clips.size(); ) {
+                bool dup = false;
+                for (size_t k = 0; k < i; ++k) if (cpu.clips[k].name == cpu.clips[i].name) { dup = true; break; }
+                if (dup) cpu.clips.erase(cpu.clips.begin() + i);
+                else ++i;
+            }
+
+            const int added = (int)(cpu.clips.size() - before);
+            cpu.clipsFromAnimFiles.push_back(added);    // ファイルごとの数（Inspector の表示用）
+            cpu.clipsFromAnimFile += added;             // 合計
         }
+
         auto rm = std::make_shared<SkinnedRenderModel>();
         if (!rm->Upload(device, cpu)) { map[key] = nullptr; return nullptr; }
         map[key] = rm;

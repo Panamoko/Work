@@ -287,6 +287,21 @@
     <ClInclude Include="Source\Engine\Scene\AnimatorComponent.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimParams.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimNode.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimBlendSpaceNode.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Animation\AnimStateMachineNode.h">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Serialization\AnimGraphSerializer.h">
+      <Filter>Source\Engine\Serialization</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -423,6 +438,18 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Systems\AnimationSystem.cpp">
       <Filter>Source\Engine\Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Animation\AnimNode.cpp">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Animation\AnimBlendSpaceNode.cpp">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Animation\AnimStateMachineNode.cpp">
+      <Filter>Source\Engine\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Serialization\AnimGraphSerializer.cpp">
+      <Filter>Source\Engine\Serialization</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

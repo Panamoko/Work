@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 17,
+    "schemaVersion": 18,
     "entities": [
         {
             "name": "Camera",
@@ -116,7 +116,8 @@
             "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.20000000298023225
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         },
         {
             "name": "ExampleStage.glb",
@@ -206,7 +207,7 @@
             "spWaveDelay": 3.0,
             "spRadius": 2.0,
             "hasShader": true,
-            "shMode": 1,
+            "shMode": 0,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
             "shRimStrength": 0.0,
@@ -232,12 +233,13 @@
             "shToonTexSteps": 0.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": 0.4924790561199188,
+            "shRoughness": 1.0,
             "hasAnimator": false,
             "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.20000000298023225
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         },
         {
             "name": "Enemy",
@@ -336,12 +338,12 @@
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
             "spRadius": 2.0,
-            "hasShader": false,
-            "shMode": 0,
+            "hasShader": true,
+            "shMode": 2,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
-            "shRimStrength": 0.0,
-            "shRimPower": 3.0,
+            "shRimStrength": 0.14000000059604646,
+            "shRimPower": 10.25,
             "shRimColor": {
                 "x": 1.0,
                 "y": 1.0,
@@ -360,15 +362,16 @@
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
             },
-            "shToonTexSteps": 0.0,
+            "shToonTexSteps": 2.0,
             "shToonTexSmooth": 0.0,
-            "shMetallic": 0.0,
-            "shRoughness": -1.0,
+            "shMetallic": 0.28999999165534975,
+            "shRoughness": 1.0,
             "hasAnimator": false,
             "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.20000000298023225
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         },
         {
             "name": "GameRule",
@@ -485,18 +488,19 @@
             "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.20000000298023225
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         },
         {
             "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 0.0,
+                    "x": -0.4059999883174896,
                     "y": 0.0,
-                    "z": 1.6269606351852418
+                    "z": 0.05700000002980232
                 },
                 "rotationEuler": {
-                    "x": 0.0,
+                    "x": 16.0,
                     "y": -0.0,
                     "z": 0.0
                 },
@@ -570,10 +574,10 @@
             "spFirstDelay": 1.0,
             "spWaveDelay": 3.0,
             "spRadius": 2.0,
-            "hasShader": false,
-            "shMode": 0,
+            "hasShader": true,
+            "shMode": 2,
             "shReceiveShadow": true,
-            "shSpecStrength": 0.0,
+            "shSpecStrength": 0.11999999731779099,
             "shRimStrength": 0.0,
             "shRimPower": 3.0,
             "shRimColor": {
@@ -581,46 +585,47 @@
                 "y": 1.0,
                 "z": 1.0
             },
-            "shToonThreshold": 0.5,
-            "shToonSoftness": 0.019999999552965165,
+            "shToonThreshold": 0.0,
+            "shToonSoftness": 0.0010000000474974514,
             "shToonShade": {
                 "x": 0.6000000238418579,
                 "y": 0.6000000238418579,
                 "z": 0.699999988079071
             },
-            "shOutlineWidth": 0.0,
+            "shOutlineWidth": 0.020999999716877939,
             "shOutlineColor": {
                 "x": 0.05000000074505806,
                 "y": 0.05000000074505806,
                 "z": 0.05000000074505806
             },
-            "shToonTexSteps": 0.0,
+            "shToonTexSteps": 2.0,
             "shToonTexSmooth": 0.0,
             "shMetallic": 0.0,
-            "shRoughness": -1.0,
+            "shRoughness": 1.0,
             "hasAnimator": false,
             "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.20000000298023225
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         },
         {
             "name": "Entity",
             "transform": {
                 "position": {
                     "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0
+                    "y": 0.1979999989271164,
+                    "z": 1.090999960899353
                 },
                 "rotationEuler": {
-                    "x": 0.0,
-                    "y": 0.0,
+                    "x": -60.79199981689453,
+                    "y": 196.0,
                     "z": 0.0
                 },
                 "scale": {
                     "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0
+                    "y": 0.9999997615814209,
+                    "z": 0.9999997615814209
                 }
             },
             "hasMesh": false,
@@ -716,10 +721,129 @@
             "shMetallic": 0.0,
             "shRoughness": -1.0,
             "hasAnimator": true,
-            "anClip": 6,
+            "anClip": 1,
+            "anSpeed": 4.0,
+            "anLoop": true,
+            "anBlendTime": 0.5,
+            "anGraph": ""
+        },
+        {
+            "name": "Entity",
+            "transform": {
+                "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": -5.277419567108154
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": false,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": true,
+            "skAsset": "Data/Model/Character/Mannequin_Large.glb",
+            "skClip": 9,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0,
+                "w": 1.0
+            },
+            "skAnim": "Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_MovementBasic.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_CombatMelee.glb",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0,
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": false,
+            "spPrefab": "",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0,
+            "hasAnimator": true,
+            "anClip": 0,
             "anSpeed": 1.0,
             "anLoop": true,
-            "anBlendTime": 0.5
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": ""
         }
     ]
 }

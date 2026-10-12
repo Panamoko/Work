@@ -1,6 +1,8 @@
 #pragma once
 #include "Engine/Scene/Component.h"
 #include "Engine/Animation/AnimationPose.h"
+#include "Engine/Animation/AnimParams.h"
+#include "Engine/Animation/AnimNode.h"
 
 namespace uel {
 
@@ -8,16 +10,25 @@ namespace uel {
     // 同じ Entity の SkinnedMeshComponent のモデルに対して「どのクリップを、どう混ぜて再生するか」を決める。
     // これが付いている間、SkinnedMeshComponent 側の clipIndex / time などは使われない。
     // 姿勢の計算そのものは AnimationSystem が行う（この Component は状態と指示だけを持つ）。
+    //
+    // 動かし方は2通り：
+    //   ・graph が空      ：クリップ1つを再生する。Play() で切り替えるとクロスフェードする。
+    //   ・graph が入っている：ノードの木が姿勢を決める。ゲーム側は params に値を書くだけ。
     class AnimatorComponent : public Component {
     public:
         std::unique_ptr<Component> Clone() const override { return std::make_unique<AnimatorComponent>(*this); }
 
         // ---- 設定 ----
-        int   clipIndex = 0;        // いま再生しているクリップ
-        float speed = 1.0f;
+        int   clipIndex = 0;        // いま再生しているクリップ（graph が空のとき）
+        float speed = 1.0f;         // 全体の再生速度（graph にも効く）
         bool  loop = true;
         bool  playing = true;
         float blendTime = 0.2f;     // Play() で秒数を指定しなかったときのクロスフェード時間
+
+        // ---- グラフ ----
+        AnimParams  params;         // グラフに渡す値。ゲーム側は params.SetFloat("Speed", v) のように書く
+        AnimNodePtr graph;          // 根のノード。入っていれば、こちらが姿勢を決める
+        std::string graphPath;      // グラフのアセットのパス（Data/Anim/<名前>.animgraph.json）。空なら未保存
 
         // ---- 実行時の状態（保存しない）----
         float time = 0.0f;          // clipIndex のクリップの再生位置

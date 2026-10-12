@@ -5,7 +5,7 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Graphics/SkinnedRenderModel.h"
 #include "Engine/Animation/AnimationPose.h"
-#include <cmath>
+#include "Engine/Animation/AnimNode.h"
 #include <memory>
 
 namespace uel {
@@ -15,27 +15,27 @@ namespace uel {
             return (index >= 0 && index < (int)cpu.clips.size()) ? &cpu.clips[index] : nullptr;
         }
 
-        // 再生位置を dt ぶん進める。ループしないクリップが端まで来たら true。
-        bool AdvanceTime(float& time, const AnimationClip* clip, float dt, bool loop) {
-            if (!clip) return false;
-            const float dur = clip->duration;
-            time += dt;
-            if (dur <= 0.0f) return false;
-            if (loop) { time = std::fmod(time, dur); if (time < 0.0f) time += dur; return false; }
-            if (time >= dur) { time = dur; return true; }
-            if (time < 0.0f) { time = 0.0f; return true; }      // 逆再生で先頭まで戻った
-            return false;
-        }
-
         // AnimatorComponent が無いとき：SkinnedMeshComponent のクリップ1つをそのまま再生する
         void EvaluateSingleClip(SkinnedMeshComponent& sk, const SkinnedModel& cpu, float dt, LocalPose& pose)
         {
             const AnimationClip* clip = ClipAt(cpu, sk.clipIndex);
-            if (sk.playing) AdvanceTime(sk.time, clip, dt * sk.speed, sk.loop);
+            if (sk.playing) AdvanceClipTime(sk.time, clip, dt * sk.speed, sk.loop);
             SampleLocalPose(cpu.skeleton, clip, sk.time, pose);
         }
 
-        // AnimatorComponent があるとき：今のクリップを再生し、切り替え中なら前の動きから混ぜる
+        // AnimatorComponent にグラフがあるとき：ノードの木に姿勢を決めさせる
+        void EvaluateGraph(AnimatorComponent& an, const SkinnedModel& cpu, float dt, LocalPose& pose)
+        {
+            AnimContext ctx{ cpu, an.params, an.playing ? dt * an.speed : 0.0f };
+            an.graph->Update(ctx);          // 1) 時間を進める
+            an.graph->Evaluate(ctx, pose);  // 2) 姿勢を出す
+            for (auto& p : an.params.items) if (p.type == AnimParamType::Trigger) p.value = 0.0f;   // Trigger は1フレームだけ有効
+            if (pose.size() != cpu.skeleton.bones.size())
+                SampleLocalPose(cpu.skeleton, nullptr, 0.0f, pose);     // ノードが何も出さなかったら bind ポーズ
+            an.lastPose = pose;
+        }
+
+        // AnimatorComponent にグラフが無いとき：今のクリップを再生し、切り替え中なら前の動きから混ぜる
         void EvaluateAnimator(AnimatorComponent& an, const SkinnedModel& cpu, float dt, LocalPose& pose, LocalPose& scratch)
         {
             const size_t boneCount = cpu.skeleton.bones.size();
@@ -43,7 +43,7 @@ namespace uel {
 
             // 1) 今のクリップ
             const AnimationClip* cur = ClipAt(cpu, an.clipIndex);
-            if (an.playing && AdvanceTime(an.time, cur, step, an.loop)) an.finished = true;
+            if (an.playing && AdvanceClipTime(an.time, cur, step, an.loop)) an.finished = true;
             SampleLocalPose(cpu.skeleton, cur, an.time, pose);
 
             // 2) クロスフェード中なら「切り替え前」を求めて、そこから今のクリップへ混ぜる
@@ -59,7 +59,7 @@ namespace uel {
                 }
                 else {
                     const AnimationClip* fc = ClipAt(cpu, an.fromClip);
-                    if (an.playing) AdvanceTime(an.fromTime, fc, step, an.fromLoop);  // 前のクリップも止めずに進める
+                    if (an.playing) AdvanceClipTime(an.fromTime, fc, step, an.fromLoop);  // 前のクリップも止めずに進める
                     SampleLocalPose(cpu.skeleton, fc, an.fromTime, scratch);
                     from = &scratch;
                 }
@@ -90,11 +90,12 @@ namespace uel {
             }
             const SkinnedModel& cpu = model->Cpu();
 
-            // 1) ローカル姿勢を決める（AnimatorComponent があればそちらが決める）
-            if (AnimatorComponent* an = slot->GetComponent<AnimatorComponent>())
-                EvaluateAnimator(*an, cpu, dt, pose, scratch);
-            else
-                EvaluateSingleClip(*sk, cpu, dt, pose);
+            // 1) ローカル姿勢を決める
+            //    AnimatorComponent（グラフあり）→ AnimatorComponent（クリップ1つ）→ SkinnedMeshComponent の順に探す
+            AnimatorComponent* an = slot->GetComponent<AnimatorComponent>();
+            if (an && an->graph) EvaluateGraph(*an, cpu, dt, pose);
+            else if (an)         EvaluateAnimator(*an, cpu, dt, pose, scratch);
+            else                 EvaluateSingleClip(*sk, cpu, dt, pose);
 
             // 2) 行列にして SkinnedMeshComponent に入れる
             ComputeGlobalPose(cpu.skeleton, pose, sk->boneGlobal);

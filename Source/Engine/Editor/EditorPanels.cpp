@@ -24,6 +24,9 @@
 #include "Engine/Scene/ShaderComponent.h"
 #include "Engine/Graphics/PostProcessSettings.h"
 #include "Engine/Scene/AnimatorComponent.h"
+#include "Engine/Animation/AnimBlendSpaceNode.h"
+#include "Engine/Animation/AnimStateMachineNode.h"
+#include "Engine/Serialization/AnimGraphSerializer.h"
 
 #include <memory>
 #include <imgui.h>
@@ -44,6 +47,222 @@ namespace uel {
         bool IsPrefabPath(const std::string& p) {
             const std::string suf = ".prefab.json";
             return p.size() >= suf.size() && p.compare(p.size() - suf.size(), suf.size(), suf) == 0;
+        }
+        bool IsAnimGraphPath(const std::string& p) {
+            const std::string suf = ".animgraph.json";
+            return p.size() >= suf.size() && p.compare(p.size() - suf.size(), suf.size(), suf) == 0;
+        }
+        // グラフのノード1つぶんの編集欄（ノードの種類ごと）。
+        // ノードエディタができるまでの仮の置き場所で、今は根のノードだけを編集する。
+        void DrawAnimNodeInspector(AnimNode* node, const SkinnedModel& model, AnimParams& params)
+        {
+            if (!node) { ImGui::TextDisabled("(no node)"); return; }
+
+            // クリップを名前で選ぶ
+            auto clipCombo = [&](const char* label, std::string& name) {
+                if (ImGui::BeginCombo(label, name.empty() ? "(none)" : name.c_str())) {
+                    for (int i = 0; i < (int)model.clips.size(); ++i) {
+                        ImGui::PushID(i);
+                        if (ImGui::Selectable(model.clips[i].name.c_str(), model.clips[i].name == name)) name = model.clips[i].name;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                };
+            // パラメータを名前で選ぶ（floatOnly = true なら Float だけを並べる）
+            auto paramCombo = [&](const char* label, std::string& name, bool floatOnly) {
+                if (ImGui::BeginCombo(label, name.empty() ? "(none)" : name.c_str())) {
+                    if (ImGui::Selectable("(none)", name.empty())) name.clear();
+                    for (int i = 0; i < (int)params.items.size(); ++i) {
+                        if (floatOnly && params.items[i].type != AnimParamType::Float) continue;
+                        ImGui::PushID(i);
+                        if (ImGui::Selectable(params.items[i].name.c_str(), params.items[i].name == name)) name = params.items[i].name;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                };
+
+            if (auto* cn = dynamic_cast<AnimClipNode*>(node)) {
+                clipCombo("Clip", cn->clipName);
+                ImGui::Checkbox("Loop", &cn->loop);
+                paramCombo("Speed Param", cn->speedParam, true);
+                ImGui::TextDisabled("time %.2f s%s", cn->time, cn->finished ? "  (finished)" : "");
+            }
+            else if (auto* bs = dynamic_cast<AnimBlendSpace1DNode*>(node)) {
+                paramCombo("Axis Param", bs->param, true);
+                ImGui::DragFloat("Smooth Time", &bs->smoothTime, 0.01f, 0.0f, 2.0f, "%.2f s");
+
+                // サンプル（クリップと、軸の上の位置）
+                int removeAt = -1;
+                for (int i = 0; i < (int)bs->samples.size(); ++i) {
+                    auto& s = bs->samples[i];
+                    ImGui::PushID(i);
+                    ImGui::SetNextItemWidth(170);
+                    clipCombo("##clip", s.clipName);
+                    ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                    ImGui::DragFloat("##pos", &s.position, 0.01f, 0.0f, 0.0f, "%.2f");
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) removeAt = i;
+                    if (i == bs->lower || i == bs->upper) {         // いま混ざっているサンプルに、割合を出す
+                        const float w = (bs->lower == bs->upper) ? 1.0f : ((i == bs->upper) ? bs->weight : 1.0f - bs->weight);
+                        ImGui::SameLine(); ImGui::Text("%3.0f%%", w * 100.0f);
+                    }
+                    ImGui::PopID();
+                }
+                if (removeAt >= 0) bs->samples.erase(bs->samples.begin() + removeAt);
+                if (ImGui::SmallButton("+ Sample")) {
+                    AnimBlendSpace1DNode::Sample s;
+                    if (!model.clips.empty()) s.clipName = model.clips[0].name;
+                    for (const auto& o : bs->samples) if (o.position >= s.position) s.position = o.position + 1.0f;
+                    bs->samples.push_back(s);
+                }
+
+                // 軸の表示：サンプルの位置（縦線）と、いまの値（赤い印）
+                if (!bs->samples.empty()) {
+                    float mn = bs->samples[0].position, mx = mn;
+                    for (const auto& s : bs->samples) { if (s.position < mn) mn = s.position; if (s.position > mx) mx = s.position; }
+                    if (mx - mn < 1e-4f) mx = mn + 1.0f;
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    ImVec2 p0 = ImGui::GetCursorScreenPos();
+                    float w = ImGui::GetContentRegionAvail().x; if (w < 40.0f) w = 40.0f;
+                    const float h = 22.0f, pad = 8.0f;
+                    ImGui::Dummy(ImVec2(w, h));                       // 場所だけ確保する（線の描画は部品ではない）
+                    auto toX = [&](float v) { return p0.x + pad + (v - mn) / (mx - mn) * (w - pad * 2.0f); };
+                    dl->AddRectFilled(p0, ImVec2(p0.x + w, p0.y + h), IM_COL32(30, 32, 38, 255), 4.0f);
+                    for (const auto& s : bs->samples)
+                        dl->AddLine(ImVec2(toX(s.position), p0.y + 3), ImVec2(toX(s.position), p0.y + h - 3), IM_COL32(120, 180, 255, 255), 2.0f);
+                    float v = bs->value; if (v < mn) v = mn; if (v > mx) v = mx;
+                    dl->AddTriangleFilled(ImVec2(toX(v) - 5, p0.y), ImVec2(toX(v) + 5, p0.y), ImVec2(toX(v), p0.y + 9), IM_COL32(255, 90, 90, 255));
+                }
+                ImGui::TextDisabled("value %.2f   phase %.2f", bs->value, bs->phase);
+            }
+            else if (auto* sm = dynamic_cast<AnimStateMachineNode*>(node)) {
+                using SM = AnimStateMachineNode;
+                const ImVec4 warn(1.0f, 0.8f, 0.3f, 1.0f);
+
+                auto stateName = [&](int i) -> const char* {
+                    if (i < 0) return "(Any)";
+                    return (i < (int)sm->states.size()) ? sm->states[i].name.c_str() : "?";
+                    };
+                auto stateCombo = [&](const char* label, int& idx, bool allowAny) {
+                    if (ImGui::BeginCombo(label, stateName(idx))) {
+                        if (allowAny && ImGui::Selectable("(Any)", idx == -1)) idx = -1;
+                        for (int i = 0; i < (int)sm->states.size(); ++i) {
+                            ImGui::PushID(i);
+                            if (ImGui::Selectable(sm->states[i].name.c_str(), idx == i)) idx = i;
+                            ImGui::PopID();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    };
+                auto makeClipNode = [&]() {
+                    auto n = std::make_unique<AnimClipNode>();
+                    if (!model.clips.empty()) n->clipName = model.clips[0].name;
+                    return AnimNodePtr(std::move(n));
+                    };
+
+                // いまの状態
+                if (sm->current >= 0 && sm->current < (int)sm->states.size()) {
+                    ImGui::Text("Now: %s", sm->states[sm->current].name.c_str());
+                    if (sm->IsFading()) { ImGui::SameLine(); ImGui::Text("(blending %.0f%%)", sm->fadeElapsed / sm->fadeDuration * 100.0f); }
+                }
+                else ImGui::TextDisabled("Now: -");
+
+                // ---- 状態 ----
+                ImGui::TextUnformatted("States  (o = entry)");
+                const char* nodeTypes[] = { "Clip", "BlendSpace1D" };
+                int removeState = -1;
+                for (int i = 0; i < (int)sm->states.size(); ++i) {
+                    SM::State& st = sm->states[i];
+                    ImGui::PushID(i);
+                    if (ImGui::RadioButton("##entry", sm->entry == i)) sm->entry = i;      // 最初の状態を選ぶ
+                    ImGui::SameLine();
+                    char nb[64]; strncpy_s(nb, sizeof(nb), st.name.c_str(), _TRUNCATE);
+                    ImGui::SetNextItemWidth(110);
+                    if (ImGui::InputText("##name", nb, sizeof(nb))) st.name = nb;
+                    ImGui::SameLine();
+                    int ty = (st.node && std::strcmp(st.node->TypeName(), "BlendSpace1D") == 0) ? 1 : 0;
+                    ImGui::SetNextItemWidth(110);
+                    if (ImGui::Combo("##type", &ty, nodeTypes, 2) || !st.node) {
+                        if (ty == 0) st.node = makeClipNode();
+                        else         st.node = AnimNodePtr(std::make_unique<AnimBlendSpace1DNode>());
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) removeState = i;
+                    if (i == sm->current) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "<- now"); }
+                    if (ImGui::TreeNode("Edit")) {
+                        DrawAnimNodeInspector(st.node.get(), model, params);    // 状態の中身（クリップや Blend Space）の編集欄
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+                if (removeState >= 0) sm->RemoveState(removeState);
+                if (ImGui::SmallButton("+ State")) {
+                    SM::State st;
+                    st.name = "State" + std::to_string(sm->states.size());
+                    st.node = makeClipNode();
+                    sm->states.push_back(std::move(st));
+                }
+
+                // ---- 遷移 ----
+                ImGui::Separator();
+                ImGui::TextUnformatted("Transitions  (checked from top)");
+                const char* floatOps[] = { ">", "<" };
+                const char* boolOps[] = { "is true", "is false" };
+                int removeTr = -1;
+                for (int i = 0; i < (int)sm->transitions.size(); ++i) {
+                    SM::Transition& tr = sm->transitions[i];
+                    ImGui::PushID(1000 + i);
+                    ImGui::SetNextItemWidth(95); stateCombo("##from", tr.from, true);
+                    ImGui::SameLine(); ImGui::TextUnformatted("->");
+                    ImGui::SameLine(); ImGui::SetNextItemWidth(95); stateCombo("##to", tr.to, false);
+                    ImGui::SameLine(); ImGui::SetNextItemWidth(60);
+                    ImGui::DragFloat("##blend", &tr.blendTime, 0.01f, 0.0f, 2.0f, "%.2fs");
+                    ImGui::SameLine(); ImGui::Checkbox("At End", &tr.waitForEnd);
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) removeTr = i;
+
+                    // 条件（すべて成り立ったら移る）
+                    int removeCond = -1;
+                    for (int k = 0; k < (int)tr.conditions.size(); ++k) {
+                        SM::Condition& c = tr.conditions[k];
+                        ImGui::PushID(k);
+                        ImGui::TextUnformatted("    if"); ImGui::SameLine();
+                        ImGui::SetNextItemWidth(100); paramCombo("##p", c.param, false);
+                        const int pi = params.Find(c.param);
+                        if (pi >= 0 && params.items[pi].type == AnimParamType::Float) {
+                            int op = (c.op == SM::CondOp::Less) ? 1 : 0;
+                            ImGui::SameLine(); ImGui::SetNextItemWidth(45);
+                            if (ImGui::Combo("##op", &op, floatOps, 2)) c.op = op ? SM::CondOp::Less : SM::CondOp::Greater;
+                            ImGui::SameLine(); ImGui::SetNextItemWidth(70);
+                            ImGui::DragFloat("##th", &c.threshold, 0.01f);
+                        }
+                        else if (pi >= 0 && params.items[pi].type == AnimParamType::Bool) {
+                            int op = (c.op == SM::CondOp::IsFalse) ? 1 : 0;
+                            ImGui::SameLine(); ImGui::SetNextItemWidth(85);
+                            if (ImGui::Combo("##op", &op, boolOps, 2)) c.op = op ? SM::CondOp::IsFalse : SM::CondOp::IsTrue;
+                        }
+                        else if (pi >= 0) { ImGui::SameLine(); ImGui::TextDisabled("is fired"); }
+                        else { ImGui::SameLine(); ImGui::TextColored(warn, "(pick a parameter)"); }
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("x")) removeCond = k;
+                        ImGui::PopID();
+                    }
+                    if (removeCond >= 0) tr.conditions.erase(tr.conditions.begin() + removeCond);
+                    ImGui::TextUnformatted("   "); ImGui::SameLine();
+                    if (ImGui::SmallButton("+ Condition")) tr.conditions.push_back(SM::Condition{});
+                    if (tr.conditions.empty() && !tr.waitForEnd) { ImGui::SameLine(); ImGui::TextColored(warn, "never fires (no condition)"); }
+                    ImGui::PopID();
+                }
+                if (removeTr >= 0) sm->transitions.erase(sm->transitions.begin() + removeTr);
+                if (ImGui::SmallButton("+ Transition")) {
+                    SM::Transition tr;
+                    tr.from = sm->states.empty() ? -1 : 0;
+                    tr.to = (sm->states.size() > 1) ? 1 : 0;
+                    sm->transitions.push_back(std::move(tr));
+                }
+            }
         }
     }
 
@@ -281,15 +500,48 @@ namespace uel {
                         if (pl->Data) { sk->assetPath = static_cast<const char*>(pl->Data); sk->clipIndex = 0; sk->time = 0.0f; }
                     ImGui::EndDragDropTarget();
                 }
-                char abuf[260]; strncpy_s(abuf, sizeof(abuf), sk->animPath.c_str(), _TRUNCATE);
-                if (ImGui::InputText("Anim GLB (option)", abuf, sizeof(abuf))) sk->animPath = abuf;
-                if (ImGui::BeginDragDropTarget()) {
-                    if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_GLB"))
-                        if (pl->Data) { sk->animPath = static_cast<const char*>(pl->Data); sk->clipIndex = 0; sk->time = 0.0f; }
-                    ImGui::EndDragDropTarget();
+
+                // ---- Anim GLB（アニメだけのファイル。複数可）：1行に1ファイル。ドロップで足し、x で外す ----
+                {
+                    std::vector<std::string> animFiles = SplitAnimPaths(sk->animPath);
+                    std::shared_ptr<SkinnedRenderModel> am;
+                    if (!sk->assetPath.empty()) am = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
+                    const std::vector<int>* counts = (am && am->Valid()) ? &am->Cpu().clipsFromAnimFiles : nullptr;
+
+                    ImGui::TextUnformatted("Anim GLB (option)");
+                    int removeAnim = -1;
+                    for (int i = 0; i < (int)animFiles.size(); ++i) {
+                        const std::string& f = animFiles[i];
+                        ImGui::PushID(i);
+                        if (ImGui::SmallButton("x")) removeAnim = i;
+                        ImGui::SameLine();
+                        ImGui::TextUnformatted(f.substr(f.find_last_of('/') + 1).c_str());     // ファイル名だけ出す
+                        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f.c_str());         // 重ねるとフルパス
+                        if (counts && i < (int)counts->size()) {
+                            ImGui::SameLine();
+                            if ((*counts)[i] > 0) ImGui::TextDisabled("+%d clips", (*counts)[i]);
+                            else ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), "+0 (bones do not match, or same clip names)");
+                        }
+                        ImGui::PopID();
+                    }
+                    bool animChanged = false;
+                    if (removeAnim >= 0) { animFiles.erase(animFiles.begin() + removeAnim); animChanged = true; }
+
+                    ImGui::Button("Drop Anim GLB here to add", ImVec2(-1.0f, 0.0f));         // ドロップの受け取り先（押しても何もしない）
+                    if (ImGui::BeginDragDropTarget()) {
+                        if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_GLB")) {
+                            if (pl->Data) {
+                                const std::string add = static_cast<const char*>(pl->Data);
+                                bool has = false;
+                                for (const auto& f : animFiles) if (f == add) has = true;
+                                if (!has) { animFiles.push_back(add); animChanged = true; }
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    if (animChanged) { sk->animPath = JoinAnimPaths(animFiles); sk->clipIndex = 0; sk->time = 0.0f; }
                 }
-                ImGui::SameLine();
-                if (ImGui::SmallButton("Clear##anim")) { sk->animPath.clear(); sk->clipIndex = 0; sk->time = 0.0f; }
+
                 ImGui::Checkbox("Visible##sk", &sk->visible);
                 ImGui::ColorEdit4("Tint##sk", &sk->color.x);
 
@@ -299,12 +551,6 @@ namespace uel {
                         const auto& clips = model->Cpu().clips;
                         ImGui::Text("Bones: %d  Clips: %d",
                             (int)model->Cpu().skeleton.bones.size(), (int)clips.size());
-                        // Anim GLB から何個のクリップが取れたか（0 ならボーン名が合っていない）
-                        if (!sk->animPath.empty()) {
-                            const int added = model->Cpu().clipsFromAnimFile;
-                            if (added > 0) ImGui::TextDisabled("Anim GLB: +%d clips", added);
-                            else ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), "Anim GLB: +0 clips (bone names do not match, ignored)");
-                        }
                         if (e->GetComponent<AnimatorComponent>()) {
                             // 再生の状態は AnimatorComponent が持つので、ここでは編集しない
                             ImGui::TextDisabled("Clip / Time are driven by AnimatorComponent.");
@@ -389,14 +635,27 @@ namespace uel {
                 SkinnedMeshComponent* ask = e->GetComponent<SkinnedMeshComponent>();
                 std::shared_ptr<SkinnedRenderModel> amodel;
                 if (ask && !ask->assetPath.empty()) amodel = GlobalSkinnedCache().GetOrLoad(device, ask->assetPath, ask->animPath);
+                const bool hasClips = amodel && amodel->Valid() && !amodel->Cpu().clips.empty();
 
                 if (!ask) {
                     ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), "Needs a SkinnedMeshComponent on the same Entity.");
                 }
-                else if (!amodel || !amodel->Valid() || amodel->Cpu().clips.empty()) {
+                else if (!hasClips) {
                     ImGui::TextDisabled("No clips to play.");
                 }
+                else if (an->graph) {
+                    // ---- グラフで動かしているとき ----
+                    ImGui::Text("Graph root: %s node", an->graph->TypeName());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Clear Graph")) an->graph.reset();
+                    if (an->graph) {
+                        ImGui::PushID("graph");     // グラフの中の部品が、下の Parameters の部品と同じ ID にならないように分ける
+                        DrawAnimNodeInspector(an->graph.get(), amodel->Cpu(), an->params);
+                        ImGui::PopID();
+                    }
+                }
                 else {
+                    // ---- クリップ1つで動かしているとき ----
                     const auto& clips = amodel->Cpu().clips;
                     if (an->clipIndex < 0 || an->clipIndex >= (int)clips.size()) an->clipIndex = 0;
                     const std::string& preview = clips[an->clipIndex].name;
@@ -409,17 +668,117 @@ namespace uel {
                         }
                         ImGui::EndCombo();
                     }
+                    ImGui::DragFloat("Blend Time", &an->blendTime, 0.01f, 0.0f, 2.0f, "%.2f s");
+                    ImGui::Checkbox("Loop", &an->loop);
+                    if (an->IsFading()) ImGui::Text("Blending  %.0f%%", an->fadeElapsed / an->fadeDuration * 100.0f);
+                    else                ImGui::TextDisabled("Blending  -");
+
+                    // 確認用：グラフを手早く作るボタン（グラフのアセットを読めるようになったら消す）
+                    ImGui::TextDisabled("New graph:");
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Clip")) {
+                        auto node = std::make_unique<AnimClipNode>();
+                        node->clipName = clips[an->clipIndex].name;
+                        node->loop = an->loop;
+                        node->speedParam = "PlayRate";
+                        if (an->params.Find("PlayRate") < 0) an->params.SetFloat("PlayRate", 1.0f);
+                        an->graph = AnimNodePtr(std::move(node));
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("State Machine")) {
+                        // 今のクリップを再生する状態を1つだけ持つステートマシン。作った後に状態と遷移を足す
+                        auto sm = std::make_unique<AnimStateMachineNode>();
+                        AnimStateMachineNode::State st;
+                        st.name = "Idle";
+                        auto cn = std::make_unique<AnimClipNode>();
+                        cn->clipName = clips[an->clipIndex].name;
+                        st.node = AnimNodePtr(std::move(cn));
+                        sm->states.push_back(std::move(st));
+                        an->graph = AnimNodePtr(std::move(sm));
+                    }
                 }
-                ImGui::DragFloat("Blend Time", &an->blendTime, 0.01f, 0.0f, 2.0f, "%.2f s");
-                ImGui::DragFloat("Speed", &an->speed, 0.01f, -4.0f, 4.0f);
-                ImGui::Checkbox("Play", &an->playing); ImGui::SameLine();
-                ImGui::Checkbox("Loop", &an->loop);
-                if (an->IsFading()) ImGui::Text("Blending  %.0f%%", an->fadeElapsed / an->fadeDuration * 100.0f);
-                else                ImGui::TextDisabled("Blending  -");
+                // ---- グラフのアセット（Data/Anim/<名前>.animgraph.json）----
+                {
+                    static std::string graphMsg;
+                    static float       graphMsgTimer = 0.0f;
+                    char gb[200]; strncpy_s(gb, sizeof(gb), an->graphPath.c_str(), _TRUNCATE);
+                    if (ImGui::InputText("Graph Asset", gb, sizeof(gb))) an->graphPath = gb;     // 名前だけでもよい（例：Enemy）
+                    if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の [Graph] をここへドロップすると読み込む
+                        if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
+                            if (pl->Data) {
+                                const std::string path = static_cast<const char*>(pl->Data);
+                                const bool ok = LoadAnimGraph(path, an->params, an->graph);
+                                if (ok) an->graphPath = path;
+                                graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                                graphMsgTimer = 3.0f;
+                            }
+                        }
+                        ImGui::EndDragDropTarget();
+                    }
+                    if (ImGui::SmallButton("Save Graph")) {
+                        const std::string path = AnimGraphPathFromName(an->graphPath);
+                        const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get());
+                        if (ok) { an->graphPath = path; g_assetRescan = true; }
+                        graphMsg = ok ? "Saved" : (an->graph ? "Save failed (name?)" : "No graph to save");
+                        graphMsgTimer = 3.0f;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Load Graph")) {
+                        const std::string path = AnimGraphPathFromName(an->graphPath);
+                        const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph);
+                        if (ok) an->graphPath = path;
+                        graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                        graphMsgTimer = 3.0f;
+                    }
+                    if (graphMsgTimer > 0.0f) {
+                        graphMsgTimer -= ImGui::GetIO().DeltaTime;
+                        ImGui::SameLine(); ImGui::TextUnformatted(graphMsg.c_str());
+                    }
+                    ImGui::TextDisabled("Edits to the graph are kept only after Save Graph.");
+                }
+                ImGui::DragFloat("Play Rate (all)", &an->speed, 0.01f, -4.0f, 4.0f);
+                ImGui::Checkbox("Play", &an->playing);
+
+                // ---- パラメータ（グラフに渡す値）----
+                ImGui::Separator();
+                ImGui::TextUnformatted("Parameters");
+                const char* typeNames[] = { "Float", "Bool", "Trigger" };   // same order as AnimParamType
+                int removeAt = -1;
+                for (int i = 0; i < (int)an->params.items.size(); ++i) {
+                    AnimParam& p = an->params.items[i];
+                    ImGui::PushID(i);
+                    int ty = (int)p.type;
+                    ImGui::SetNextItemWidth(70);
+                    if (ImGui::Combo("##type", &ty, typeNames, 3)) { p.type = (AnimParamType)ty; p.value = 0.0f; }
+                    ImGui::SameLine();
+                    char nb[64]; strncpy_s(nb, sizeof(nb), p.name.c_str(), _TRUNCATE);
+                    ImGui::SetNextItemWidth(110);
+                    if (ImGui::InputText("##name", nb, sizeof(nb))) p.name = nb;
+                    ImGui::SameLine();
+                    if (p.type == AnimParamType::Float) {
+                        ImGui::SetNextItemWidth(90);
+                        ImGui::DragFloat("##val", &p.value, 0.01f);
+                    }
+                    else if (p.type == AnimParamType::Bool) {
+                        bool b = p.value > 0.5f;
+                        if (ImGui::Checkbox("##val", &b)) p.value = b ? 1.0f : 0.0f;
+                    }
+                    else {
+                        if (ImGui::SmallButton("Fire")) p.value = 1.0f;
+                        ImGui::SameLine(); ImGui::TextDisabled(p.value > 0.5f ? "(set)" : "(-)");
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) removeAt = i;
+                    ImGui::PopID();
+                }
+                if (removeAt >= 0) an->params.items.erase(an->params.items.begin() + removeAt);
+                if (ImGui::SmallButton("+ Parameter")) {
+                    AnimParam p; p.name = "Param" + std::to_string(an->params.items.size());
+                    an->params.items.push_back(p);
+                }
             }
             ImGui::PopID();
         }
-
 
         // + Add Component（UEのドロップダウン）
         if (ImGui::Button("+ Add Component")) ImGui::OpenPopup("AddComponentPopup");
@@ -655,7 +1014,7 @@ namespace uel {
                         std::string ext = entry.path().extension().string();
                         for (char& c : ext) c = (char)std::tolower((unsigned char)c);
                         std::string fname = entry.path().generic_string();
-                        if (ext != ".glb" && !IsPrefabPath(fname)) continue;
+                        if (ext != ".glb" && !IsPrefabPath(fname) && !IsAnimGraphPath(fname)) continue;
                         std::string full = entry.path().generic_string();
                         std::string dir = full.substr(0, full.find_last_of('/'));
                         groups[dir].push_back(full);
@@ -673,7 +1032,9 @@ namespace uel {
 
         bool hasPick = !picked.empty();
         bool pickIsPrefab = hasPick && IsPrefabPath(picked);
-        if (ImGui::Button("Assign to Selected") && hasPick && !pickIsPrefab) {   // Prefabはメッシュとして割り当てない
+        bool pickIsGraph = hasPick && IsAnimGraphPath(picked);
+        // Prefab とグラフは、メッシュとして割り当てない
+        if (ImGui::Button("Assign to Selected") && hasPick && !pickIsPrefab && !pickIsGraph) {
             if (Entity* e = world.Get(selected)) {
                 auto* m = e->GetComponent<MeshRendererComponent>();
                 if (!m) m = e->AddComponent<MeshRendererComponent>();
@@ -681,7 +1042,7 @@ namespace uel {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Create Entity") && hasPick) {
+        if (ImGui::Button("Create Entity") && hasPick && !pickIsGraph) {    // グラフからは Entity を作らない
             if (pickIsPrefab) {
                 EntityId id = EditorSpawnPrefab(world, history, picked);
                 if (id.IsValid()) selected = id;
@@ -724,17 +1085,20 @@ namespace uel {
                     std::string name = f.substr(f.find_last_of('/') + 1);
                     if (filtering && name.find(search) == std::string::npos) continue;
 
-                    bool prefab = IsPrefabPath(f);
+                    // 種類ごとに、名前の前の印と、ドラッグで運ぶデータの種類を変える
+                    const bool prefab = IsPrefabPath(f);
+                    const bool graph = IsAnimGraphPath(f);
+                    const char* tag = prefab ? "[Prefab] " : (graph ? "[Graph] " : "");
+                    const char* payloadType = prefab ? "ASSET_PREFAB" : (graph ? "ASSET_ANIMGRAPH" : "ASSET_GLB");
                     char item[320];
-                    snprintf(item, sizeof(item), "%s%s##%s", prefab ? "[Prefab] " : "", name.c_str(), f.c_str());
+                    snprintf(item, sizeof(item), "%s%s##%s", tag, name.c_str(), f.c_str());
                     if (ImGui::Selectable(item, f == picked))
                         picked = f;
 
                     if (ImGui::BeginDragDropSource()) {
-                        ImGui::SetDragDropPayload(prefab ? "ASSET_PREFAB" : "ASSET_GLB", f.c_str(), f.size() + 1);
+                        ImGui::SetDragDropPayload(payloadType, f.c_str(), f.size() + 1);
                         ImGui::TextUnformatted(name.c_str());
                         ImGui::EndDragDropSource();
-                    
                     }
                 }
                 ImGui::TreePop();
@@ -744,6 +1108,7 @@ namespace uel {
         ImGui::EndChild();
         ImGui::End();
     }
+
 
     void DrawEnvironmentPanel(SceneLighting& light, PostProcessSettings& post)
     {
@@ -790,6 +1155,10 @@ namespace uel {
 
         // 再生の状態は、AnimatorComponent があればそちら、無ければ SkinnedMeshComponent のものを使う
         AnimatorComponent* an = e->GetComponent<AnimatorComponent>();
+        if (an && an->graph) {
+            ImGui::TextUnformatted("This Entity is driven by an animation graph. Timeline preview works in clip mode only.");
+            ImGui::End(); return;
+        }
         int& clipIndex = an ? an->clipIndex : sk->clipIndex;
         float& time = an ? an->time : sk->time;
         float& speed = an ? an->speed : sk->speed;

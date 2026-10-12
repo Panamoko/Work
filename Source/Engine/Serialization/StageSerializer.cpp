@@ -16,6 +16,7 @@
 #include "Engine/Graphics/SceneLighting.h"
 #include "Engine/Graphics/PostProcessSettings.h"
 #include "Engine/Scene/AnimatorComponent.h"
+#include "Engine/Serialization/AnimGraphSerializer.h"
 
 #include <fstream>
 #include <vector>
@@ -54,7 +55,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 17;
+        constexpr int kSchemaLatest = 18;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -96,6 +97,7 @@ namespace uel {
             float shMetallic = 0.0f;
             float shRoughness = -1.0f;   // マイナスのまま＝ファイルに無かった（版 15 以前）。FromDTO で shSpecPower から換算する
             bool  hasAnimator = false; int anClip = 0; float anSpeed = 1.0f; bool anLoop = true; float anBlendTime = 0.2f;
+            std::string anGraph;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -129,6 +131,7 @@ namespace uel {
                 if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));   
                 if (g_loadSchema >= 17)
                     ar(CEREAL_NVP(hasAnimator), CEREAL_NVP(anClip), CEREAL_NVP(anSpeed), CEREAL_NVP(anLoop), CEREAL_NVP(anBlendTime)); // v17// v16
+                if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));                                                // v18
             }
         };
 
@@ -196,6 +199,7 @@ namespace uel {
             if (auto* an = e.GetComponent<AnimatorComponent>()) {
                 ed.hasAnimator = true;
                 ed.anClip = an->clipIndex; ed.anSpeed = an->speed; ed.anLoop = an->loop; ed.anBlendTime = an->blendTime;
+                ed.anGraph = an->graphPath;
             }
 
             return ed;
@@ -268,6 +272,8 @@ namespace uel {
             if (ed.hasAnimator) {
                 auto* an = e.AddComponent<AnimatorComponent>();
                 an->clipIndex = ed.anClip; an->speed = ed.anSpeed; an->loop = ed.anLoop; an->blendTime = ed.anBlendTime;
+                an->graphPath = ed.anGraph;
+                if (!an->graphPath.empty()) LoadAnimGraph(an->graphPath, an->params, an->graph);    // ファイルが無ければ、クリップ1つの再生になる
             }
         }
 

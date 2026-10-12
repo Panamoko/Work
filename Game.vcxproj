@@ -130,6 +130,10 @@
     <ClInclude Include="Source\Engine\AI\NavObstacleComponent.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationClip.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationPose.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimBlendSpaceNode.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimNode.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimParams.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimStateMachineNode.h" />
     <ClInclude Include="Source\Engine\Animation\Skeleton.h" />
     <ClInclude Include="Source\Engine\Animation\SkinnedModel.h" />
     <ClInclude Include="Source\Engine\Assets\GltfMeshLoader.h" />
@@ -183,6 +187,7 @@
     <ClInclude Include="Source\Engine\Scene\SkinnedMeshComponent.h" />
     <ClInclude Include="Source\Engine\Scene\TransformComponent.h" />
     <ClInclude Include="Source\Engine\Scene\World.h" />
+    <ClInclude Include="Source\Engine\Serialization\AnimGraphSerializer.h" />
     <ClInclude Include="Source\Engine\Serialization\StageSerializer.h" />
     <ClInclude Include="Source\Engine\Systems\AnimationSystem.h" />
     <ClInclude Include="Source\Engine\Systems\RenderSystem.h" />
@@ -201,6 +206,9 @@
     <ClCompile Include="External\Tracy\TracyClient.cpp" />
     <ClCompile Include="Source\Core\Main.cpp" />
     <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp" />
+    <ClCompile Include="Source\Engine\Animation\AnimBlendSpaceNode.cpp" />
+    <ClCompile Include="Source\Engine\Animation\AnimNode.cpp" />
+    <ClCompile Include="Source\Engine\Animation\AnimStateMachineNode.cpp" />
     <ClCompile Include="Source\Engine\Assets\GltfMeshLoader.cpp" />
     <ClCompile Include="Source\Engine\Assets\GltfSkinnedLoader.cpp" />
     <ClCompile Include="Source\Engine\Assets\MeshCache.cpp" />
@@ -230,6 +238,7 @@
     <ClCompile Include="Source\Engine\Physics\HitShapes.cpp" />
     <ClCompile Include="Source\Engine\Platform\Window.cpp" />
     <ClCompile Include="Source\Engine\Scene\World.cpp" />
+    <ClCompile Include="Source\Engine\Serialization\AnimGraphSerializer.cpp" />
     <ClCompile Include="Source\Engine\Serialization\StageSerializer.cpp" />
     <ClCompile Include="Source\Engine\Systems\AnimationSystem.cpp" />
     <ClCompile Include="Source\Engine\Systems\RenderSystem.cpp" />

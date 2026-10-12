@@ -29,6 +29,7 @@ namespace uel {
         std::vector<SkinnedSubmesh> submeshes;
         std::vector<SkinnedTexture> textures;   // ②-2でSRV化
         int clipsFromAnimFile = 0;              // Anim GLB（別ファイル）から追加されたクリップの数
+        std::vector<int> clipsFromAnimFiles;    // Anim GLB のファイルごとに、追加されたクリップの数
         bool Valid() const { return !vertices.empty() && !indices.empty(); }
     };
 
