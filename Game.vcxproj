@@ -142,6 +142,7 @@
     <ClInclude Include="Source\Engine\Assets\SkinnedModelCache.h" />
     <ClInclude Include="Source\Engine\Config\EngineConfig.h" />
     <ClInclude Include="Source\Engine\Core\Engine.h" />
+    <ClInclude Include="Source\Engine\Editor\AnimGraphPanel.h" />
     <ClInclude Include="Source\Engine\Editor\CommandHistory.h" />
     <ClInclude Include="Source\Engine\Editor\EditorCamera.h" />
     <ClInclude Include="Source\Engine\Editor\EditorPanels.h" />
@@ -215,6 +216,7 @@
     <ClCompile Include="Source\Engine\Assets\SkinnedModelCache.cpp" />
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp" />
     <ClCompile Include="Source\Engine\Core\Engine.cpp" />
+    <ClCompile Include="Source\Engine\Editor\AnimGraphPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\EditorCamera.cpp" />
     <ClCompile Include="Source\Engine\Editor\EditorPanels.cpp" />
     <ClCompile Include="Source\Engine\Editor\EntityCommands.cpp" />

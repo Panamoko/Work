@@ -113,7 +113,7 @@ namespace uel {
                 GameContext ctx{ world, *e, cache, device, dt, in, &nav, &flow };
                 for (size_t ci = 0; ci < e->components.size(); ++ci) e->components[ci]->Update(ctx);
             }
-
+            world.FlushDestroy();     // Update ‚Ì’†‚Å—\–ñ‚³‚ê‚½uŒã‚ÅÁ‚·v‚ðA‚±‚±‚Å‚Ü‚Æ‚ß‚ÄÁ‚·
             if (player) { view = player->GetComponent<PlayerComponent>()->GetView(); }
             else { view = camera.GetView(); }
         }

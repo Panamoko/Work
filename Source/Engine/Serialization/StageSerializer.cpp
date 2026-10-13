@@ -55,7 +55,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 18;
+        constexpr int kSchemaLatest = 19;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -98,6 +98,7 @@ namespace uel {
             float shRoughness = -1.0f;   // マイナスのまま＝ファイルに無かった（版 15 以前）。FromDTO で shSpecPower から換算する
             bool  hasAnimator = false; int anClip = 0; float anSpeed = 1.0f; bool anLoop = true; float anBlendTime = 0.2f;
             std::string anGraph;
+            std::string skFpHide;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -131,7 +132,8 @@ namespace uel {
                 if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));   
                 if (g_loadSchema >= 17)
                     ar(CEREAL_NVP(hasAnimator), CEREAL_NVP(anClip), CEREAL_NVP(anSpeed), CEREAL_NVP(anLoop), CEREAL_NVP(anBlendTime)); // v17// v16
-                if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));                                                // v18
+                if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));    
+                if (g_loadSchema >= 19) ar(CEREAL_NVP(skFpHide));                                               // v19// v18
             }
         };
 
@@ -159,6 +161,7 @@ namespace uel {
                 ed.hasSkinned = true;
                 ed.skAsset = sk->assetPath; ed.skClip = sk->clipIndex; ed.skSpeed = sk->speed;
                 ed.skAnim = sk->animPath;
+                ed.skFpHide = sk->fpHideBone;
                 ed.skLoop = sk->loop; ed.skVisible = sk->visible;
                 ed.skColor = { sk->color.x, sk->color.y, sk->color.z, sk->color.w };
             }
@@ -228,6 +231,7 @@ namespace uel {
                 auto* sk = e.AddComponent<SkinnedMeshComponent>();
                 sk->assetPath = ed.skAsset; sk->clipIndex = ed.skClip; sk->speed = ed.skSpeed;
                 sk->animPath = ed.skAnim;
+                sk->fpHideBone = ed.skFpHide;
                 sk->loop = ed.skLoop; sk->visible = ed.skVisible;
                 sk->color = { ed.skColor.x, ed.skColor.y, ed.skColor.z, ed.skColor.w };
             }

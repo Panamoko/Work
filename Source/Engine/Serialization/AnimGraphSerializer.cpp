@@ -15,7 +15,10 @@ namespace uel {
     namespace {
 
         // ファイルの版。項目を足すときは +1 して、読む側で「その版以降だけ読む」ようにする
-        constexpr int kAnimGraphVersion = 1;
+        //   1 … 最初の形
+        //   2 … ノードエディタ上の位置（状態の x / y、Any の箱の anyX / anyY）
+        constexpr int kAnimGraphVersion = 3;
+        int g_loadVersion = kAnimGraphVersion;     // 読み込み中のファイルの版（保存するときは最新）
 
         struct ParamDTO {
             std::string name; int type = 0; float value = 0.0f;
@@ -29,6 +32,10 @@ namespace uel {
             std::string param; int op = 0; float threshold = 0.0f;
             template<class A> void serialize(A& ar) { ar(CEREAL_NVP(param), CEREAL_NVP(op), CEREAL_NVP(threshold)); }
         };
+        struct NotifyDTO {
+            float time = 0.0f; std::string name;
+            template<class A> void serialize(A& ar) { ar(CEREAL_NVP(time), CEREAL_NVP(name)); }
+        };
         struct TransitionDTO {
             int from = -1, to = 0; float blendTime = 0.2f; bool waitForEnd = false;
             std::vector<ConditionDTO> conditions;
@@ -41,6 +48,7 @@ namespace uel {
         struct StateDTO {
             std::string name;
             std::vector<NodeDTO> node;      // 0個か1個（状態の中身）
+            float x = 0.0f, y = 0.0f;       // ノードエディタ上の箱の位置（版 2 から）
             template<class A> void serialize(A& ar);
         };
 
@@ -50,22 +58,33 @@ namespace uel {
 
             // Clip
             std::string clip; bool loop = true; float speed = 1.0f; std::string speedParam;
+            std::vector<NotifyDTO> notifies;
             // BlendSpace1D
             std::string param; float smoothTime = 0.1f; std::vector<SampleDTO> samples;
             // StateMachine
             std::vector<StateDTO> states; std::vector<TransitionDTO> transitions; int entry = 0;
+            float anyX = -190.0f, anyY = 8.0f;      // ノードエディタ上の「Any」の箱の位置（版 2 から）
 
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(type));
                 if (type == "Clip")
+                {
                     ar(CEREAL_NVP(clip), CEREAL_NVP(loop), CEREAL_NVP(speed), CEREAL_NVP(speedParam));
+                    if (g_loadVersion >= 3) ar(CEREAL_NVP(notifies));
+                }
                 else if (type == "BlendSpace1D")
                     ar(CEREAL_NVP(param), CEREAL_NVP(speed), CEREAL_NVP(smoothTime), CEREAL_NVP(samples));
                 else if (type == "StateMachine")
+                {
                     ar(CEREAL_NVP(entry), CEREAL_NVP(states), CEREAL_NVP(transitions));
+                    if (g_loadVersion >= 2) ar(CEREAL_NVP(anyX), CEREAL_NVP(anyY));
+                }
             }
         };
-        template<class A> void StateDTO::serialize(A& ar) { ar(CEREAL_NVP(name), CEREAL_NVP(node)); }
+        template<class A> void StateDTO::serialize(A& ar) {
+            ar(CEREAL_NVP(name), CEREAL_NVP(node));
+            if (g_loadVersion >= 2) ar(CEREAL_NVP(x), CEREAL_NVP(y));
+        }
 
         // ノード → 保存データ（子も含めて）
         NodeDTO ToDTO(const AnimNode& n)
@@ -74,6 +93,7 @@ namespace uel {
             if (auto* cn = dynamic_cast<const AnimClipNode*>(&n)) {
                 d.type = "Clip";
                 d.clip = cn->clipName; d.loop = cn->loop; d.speed = cn->speed; d.speedParam = cn->speedParam;
+                for (const auto& nt : cn->notifies) d.notifies.push_back({ nt.time, nt.name });
             }
             else if (auto* bs = dynamic_cast<const AnimBlendSpace1DNode*>(&n)) {
                 d.type = "BlendSpace1D";
@@ -83,8 +103,10 @@ namespace uel {
             else if (auto* sm = dynamic_cast<const AnimStateMachineNode*>(&n)) {
                 d.type = "StateMachine";
                 d.entry = sm->entry;
+                d.anyX = sm->anyX; d.anyY = sm->anyY;
                 for (const auto& st : sm->states) {
                     StateDTO sd; sd.name = st.name;
+                    sd.x = st.editorX; sd.y = st.editorY;
                     if (st.node) sd.node.push_back(ToDTO(*st.node.get()));
                     d.states.push_back(std::move(sd));
                 }
@@ -104,6 +126,7 @@ namespace uel {
             if (d.type == "Clip") {
                 auto n = std::make_unique<AnimClipNode>();
                 n->clipName = d.clip; n->loop = d.loop; n->speed = d.speed; n->speedParam = d.speedParam;
+                for (const auto& nd : d.notifies) n->notifies.push_back({ nd.time, nd.name });
                 return AnimNodePtr(std::move(n));
             }
             if (d.type == "BlendSpace1D") {
@@ -115,9 +138,11 @@ namespace uel {
             if (d.type == "StateMachine") {
                 auto n = std::make_unique<AnimStateMachineNode>();
                 n->entry = d.entry;
+                n->anyX = d.anyX; n->anyY = d.anyY;
                 for (const auto& sd : d.states) {
                     AnimStateMachineNode::State st;
                     st.name = sd.name;
+                    st.editorX = sd.x; st.editorY = sd.y;
                     if (!sd.node.empty()) st.node = FromDTO(sd.node[0]);
                     n->states.push_back(std::move(st));
                 }
@@ -162,6 +187,7 @@ namespace uel {
         std::ofstream ofs(path);
         if (!ofs) return false;
         int version = kAnimGraphVersion;
+        g_loadVersion = kAnimGraphVersion;      // 保存は、いつも最新の版の項目を全部書く
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("version", version),
             cereal::make_nvp("params", pd),
@@ -179,13 +205,16 @@ namespace uel {
         std::vector<NodeDTO> rd;
         try {
             cereal::JSONInputArchive ar(ifs);
-            ar(cereal::make_nvp("version", version),
-                cereal::make_nvp("params", pd),
+            ar(cereal::make_nvp("version", version));
+            g_loadVersion = version;            // このファイルの版にある項目だけを読む（古いファイルもそのまま読める）
+            ar(cereal::make_nvp("params", pd),
                 cereal::make_nvp("root", rd));
         }
         catch (...) {
+            g_loadVersion = kAnimGraphVersion;
             return false;       // JSON として読めない／必要な項目が無い
         }
+        g_loadVersion = kAnimGraphVersion;
         if (rd.empty()) return false;
         AnimNodePtr loaded = FromDTO(rd[0]);
         if (!loaded) return false;

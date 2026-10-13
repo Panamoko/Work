@@ -1,10 +1,10 @@
 {
-    "version": 1,
+    "version": 2,
     "params": [
         {
             "name": "Speed",
             "type": 0,
-            "value": 0.3700000047683716
+            "value": 0.09000000357627869
         },
         {
             "name": "Attack",
@@ -27,19 +27,23 @@
                             "speed": 1.0,
                             "speedParam": "Speed"
                         }
-                    ]
+                    ],
+                    "x": 0.0,
+                    "y": 0.0
                 },
                 {
                     "name": "Move",
                     "node": [
                         {
                             "type": "Clip",
-                            "clip": "walk",
+                            "clip": "sprint",
                             "loop": true,
                             "speed": 1.0,
                             "speedParam": "Speed"
                         }
-                    ]
+                    ],
+                    "x": 232.0,
+                    "y": -159.0
                 },
                 {
                     "name": "Attack",
@@ -51,7 +55,9 @@
                             "speed": 1.0,
                             "speedParam": "Speed"
                         }
-                    ]
+                    ],
+                    "x": 460.0,
+                    "y": 0.0
                 }
             ],
             "transitions": [
@@ -100,8 +106,23 @@
                     "blendTime": 0.20000000298023225,
                     "waitForEnd": true,
                     "conditions": []
+                },
+                {
+                    "from": 0,
+                    "to": 2,
+                    "blendTime": 0.10000000149011612,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
                 }
-            ]
+            ],
+            "anyX": -190.0,
+            "anyY": 8.0
         }
     ]
 }

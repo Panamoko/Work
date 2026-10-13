@@ -22,7 +22,13 @@ namespace uel {
         bool              visible = true;
         DirectX::XMFLOAT4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
 
-        // ---- 実行時だけの値（保存しない）。AnimationSystem が毎フレーム書き込む ----
+        // 一人称のときに潰す骨の名前（頭など）。空なら何もしない。
+        // カメラが頭の位置にあると、自分の頭や髪が画面をふさぐので、その骨と子の骨を1点に縮めて見えなくする。
+        std::string       fpHideBone;
+
+        // ---- 実行時だけの値（保存しない）----
+        bool firstPerson = false;                      // 一人称で描くか。Play を始めるとき、プレイヤーだけ true になる
+        // AnimationSystem が毎フレーム書き込む
         std::vector<DirectX::XMFLOAT4X4> boneGlobal;   // ボーンごとのモデル空間の行列（skeleton.bones と同じ並び）
         std::vector<DirectX::XMFLOAT4X4> palette;      // スキニング用の行列（skeleton.joints と同じ並び）
     };

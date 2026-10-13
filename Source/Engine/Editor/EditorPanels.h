@@ -29,5 +29,10 @@ namespace uel {
     // Inspectorで Apply された Prefab のパス（Engineが全Sceneへ反映する）。取り出すと空に戻る
     std::string ConsumePrefabRefreshRequest();
 
+    class AnimNode;
+    class AnimParams;
+    struct SkinnedModel;
+    void DrawAnimNodeDetails(AnimNode* node, const SkinnedModel& model, AnimParams& params);   // ノード1つぶんの編集欄（ノードエディタから呼ぶ）
+    void RequestAssetRescan();      // Asset Browser に、次のフレームで一覧を作り直させる（ファイルを保存した後に呼ぶ）
 
 }

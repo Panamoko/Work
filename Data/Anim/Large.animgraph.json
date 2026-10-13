@@ -1,0 +1,199 @@
+{
+    "version": 2,
+    "params": [
+        {
+            "name": "Speed",
+            "type": 0,
+            "value": 0.17000000178813935
+        },
+        {
+            "name": "Hima",
+            "type": 1,
+            "value": 0.0
+        },
+        {
+            "name": "Attack",
+            "type": 2,
+            "value": 0.0
+        },
+        {
+            "name": "Attack2",
+            "type": 2,
+            "value": 0.0
+        }
+    ],
+    "root": [
+        {
+            "type": "StateMachine",
+            "entry": 0,
+            "states": [
+                {
+                    "name": "Idle",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Flexing",
+                            "loop": true,
+                            "speed": 1.0,
+                            "speedParam": ""
+                        }
+                    ],
+                    "x": 163.0,
+                    "y": -116.0
+                },
+                {
+                    "name": "Run",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Running_A",
+                            "loop": true,
+                            "speed": 1.0,
+                            "speedParam": ""
+                        }
+                    ],
+                    "x": 406.0,
+                    "y": -118.0
+                },
+                {
+                    "name": "Attack",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Dodge_Right",
+                            "loop": false,
+                            "speed": 1.0,
+                            "speedParam": ""
+                        }
+                    ],
+                    "x": 286.0,
+                    "y": -240.0
+                },
+                {
+                    "name": "Attack2",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "EXPERIMENTAL_Large_Transform",
+                            "loop": false,
+                            "speed": 1.0,
+                            "speedParam": ""
+                        }
+                    ],
+                    "x": 298.0,
+                    "y": 18.0
+                }
+            ],
+            "transitions": [
+                {
+                    "from": 0,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Speed",
+                            "op": 0,
+                            "threshold": 0.10000000149011612
+                        }
+                    ]
+                },
+                {
+                    "from": 0,
+                    "to": 2,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 1,
+                    "to": 2,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 2,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 1,
+                    "to": 0,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Speed",
+                            "op": 1,
+                            "threshold": 0.10000000149011612
+                        }
+                    ]
+                },
+                {
+                    "from": 0,
+                    "to": 3,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack2",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 2,
+                    "to": 0,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 3,
+                    "to": 0,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 3,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 1,
+                    "to": 3,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack2",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                }
+            ],
+            "anyX": -190.0,
+            "anyY": 8.0
+        }
+    ]
+}

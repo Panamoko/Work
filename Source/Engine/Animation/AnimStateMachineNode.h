@@ -26,6 +26,7 @@ namespace uel {
         struct State {
             std::string name;
             AnimNodePtr node;               // この状態で再生するもの（空なら bind ポーズ）
+            float editorX = 0.0f, editorY = 0.0f;   // ノードエディタ上の箱の位置
         };
 
         struct Transition {
@@ -40,6 +41,7 @@ namespace uel {
         std::vector<State>      states;
         std::vector<Transition> transitions;    // 上から順に調べて、最初に成り立ったものを使う
         int entry = 0;                           // 最初の状態
+        float anyX = -190.0f, anyY = 8.0f;      // ノードエディタ上の「Any」の箱の位置
 
         // ---- 実行時の状態 ----
         int   current = -1;                 // 今の状態（-1 = まだ始まっていない）
@@ -54,6 +56,7 @@ namespace uel {
         void Update(AnimContext& ctx) override;
         void Evaluate(AnimContext& ctx, LocalPose& out) override;
         void Reset() override { current = -1; fromState = -1; fadeElapsed = fadeDuration = 0.0f; }
+        bool HasNotify(const std::string& name) const override;     // どれかの状態の中身が、この名前の通知を持っているか
         std::unique_ptr<AnimNode> Clone() const override { return std::make_unique<AnimStateMachineNode>(*this); }
 
         // 状態を1つ消す（遷移の番号を詰め直す。エディタ用）

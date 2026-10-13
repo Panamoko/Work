@@ -30,6 +30,18 @@ namespace uel {
         AnimNodePtr graph;          // 根のノード。入っていれば、こちらが姿勢を決める
         std::string graphPath;      // グラフのアセットのパス（Data/Anim/<名前>.animgraph.json）。空なら未保存
 
+
+        // ---- 通知（実行時だけ。保存しない）----
+        // このフレームのアニメの計算で発火した通知の名前。AnimationSystem が毎フレーム入れ直す。
+        // ゲーム側（Component の Update）が読むのは、次のフレームになる。
+        std::vector<std::string> events;
+        std::string lastEvent;              // 最後に発火した通知（ノードエディタの表示用）
+        float       lastEventAge = 0.0f;    // それから何秒たったか
+        bool WasFired(const char* name) const {
+            for (const std::string& e : events) if (e == name) return true;
+            return false;
+        }
+
         // ---- 実行時の状態（保存しない）----
         float time = 0.0f;          // clipIndex のクリップの再生位置
         bool  finished = false;     // ループしないクリップが最後まで再生された

@@ -81,4 +81,13 @@ namespace uel {
         return w;
     }
 
+
+    void World::FlushDestroy()
+    {
+        if (pendingDestroy.empty()) return;
+        std::vector<EntityId> ids;
+        ids.swap(pendingDestroy);       // Á‚µ‚Ä‚¢‚éÅ’†‚É—\–ñ‚ª‘‚¦‚Ä‚à‰ó‚ê‚È‚¢‚æ‚¤‚ÉAæ‚Éæ‚èo‚·
+        for (EntityId id : ids) DestroyEntity(id);     // ‚·‚Å‚ÉÁ‚¦‚Ä‚¢‚é Entity ‚ÍADestroyEntity ‚ª‰½‚à‚µ‚È‚¢
+    }
+
 } // namespace uel

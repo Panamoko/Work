@@ -10,6 +10,8 @@
 #include "Engine/Game/ScreenUIComponent.h"
 #include "Engine/Systems/AnimationSystem.h"
 #include "Engine/Assets/SkinnedModelCache.h"
+#include "Engine/Editor/AnimGraphPanel.h"
+#include "Engine/Scene/SkinnedMeshComponent.h"
 
 #include <filesystem>
 #include <imgui.h>
@@ -175,6 +177,7 @@ namespace uel {
             DrawAssetBrowserPanel(world, selected, history);
             DrawEnvironmentPanel(lighting, postSettings);
             DrawAnimationEditorPanel(world, selected, graphics->GetDevice());
+            DrawAnimGraphPanel(aw, selected, mode == EditorMode::Play, graphics->GetDevice());
             DrawNavGridPanel(world);
             // Prefab が Apply されたら、全Sceneの同じPrefabのインスタンスへ反映
             std::string refreshed = ConsumePrefabRefreshRequest();
@@ -223,6 +226,7 @@ namespace uel {
 
         if (player) {
             if (auto* m = player->GetComponent<MeshRendererComponent>()) m->firstPerson = true;
+            if (auto* psk = player->GetComponent<SkinnedMeshComponent>()) psk->firstPerson = true;
             auto* php = player->GetComponent<HPComponent>();
             if (!php) php = player->AddComponent<HPComponent>();
             php->hp = php->maxHp;

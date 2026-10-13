@@ -1,0 +1,207 @@
+{
+    "version": 3,
+    "params": [
+        {
+            "name": "Speed",
+            "type": 0,
+            "value": 0.019999999552965165
+        },
+        {
+            "name": "Attack",
+            "type": 2,
+            "value": 0.0
+        },
+        {
+            "name": "Attack2",
+            "type": 2,
+            "value": 0.0
+        },
+        {
+            "name": "Dead",
+            "type": 1,
+            "value": 0.0
+        }
+    ],
+    "root": [
+        {
+            "type": "StateMachine",
+            "entry": 0,
+            "states": [
+                {
+                    "name": "Idle",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Idle_A",
+                            "loop": true,
+                            "speed": 1.0,
+                            "speedParam": "",
+                            "notifies": []
+                        }
+                    ],
+                    "x": 163.0,
+                    "y": -116.0
+                },
+                {
+                    "name": "Run",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Running_A",
+                            "loop": true,
+                            "speed": 1.0,
+                            "speedParam": "Speed",
+                            "notifies": []
+                        }
+                    ],
+                    "x": 734.5516357421875,
+                    "y": -114.34940338134766
+                },
+                {
+                    "name": "Attack",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Melee_Unarmed_Punch",
+                            "loop": false,
+                            "speed": 1.0,
+                            "speedParam": "",
+                            "notifies": [
+                                {
+                                    "time": 0.5,
+                                    "name": "Hit"
+                                }
+                            ]
+                        }
+                    ],
+                    "x": 487.82989501953127,
+                    "y": 257.72332763671877
+                },
+                {
+                    "name": "Death",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Death_A",
+                            "loop": false,
+                            "speed": 1.0,
+                            "speedParam": "",
+                            "notifies": []
+                        }
+                    ],
+                    "x": 471.2891845703125,
+                    "y": 9.469879150390625
+                }
+            ],
+            "transitions": [
+                {
+                    "from": 0,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Speed",
+                            "op": 0,
+                            "threshold": 0.10000000149011612
+                        }
+                    ]
+                },
+                {
+                    "from": 1,
+                    "to": 0,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Speed",
+                            "op": 1,
+                            "threshold": 0.10000000149011612
+                        }
+                    ]
+                },
+                {
+                    "from": 0,
+                    "to": 2,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 2,
+                    "to": 0,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 2,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
+                },
+                {
+                    "from": 1,
+                    "to": 2,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Attack",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 1,
+                    "to": 3,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Dead",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 0,
+                    "to": 3,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Dead",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 2,
+                    "to": 3,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Dead",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                }
+            ],
+            "anyX": 226.80723571777345,
+            "anyY": 258.1956787109375
+        }
+    ]
+}

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace uel {
 
@@ -25,6 +26,7 @@ namespace uel {
         const SkinnedModel& model;      // 骨格とクリップ
         AnimParams& params;     // グラフに渡された値（Trigger を下ろすので const ではない）
         float               dt;         // 進める時間（秒）
+        std::vector<std::string>* events = nullptr;     // このフレームに発火した通知の名前を入れる先（無ければ nullptr）
     };
 
     // ポーズを出すノードの基底（UE の AnimGraph のノードに当たる）。
@@ -38,6 +40,7 @@ namespace uel {
         virtual void Evaluate(AnimContext& ctx, LocalPose& out) = 0;
         virtual void Reset() {}                                 // 頭から再生し直す
         virtual bool IsFinished() const { return false; }       // ループしないクリップが最後まで再生されたら true
+        virtual bool HasNotify(const std::string&) const { return false; }     // この名前の通知を、自分か子が持っているか
         virtual std::unique_ptr<AnimNode> Clone() const = 0;    // 子も含めて複製する
     };
 
@@ -62,11 +65,19 @@ namespace uel {
     // クリップを1つ再生するノード。木の「葉」になる。
     class AnimClipNode : public AnimNode {
     public:
+        // 通知（UE の Anim Notify に当たる）。再生位置がこの時刻を通り過ぎたら、名前をゲーム側へ知らせる。
+        //   例：パンチのクリップの 0.42 秒に "Hit" を置くと、腕が当たる瞬間にダメージを出せる
+        struct Notify {
+            float       time = 0.0f;    // クリップの頭からの秒数
+            std::string name;
+        };
+
         // ---- 設定 ----
         std::string clipName;           // 名前で指定する（番号だと、モデルを差し替えたときにずれるため）
         bool        loop = true;
         float       speed = 1.0f;
         std::string speedParam;         // 空でなければ、この Float パラメータを再生速度に掛ける
+        std::vector<Notify> notifies;
 
         // ---- 実行時の状態 ----
         float time = 0.0f;
@@ -75,14 +86,20 @@ namespace uel {
         const char* TypeName() const override { return "Clip"; }
         void Update(AnimContext& ctx) override;
         void Evaluate(AnimContext& ctx, LocalPose& out) override;
-        void Reset() override { time = 0.0f; finished = false; }
-        std::unique_ptr<AnimNode> Clone() const override { return std::make_unique<AnimClipNode>(*this); }
+        void Reset() override { time = 0.0f; finished = false; fresh = true; }
         bool IsFinished() const override { return finished; }
+        bool HasNotify(const std::string& name) const override {
+            for (const Notify& n : notifies) if (n.name == name) return true;
+            return false;
+        }
+        std::unique_ptr<AnimNode> Clone() const override { return std::make_unique<AnimClipNode>(*this); }
 
         // このモデルでの clipName のクリップ（無ければ nullptr）
         const AnimationClip* FindClip(const SkinnedModel& model);
 
     private:
+        bool fresh = true;              // 頭から再生し始めたばかり（時刻 0 に置いた通知も、最初の1回で発火させるための印）
+
         // 名前からクリップを探した結果を覚えておく（毎フレーム文字列で探さないため）
         const SkinnedModel* cachedModel = nullptr;
         std::string         cachedName;

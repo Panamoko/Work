@@ -87,7 +87,32 @@ namespace uel {
                 clipCombo("Clip", cn->clipName);
                 ImGui::Checkbox("Loop", &cn->loop);
                 paramCombo("Speed Param", cn->speedParam, true);
-                ImGui::TextDisabled("time %.2f s%s", cn->time, cn->finished ? "  (finished)" : "");
+                const AnimationClip* nclip = cn->FindClip(model);
+                const float ndur = (nclip && nclip->duration > 0.0f) ? nclip->duration : 0.0f;
+                ImGui::TextDisabled("time %.2f / %.2f s%s", cn->time, ndur, cn->finished ? "  (finished)" : "");
+
+                // ---- 通知：再生位置がこの時刻を通り過ぎたら、名前をゲーム側へ知らせる ----
+                ImGui::Separator();
+                ImGui::TextUnformatted("Notifies");
+                int removeN = -1;
+                for (int i = 0; i < (int)cn->notifies.size(); ++i) {
+                    AnimClipNode::Notify& n = cn->notifies[i];
+                    ImGui::PushID(i);
+                    ImGui::SetNextItemWidth(80);
+                    ImGui::DragFloat("##t", &n.time, 0.005f, 0.0f, (ndur > 0.0f) ? ndur : 100.0f, "%.2f s");
+                    ImGui::SameLine();
+                    char nb[48]; strncpy_s(nb, sizeof(nb), n.name.c_str(), _TRUNCATE);
+                    ImGui::SetNextItemWidth(110);
+                    if (ImGui::InputText("##n", nb, sizeof(nb))) n.name = nb;
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("x")) removeN = i;
+                    ImGui::PopID();
+                }
+                if (removeN >= 0) cn->notifies.erase(cn->notifies.begin() + removeN);
+                if (ImGui::SmallButton("+ Notify at current time")) {
+                    AnimClipNode::Notify n; n.time = cn->time; n.name = "Hit";
+                    cn->notifies.push_back(n);
+                }
             }
             else if (auto* bs = dynamic_cast<AnimBlendSpace1DNode*>(node)) {
                 paramCombo("Axis Param", bs->param, true);
@@ -271,6 +296,17 @@ namespace uel {
         std::string p = g_prefabRefresh;
         g_prefabRefresh.clear();
         return p;
+    }
+
+
+    void RequestAssetRescan()
+    {
+        g_assetRescan = true;
+    }
+
+    void DrawAnimNodeDetails(AnimNode* node, const SkinnedModel& model, AnimParams& params)
+    {
+        DrawAnimNodeInspector(node, model, params);
     }
 
     void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history)
@@ -545,6 +581,34 @@ namespace uel {
                 ImGui::Checkbox("Visible##sk", &sk->visible);
                 ImGui::ColorEdit4("Tint##sk", &sk->color.x);
 
+                // ---- 一人称で潰す骨（Play 中、プレイヤーのときだけ効く）----
+                {
+                    std::shared_ptr<SkinnedRenderModel> fm;
+                    if (!sk->assetPath.empty()) fm = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
+                    const bool haveBones = fm && fm->Valid();
+                    if (ImGui::BeginCombo("FP Hide Bone", sk->fpHideBone.empty() ? "(none)" : sk->fpHideBone.c_str())) {
+                        if (ImGui::Selectable("(none)", sk->fpHideBone.empty())) sk->fpHideBone.clear();
+                        if (haveBones) {
+                            const auto& bones = fm->Cpu().skeleton.bones;
+                            for (int i = 0; i < (int)bones.size(); ++i) {
+                                ImGui::PushID(i);
+                                if (ImGui::Selectable(bones[i].name.c_str(), bones[i].name == sk->fpHideBone)) sk->fpHideBone = bones[i].name;
+                                ImGui::PopID();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    if (ImGui::SmallButton("Auto (head)") && haveBones) {
+                        // 名前に "head" を含む最初の骨を選ぶ（骨は親が先に並んでいるので、いちばん根元に近いものになる）
+                        for (const auto& b : fm->Cpu().skeleton.bones) {
+                            std::string low = b.name;
+                            for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
+                            if (low.find("head") != std::string::npos) { sk->fpHideBone = b.name; break; }
+                        }
+                    }
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Preview##fp", &sk->firstPerson);      // 編集中に結果を見るためのもの（保存されない）
+                }
                 if (!sk->assetPath.empty()) {
                     auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                     if (model && model->Valid()) {
@@ -649,9 +713,15 @@ namespace uel {
                     ImGui::SameLine();
                     if (ImGui::SmallButton("Clear Graph")) an->graph.reset();
                     if (an->graph) {
-                        ImGui::PushID("graph");     // グラフの中の部品が、下の Parameters の部品と同じ ID にならないように分ける
-                        DrawAnimNodeInspector(an->graph.get(), amodel->Cpu(), an->params);
-                        ImGui::PopID();
+                        if (dynamic_cast<AnimStateMachineNode*>(an->graph.get())) {
+                            // ステートマシンは、ノードエディタで編集する
+                            ImGui::TextDisabled("Edit states and transitions in the Anim Graph panel.");
+                        }
+                        else {
+                            ImGui::PushID("graph");     // グラフの中の部品が、下の Parameters の部品と同じ ID にならないように分ける
+                            DrawAnimNodeInspector(an->graph.get(), amodel->Cpu(), an->params);
+                            ImGui::PopID();
+                        }
                     }
                 }
                 else {
@@ -673,29 +743,8 @@ namespace uel {
                     if (an->IsFading()) ImGui::Text("Blending  %.0f%%", an->fadeElapsed / an->fadeDuration * 100.0f);
                     else                ImGui::TextDisabled("Blending  -");
 
-                    // 確認用：グラフを手早く作るボタン（グラフのアセットを読めるようになったら消す）
-                    ImGui::TextDisabled("New graph:");
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("Clip")) {
-                        auto node = std::make_unique<AnimClipNode>();
-                        node->clipName = clips[an->clipIndex].name;
-                        node->loop = an->loop;
-                        node->speedParam = "PlayRate";
-                        if (an->params.Find("PlayRate") < 0) an->params.SetFloat("PlayRate", 1.0f);
-                        an->graph = AnimNodePtr(std::move(node));
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("State Machine")) {
-                        // 今のクリップを再生する状態を1つだけ持つステートマシン。作った後に状態と遷移を足す
-                        auto sm = std::make_unique<AnimStateMachineNode>();
-                        AnimStateMachineNode::State st;
-                        st.name = "Idle";
-                        auto cn = std::make_unique<AnimClipNode>();
-                        cn->clipName = clips[an->clipIndex].name;
-                        st.node = AnimNodePtr(std::move(cn));
-                        sm->states.push_back(std::move(st));
-                        an->graph = AnimNodePtr(std::move(sm));
-                    }
+                    ImGui::TextDisabled("To use a graph: right-click the canvas in the Anim Graph panel.");
+
                 }
                 // ---- グラフのアセット（Data/Anim/<名前>.animgraph.json）----
                 {

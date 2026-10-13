@@ -36,10 +36,21 @@ namespace uel {
         void SetBool(const std::string& name, bool v) { Ensure(name, AnimParamType::Bool).value = v ? 1.0f : 0.0f; }
         void SetTrigger(const std::string& name) { Ensure(name, AnimParamType::Trigger).value = 1.0f; }
 
+        // その名前のパラメータがあるときだけ値を書く（無ければ作らずに false を返す）。
+// ゲーム側のコードが使う。無いときに作ってしまうと、関係ないグラフにパラメータが増えていくため。
+        bool SetIfExists(const std::string& name, float v) {
+            const int i = Find(name);
+            if (i < 0) return false;
+            items[i].value = v;
+            return true;
+        }
+
+
         float GetFloat(const std::string& name, float fallback = 0.0f) const {
             const int i = Find(name);
             return (i >= 0) ? items[i].value : fallback;
         }
+
         bool GetBool(const std::string& name) const { return GetFloat(name, 0.0f) > 0.5f; }
 
         // Trigger は「1回だけ効く」値。立っていれば下ろして true を返す。

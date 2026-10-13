@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 14,
+    "schemaVersion": 18,
     "prefab": {
         "name": "Enemy",
         "transform": {
@@ -19,33 +19,19 @@
                 "z": 0.5
             }
         },
-        "hasMesh": true,
+        "hasMesh": false,
         "mesh": {
-            "assetId": "Data/Model/unitychan/Mannequin_Large.glb",
+            "assetId": "",
             "color": {
-                "x": 1.0,
-                "y": 1.0,
-                "z": 1.0,
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
                 "w": 1.0
             },
-            "visible": false,
+            "visible": true,
             "firstPerson": false,
-            "hiddenSubmesh": [
-                0,
-                0,
-                0,
-                0,
-                0,
-                0
-            ],
-            "submeshRole": [
-                0,
-                0,
-                0,
-                0,
-                0,
-                0
-            ]
+            "hiddenSubmesh": [],
+            "submeshRole": []
         },
         "hasHP": true,
         "hp": 100.0,
@@ -56,7 +42,7 @@
         "hasPlayer": false,
         "hasSkinned": true,
         "skAsset": "Data/Model/unitychan/Mannequin_Large.glb",
-        "skClip": 0,
+        "skClip": 15,
         "skSpeed": 1.0,
         "skLoop": true,
         "skVisible": true,
@@ -66,7 +52,7 @@
             "z": 1.0,
             "w": 1.0
         },
-        "skAnim": "Data/Model/unitychan/Mannequin_Large.glbData/Model/unitychan/Mannequin_Large.glb",
+        "skAnim": "Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_CombatMelee.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_General.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_MovementAdvanced.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_MovementBasic.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_Simulation.glb;Data/Model/KayKit_Character_Animations_1.1/Animations/gltf/Rig_Large/Rig_Large_Special.glb",
         "hasNavObs": false,
         "navHalfX": 1.0,
         "navHalfZ": 1.0,
@@ -81,12 +67,12 @@
         "ruleLose": "",
         "ruleDelay": 2.0,
         "prefabPath": "",
-        "hasHitbox": false,
-        "hbBodyBottom": 0.30000001192092898,
-        "hbBodyTop": 1.2999999523162842,
-        "hbBodyRadius": 0.3499999940395355,
-        "hbHeadHeight": 1.600000023841858,
-        "hbHeadRadius": 0.2199999988079071,
+        "hasHitbox": true,
+        "hbBodyBottom": 0.27000001072883608,
+        "hbBodyTop": 1.7200000286102296,
+        "hbBodyRadius": 1.4299999475479127,
+        "hbHeadHeight": 3.3499999046325685,
+        "hbHeadRadius": 0.5899999737739563,
         "hbHeadMul": 2.0,
         "hasSpawner": false,
         "spPrefab": "",
@@ -101,9 +87,8 @@
         "shMode": 2,
         "shReceiveShadow": true,
         "shSpecStrength": 0.0,
-        "shSpecPower": 32.0,
-        "shRimStrength": 0.0,
-        "shRimPower": 3.0,
+        "shRimStrength": 0.14000000059604646,
+        "shRimPower": 10.25,
         "shRimColor": {
             "x": 1.0,
             "y": 1.0,
@@ -116,11 +101,21 @@
             "y": 0.6000000238418579,
             "z": 0.699999988079071
         },
-        "shOutlineWidth": 0.019999999552965165,
+        "shOutlineWidth": 0.0,
         "shOutlineColor": {
             "x": 0.05000000074505806,
             "y": 0.05000000074505806,
             "z": 0.05000000074505806
-        }
+        },
+        "shToonTexSteps": 2.0,
+        "shToonTexSmooth": 0.0,
+        "shMetallic": 0.28999999165534975,
+        "shRoughness": 1.0,
+        "hasAnimator": true,
+        "anClip": 0,
+        "anSpeed": 1.0,
+        "anLoop": true,
+        "anBlendTime": 0.20000000298023225,
+        "anGraph": "Data/Anim/Enemy.animgraph.json"
     }
 }

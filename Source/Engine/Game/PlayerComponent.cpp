@@ -11,6 +11,8 @@
 #include "Engine/Scene/SkinnedMeshComponent.h"
 #include "Engine/Game/HitboxComponent.h"
 #include "Engine/Physics/HitShapes.h"
+#include "Engine/Game/OpponentComponent.h"
+#include "Engine/Scene/AnimatorComponent.h"
 
 #include <cmath>
 #include <memory>
@@ -28,7 +30,8 @@ namespace uel {
         float dt = ctx.dt;
         if (hitMarker > 0.0f) hitMarker -= dt;
         auto* myHp = self.GetComponent<HPComponent>();
-        bool canAct = in.enabled && !(myHp && myHp->hp <= 0.0f);   // 死亡中は操作不可
+        const bool isDead = (myHp && myHp->hp <= 0.0f);
+        const bool canAct = in.enabled && !isDead;   // 死亡中は操作不可
 
         // 対象メッシュ取得（assetId空は手続き立方体）
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
@@ -39,7 +42,7 @@ namespace uel {
             };
 
         // 見回し
-        if (in.enabled && in.lookActive) {
+        if (canAct && in.lookActive) {
             t->rotationEuler.y += in.mouseDX * 0.15f;
             pitch -= in.mouseDY * 0.004f;
             const float lim = 1.55f;
@@ -53,7 +56,7 @@ namespace uel {
         // 移動量
         float dx = 0.0f, dz = 0.0f;
         float speed = moveSpeed * dt;
-        if (in.enabled) {
+        if (canAct) {
             if (in.keyW) { dx += sy * speed; dz += cy * speed; }
             if (in.keyS) { dx -= sy * speed; dz -= cy * speed; }
             if (in.keyD) { dx += cy * speed; dz -= sy * speed; }
@@ -81,6 +84,7 @@ namespace uel {
             }
             return false;
             };
+        const float beforeX = t->position.x, beforeZ = t->position.z;
         if (!wallBlocked(dx, dz)) { t->position.x += dx; t->position.z += dz; }
         else { if (!wallBlocked(dx, 0)) t->position.x += dx; if (!wallBlocked(0, dz)) t->position.z += dz; }
 
@@ -102,7 +106,8 @@ namespace uel {
 
         // 重力・接地・ジャンプ
         bool grounded = (t->position.y <= ground + 0.001f);
-        if (grounded && in.enabled && in.jumpPressed) velY = 6.0f;
+        const bool jumped = grounded && canAct && in.jumpPressed;
+        if (jumped) velY = 6.0f;
         velY -= 15.0f * dt;
         t->position.y += velY * dt;
         if (t->position.y < ground) { t->position.y = ground; velY = 0.0f; }
@@ -110,7 +115,8 @@ namespace uel {
         // 射撃（前方レイ、当たったEntityを赤く）
         float cp = cosf(pitch), sp = sinf(pitch);
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
-        if (in.enabled && in.shootClicked) {
+        const bool shot = canAct && in.shootClicked;
+        if (shot) {
             XMFLOAT3 rd = { cp * sy, sp, cp * cy };
             const float baseDamage = 34.0f;
 
@@ -122,6 +128,7 @@ namespace uel {
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* hb = ge->GetComponent<HitboxComponent>();
                 if (!gt || !hb) continue;
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
                 auto ws = hb->GetWorldShapes(*gt);
                 float tt;
                 if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
@@ -134,6 +141,7 @@ namespace uel {
                 if (!slot) continue; Entity* ge = slot.get();
                 if (ge == &self) continue;
                 if (ge->GetComponent<HitboxComponent>()) continue;
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
                 bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
@@ -163,10 +171,33 @@ namespace uel {
                         hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
                     if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
                         sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };
-                    if (hpc->hp <= 0.0f)
-                        ctx.world.DestroyEntity(hitE->id);             // 撃破→消去
+                    // 撃破：敵（OpponentComponent）は、自分で死亡アニメを再生してから消える。それ以外は、その場で消す
+                    if (hpc->hp <= 0.0f && !hitE->GetComponent<OpponentComponent>())
+                        ctx.world.DestroyEntity(hitE->id);
                 }
             }
+        }
+
+        // ---- アニメーションへ：いまの状態を渡す（グラフに同じ名前のパラメータがあるときだけ書く）----
+        if (AnimatorComponent* an = self.GetComponent<AnimatorComponent>()) {
+            // 実際に動いた量（壁に止められたぶんは含まない）から、速さと向きを求める
+            const float mx = t->position.x - beforeX, mz = t->position.z - beforeZ;
+            const float inv = (dt > 1e-6f) ? 1.0f / dt : 0.0f;
+            const float moved = sqrtf(mx * mx + mz * mz) * inv;                     // m/s
+            // 体の向きから見た方向（右が +X、前が +Y）。全速で 1 になるように moveSpeed で割る
+            const float norm = (moveSpeed > 1e-4f) ? inv / moveSpeed : 0.0f;
+            float localX = (mx * cy - mz * sy) * norm;
+            float localY = (mx * sy + mz * cy) * norm;
+            if (localX > 1.0f) localX = 1.0f; if (localX < -1.0f) localX = -1.0f;
+            if (localY > 1.0f) localY = 1.0f; if (localY < -1.0f) localY = -1.0f;
+
+            an->params.SetIfExists(kAnimSpeed, moved);
+            an->params.SetIfExists(kAnimMoveX, localX);
+            an->params.SetIfExists(kAnimMoveY, localY);
+            an->params.SetIfExists(kAnimGrounded, (t->position.y <= ground + 0.001f) ? 1.0f : 0.0f);
+            an->params.SetIfExists(kAnimDead, isDead ? 1.0f : 0.0f);
+            if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger：跳んだ
+            if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger：撃った
         }
 
         // カメラ

@@ -5,6 +5,7 @@
 #include "Engine/Scene/TransformComponent.h"
 #include "Engine/Scene/MeshRendererComponent.h"
 #include "Engine/Scene/HPComponent.h"
+#include "Engine/Scene/AnimatorComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -15,6 +16,18 @@
 using namespace DirectX;
 
 namespace uel {
+    namespace {
+
+        // グラフに、その名前のパラメータがあるときだけ値を書く。
+        // （無いときに作ってしまうと、関係ないグラフにパラメータが増えていくので、作らない）
+        void SetAnimValue(AnimatorComponent* an, const char* name, float value)
+        {
+            if (!an) return;
+            const int i = an->params.Find(name);
+            if (i >= 0) an->params.items[i].value = value;
+        }
+
+    } // namespace
 
     void OpponentComponent::Update(GameContext& ctx)
     {
@@ -22,6 +35,25 @@ namespace uel {
         auto* t = self.GetComponent<TransformComponent>();
         if (!t) return;
         float dt = ctx.dt;
+        AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // 無くても動く（アニメが変わらないだけ）
+
+        // 死亡：HP が 0 になったら、すぐには消さず「倒れている最中」にする
+        if (!dying) {
+            auto* myHp = self.GetComponent<HPComponent>();
+            if (myHp && myHp->hp <= 0.0f) {
+                dying = true;
+                deathTimer = an ? deathDelay : 0.0f;    // アニメの無い敵は、待たずに消える（今までと同じ）
+                hitTimer = -1.0f;                       // 出かかっていた攻撃は取り消す
+                path.clear();
+            }
+        }
+        if (dying) {
+            SetAnimValue(an, kAnimDead, 1.0f);          // アニメーションへ：倒れた（Bool。消えるまで true のまま）
+            deathTimer -= dt;
+            // 自分の Entity は、この場では消せない（いま実行中のこの Component ごと無くなってしまう）。
+            // 予約だけして、全員の Update が終わった後に World がまとめて消す
+            if (deathTimer <= 0.0f) ctx.world.DestroyLater(self.id);
+        }
 
         // プレイヤー探索
         Entity* player = nullptr;
@@ -31,7 +63,8 @@ namespace uel {
         }
 
         float distPlayer = 1e9f;
-        if (player) {
+        float movedSpeed = 0.0f;    // このフレームに実際に動いた速さ（止まっていれば 0）
+        if (player && !dying) {     // 倒れている最中は、追いかけない・向きも変えない
             if (auto* pt = player->GetComponent<TransformComponent>()) {
                 float dxp = pt->position.x - t->position.x;
                 float dzp = pt->position.z - t->position.z;
@@ -58,10 +91,11 @@ namespace uel {
                 float dx = target.x - t->position.x;
                 float dz = target.z - t->position.z;
                 float l = sqrtf(dx * dx + dz * dz);
-                if (distPlayer > stopRange && l > 1e-4f) {
+                if (distPlayer > stopRange && l > 1e-4f && moveLockTimer <= 0.0f) {    // 攻撃のあいだ（moveLockTimer）は動かない
                     float step = moveSpeed * dt;
                     t->position.x += dx / l * step;
                     t->position.z += dz / l * step;
+                    movedSpeed = moveSpeed;
                 }
 
                 // 向き：停止圏内はプレイヤー方向、移動中は進行方向。近すぎる時は更新しない（スピン防止）
@@ -72,14 +106,31 @@ namespace uel {
             }
         }
 
-        // 接触攻撃
-        attackTimer -= dt;
-        if (player && distPlayer <= attackRange && attackTimer <= 0.0f) {
-            if (auto* php = player->GetComponent<HPComponent>()) php->hp -= attackDamage;
-            attackTimer = attackInterval;
+        // アニメーションへ：いまの移動の速さ
+        SetAnimValue(an, kAnimSpeed, movedSpeed);
+
+        if (!dying) {
+            // 接触攻撃：届く距離にいて、前の攻撃から時間がたっていれば、攻撃を始める
+            attackTimer -= dt;
+            moveLockTimer -= dt;
+            if (player && distPlayer <= attackRange && attackTimer <= 0.0f) {
+                attackTimer = attackInterval;
+                hitTimer = attackHitDelay;                  // ダメージは、振りかぶるぶん遅れて入る
+                moveLockTimer = attackMoveLock;             // 攻撃のあいだは、その場に止まる
+                SetAnimValue(an, kAnimAttack, 1.0f);        // アニメーションへ：攻撃を始めた（Trigger）
+            }
+            // 攻撃のダメージ：始めてから attackHitDelay 秒後に、まだ届く距離にいれば当たる
+            if (hitTimer >= 0.0f) {
+                hitTimer -= dt;
+                if (hitTimer <= 0.0f) {
+                    hitTimer = -1.0f;
+                    if (player && distPlayer <= attackRange * 1.25f)    // 少し離れたくらいでは外れない（振っている間に逃げ切れば外れる）
+                        if (auto* php = player->GetComponent<HPComponent>()) php->hp -= attackDamage;
+                }
+            }
         }
 
-        // 地面追従
+        // 地面追従（倒れている最中も、地面には乗せておく）
         float ground = -1e9f;
         for (const auto& slot : ctx.world.Slots()) {
             if (!slot) continue;

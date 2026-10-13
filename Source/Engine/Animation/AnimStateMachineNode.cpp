@@ -102,6 +102,12 @@ namespace uel {
         lastPose = out;
     }
 
+    bool AnimStateMachineNode::HasNotify(const std::string& name) const
+    {
+        for (const State& st : states) if (st.node && st.node->HasNotify(name)) return true;
+        return false;
+    }
+
     void AnimStateMachineNode::RemoveState(int index)
     {
         if (!ValidState(index)) return;

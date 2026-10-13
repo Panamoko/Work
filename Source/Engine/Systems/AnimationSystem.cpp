@@ -27,6 +27,7 @@ namespace uel {
         void EvaluateGraph(AnimatorComponent& an, const SkinnedModel& cpu, float dt, LocalPose& pose)
         {
             AnimContext ctx{ cpu, an.params, an.playing ? dt * an.speed : 0.0f };
+            ctx.events = &an.events;        // 発火した通知の名前を、ここへ入れてもらう
             an.graph->Update(ctx);          // 1) 時間を進める
             an.graph->Evaluate(ctx, pose);  // 2) 姿勢を出す
             for (auto& p : an.params.items) if (p.type == AnimParamType::Trigger) p.value = 0.0f;   // Trigger は1フレームだけ有効
@@ -93,9 +94,22 @@ namespace uel {
             // 1) ローカル姿勢を決める
             //    AnimatorComponent（グラフあり）→ AnimatorComponent（クリップ1つ）→ SkinnedMeshComponent の順に探す
             AnimatorComponent* an = slot->GetComponent<AnimatorComponent>();
+            if (an) an->events.clear();     // 前のフレームの通知を捨てる
             if (an && an->graph) EvaluateGraph(*an, cpu, dt, pose);
             else if (an)         EvaluateAnimator(*an, cpu, dt, pose, scratch);
             else                 EvaluateSingleClip(*sk, cpu, dt, pose);
+            // 一人称のとき：指定した骨（頭など）を潰して、カメラの前に自分の頭が映らないようにする。
+// スケールをほぼ 0 にすると、その骨と子の骨（髪や顔）に付いた頂点が1点に集まり、描かれなくなる
+            if (sk->firstPerson && !sk->fpHideBone.empty()) {
+                const int hb = cpu.skeleton.Find(sk->fpHideBone);
+                if (hb >= 0 && hb < (int)pose.size()) pose[hb].s = { 0.0001f, 0.0001f, 0.0001f };
+            }
+
+            // ノードエディタの表示用：最後に発火した通知と、それからの時間
+            if (an) {
+                if (!an->events.empty()) { an->lastEvent = an->events.back(); an->lastEventAge = 0.0f; }
+                else an->lastEventAge += dt;
+            }
 
             // 2) 行列にして SkinnedMeshComponent に入れる
             ComputeGlobalPose(cpu.skeleton, pose, sk->boneGlobal);
