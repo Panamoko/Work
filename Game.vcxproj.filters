@@ -66,6 +66,9 @@
     <Filter Include="Source\Engine\AI">
       <UniqueIdentifier>{2c932859-d606-403b-a715-555eddc191dd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Engine\Components">
+      <UniqueIdentifier>{20452f5c-5925-4f0a-b772-4435608a27a5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -128,12 +131,6 @@
     <ClInclude Include="Source\Engine\Scene\EntityId.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\Component.h">
-      <Filter>Source\Engine\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\TransformComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Scene\Entity.h">
       <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
@@ -145,9 +142,6 @@
     </ClInclude>
     <ClInclude Include="Source\Engine\Graphics\CubeRenderer.h">
       <Filter>Source\Engine\Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\MeshRendererComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Systems\RenderSystem.h">
       <Filter>Source\Engine\Systems</Filter>
@@ -188,19 +182,7 @@
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h">
       <Filter>Source\Engine\Physics</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Game\InputState.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Game\GameContext.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Game\PlayerComponent.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\HPComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Game\OpponentComponent.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h">
@@ -236,44 +218,20 @@
     <ClInclude Include="Source\Engine\Assets\SkinnedModelCache.h">
       <Filter>Source\Engine\Assets</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\SkinnedMeshComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\AI\NavObstacleComponent.h">
-      <Filter>Source\Engine\AI</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\AI\EngineNavGrid.h">
       <Filter>Source\Engine\AI</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Game\GameFlow.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Engine\Game\ScreenUIComponent.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Game\GameRuleComponent.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\PrefabInstanceComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Engine\Physics\HitShapes.h">
       <Filter>Source\Engine\Physics</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Game\HitboxComponent.h">
-      <Filter>Source\Engine\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Game\SpawnerComponent.h">
-      <Filter>Source\Engine\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Graphics\ShaderCommon.h">
       <Filter>Source\Engine\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Graphics\ShadingParams.h">
       <Filter>Source\Engine\Graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\ShaderComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Graphics\PostProcessSettings.h">
       <Filter>Source\Engine\Graphics</Filter>
@@ -283,9 +241,6 @@
     </ClInclude>
     <ClInclude Include="Source\Engine\Systems\AnimationSystem.h">
       <Filter>Source\Engine\Systems</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Engine\Scene\AnimatorComponent.h">
-      <Filter>Source\Engine\Scene</Filter>
     </ClInclude>
     <ClInclude Include="Source\Engine\Animation\AnimParams.h">
       <Filter>Source\Engine\Animation</Filter>
@@ -310,6 +265,51 @@
     </ClInclude>
     <ClInclude Include="Source\Engine\Editor\AnimGraphPanelInternal.h">
       <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\AnimatorComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\Component.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\GameRuleComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\HitboxComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\HPComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\MeshRendererComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\NavObstacleComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\OpponentComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\PlayerComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\PrefabInstanceComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\ScreenUIComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\ShaderComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\SkinnedMeshComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\SpawnerComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\TransformComponent.h">
+      <Filter>Source\Engine\Components</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -403,12 +403,6 @@
     <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp">
       <Filter>Source\Engine\Physics</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Game\PlayerComponent.cpp">
-      <Filter>Source\Engine\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Game\OpponentComponent.cpp">
-      <Filter>Source\Engine\Game</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp">
       <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
@@ -430,14 +424,8 @@
     <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp">
       <Filter>Source\Engine\AI</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Engine\Game\GameRuleComponent.cpp">
-      <Filter>Source\Engine\Game</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Engine\Physics\HitShapes.cpp">
       <Filter>Source\Engine\Physics</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Engine\Game\SpawnerComponent.cpp">
-      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp">
       <Filter>Source\Engine\Assets</Filter>
@@ -477,6 +465,18 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Editor\AnimGraphStateMachineView.cpp">
       <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Components\GameRuleComponent.cpp">
+      <Filter>Source\Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Components\OpponentComponent.cpp">
+      <Filter>Source\Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Components\PlayerComponent.cpp">
+      <Filter>Source\Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Components\SpawnerComponent.cpp">
+      <Filter>Source\Engine\Components</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

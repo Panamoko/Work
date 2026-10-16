@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 #include "Engine/Scene/EntityId.h"
-#include "Engine/Scene/Component.h"
+#include "Engine/Components/Component.h"
 
 namespace uel {
 

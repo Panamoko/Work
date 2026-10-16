@@ -1,7 +1,7 @@
 #include "Engine/AI/EngineNavGrid.h"
-#include "Engine/AI/NavObstacleComponent.h"
+#include "Engine/Components/NavObstacleComponent.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Scene/TransformComponent.h"
+#include "Engine/Components/TransformComponent.h"
 #include <queue>
 #include <cfloat>
 #include <cmath>

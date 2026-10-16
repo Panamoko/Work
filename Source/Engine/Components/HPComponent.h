@@ -1,5 +1,5 @@
 #pragma once
-#include "Engine/Scene/Component.h"
+#include "Engine/Components/Component.h"
 
 namespace uel {
     class HPComponent : public Component {

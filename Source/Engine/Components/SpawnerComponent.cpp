@@ -1,7 +1,7 @@
-#include "Engine/Game/SpawnerComponent.h"
+#include "Engine/Components/SpawnerComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Scene/TransformComponent.h"
+#include "Engine/Components/TransformComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
 #include <cmath>
 #include <algorithm>

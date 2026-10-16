@@ -1,6 +1,6 @@
 #pragma once
-#include "Engine/Scene/Component.h"
-#include "Engine/Scene/TransformComponent.h"
+#include "Engine/Components/Component.h"
+#include "Engine/Components/TransformComponent.h"
 #include <DirectXMath.h>
 
 namespace uel {

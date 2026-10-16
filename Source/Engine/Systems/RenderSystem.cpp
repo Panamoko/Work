@@ -1,16 +1,16 @@
 #include "Engine/Systems/RenderSystem.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Scene/TransformComponent.h"
-#include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Components/TransformComponent.h"
+#include "Engine/Components/MeshRendererComponent.h"
 #include "Engine/Graphics/MeshShader.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/EngineShadowMap.h"
 #include "Engine/Graphics/SkinnedMeshShader.h"
 #include "Engine/Assets/SkinnedModelCache.h"
-#include "Engine/Scene/SkinnedMeshComponent.h"
+#include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Animation/AnimationPose.h"
-#include "Engine/Scene/ShaderComponent.h"
+#include "Engine/Components/ShaderComponent.h"
 
 namespace uel {
 

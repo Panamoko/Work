@@ -1,7 +1,7 @@
 #pragma once
 #include "Engine/Editor/CommandHistory.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Scene/TransformComponent.h"
+#include "Engine/Components/TransformComponent.h"
 #include "Engine/Scene/EntityId.h"
 #include <memory>
 #include <cstring>

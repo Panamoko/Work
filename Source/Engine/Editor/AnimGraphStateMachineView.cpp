@@ -1,6 +1,6 @@
 ﻿#include "Engine/Editor/AnimGraphPanelInternal.h"
 #include "Engine/Editor/EditorPanels.h"
-#include "Engine/Scene/AnimatorComponent.h"
+#include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Animation/AnimBlendSpaceNode.h"
 
 #include <imgui.h>

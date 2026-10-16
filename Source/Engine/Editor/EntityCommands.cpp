@@ -1,7 +1,7 @@
 #include "Engine/Editor/EntityCommands.h"
 #include "Engine/Scene/World.h"
-#include "Engine/Scene/TransformComponent.h"
-#include "Engine/Scene/MeshRendererComponent.h"
+#include "Engine/Components/TransformComponent.h"
+#include "Engine/Components/MeshRendererComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
 
 #include <memory>

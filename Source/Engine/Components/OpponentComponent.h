@@ -1,5 +1,5 @@
 #pragma once
-#include "Engine/Scene/Component.h"
+#include "Engine/Components/Component.h"
 #include <DirectXMath.h>
 #include <vector>
 

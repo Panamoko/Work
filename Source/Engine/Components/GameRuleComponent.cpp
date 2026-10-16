@@ -1,10 +1,10 @@
-#include "Engine/Game/GameRuleComponent.h"
+#include "Engine/Components/GameRuleComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/GameFlow.h"
-#include "Engine/Game/PlayerComponent.h"
-#include "Engine/Game/OpponentComponent.h"
-#include "Engine/Game/SpawnerComponent.h"
-#include "Engine/Scene/HPComponent.h"
+#include "Engine/Components/PlayerComponent.h"
+#include "Engine/Components/OpponentComponent.h"
+#include "Engine/Components/SpawnerComponent.h"
+#include "Engine/Components/HPComponent.h"
 #include "Engine/Scene/World.h"
 
 namespace uel {
