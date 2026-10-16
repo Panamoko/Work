@@ -115,18 +115,29 @@ namespace uel {
             moveLockTimer -= dt;
             if (player && distPlayer <= attackRange && attackTimer <= 0.0f) {
                 attackTimer = attackInterval;
-                hitTimer = attackHitDelay;                  // ダメージは、振りかぶるぶん遅れて入る
                 moveLockTimer = attackMoveLock;             // 攻撃のあいだは、その場に止まる
                 SetAnimValue(an, kAnimAttack, 1.0f);        // アニメーションへ：攻撃を始めた（Trigger）
+
+                // ダメージを出す瞬間の決め方：
+                //   グラフに "Hit" の通知があれば、その通知を待つ（クリップの当たる瞬間に合う）
+                //   無ければ、今までどおり attackHitDelay 秒後に出す
+                hitByNotify = an && an->graph && an->graph->HasNotify(kNotifyHit);
+                hitTimer = hitByNotify ? attackInterval : attackHitDelay;     // 通知を待つ場合は、次の攻撃までに来なければあきらめる
             }
-            // 攻撃のダメージ：始めてから attackHitDelay 秒後に、まだ届く距離にいれば当たる
+
+            // 攻撃のダメージ
             if (hitTimer >= 0.0f) {
+                bool hitNow = false;
                 hitTimer -= dt;
-                if (hitTimer <= 0.0f) {
-                    hitTimer = -1.0f;
-                    if (player && distPlayer <= attackRange * 1.25f)    // 少し離れたくらいでは外れない（振っている間に逃げ切れば外れる）
-                        if (auto* php = player->GetComponent<HPComponent>()) php->hp -= attackDamage;
+                if (hitByNotify) {
+                    // 通知は、前のフレームのアニメの計算で発火したもの（アニメの計算は、ゲームの更新の後にある）
+                    if (an && an->WasFired(kNotifyHit)) { hitNow = true; hitTimer = -1.0f; }
+                    else if (hitTimer <= 0.0f) hitTimer = -1.0f;         // 通知が来なかった（攻撃の状態に入れなかった、など）：当てずに終える
                 }
+                else if (hitTimer <= 0.0f) { hitNow = true; hitTimer = -1.0f; }
+
+                if (hitNow && player && distPlayer <= attackRange * 1.25f)    // 少し離れたくらいでは外れない（振っている間に逃げ切れば外れる）
+                    if (auto* php = player->GetComponent<HPComponent>()) php->hp -= attackDamage;
             }
         }
 

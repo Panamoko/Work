@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Scene/EntityId.h"
+#include "Engine/Animation/AnimNode.h"     // DrawNotifyEditor が AnimClipNode::Notify を使う
 #include <vector>
 #include <string>
 struct ID3D11Device;   // ★ グローバル名前空間で前方宣言（uelの外）
@@ -33,6 +34,7 @@ namespace uel {
     class AnimParams;
     struct SkinnedModel;
     void DrawAnimNodeDetails(AnimNode* node, const SkinnedModel& model, AnimParams& params);   // ノード1つぶんの編集欄（ノードエディタから呼ぶ）
-    void RequestAssetRescan();      // Asset Browser に、次のフレームで一覧を作り直させる（ファイルを保存した後に呼ぶ）
+    void DrawNotifyEditor(std::vector<AnimClipNode::Notify>& notifies, float duration, float playTime);   // 通知のタイムライン＋一覧（playTime < 0 なら赤い線を出さない）
+    void RequestAssetRescan();     // Asset Browser に、次のフレームで一覧を作り直させる（ファイルを保存した後に呼ぶ）
 
 }

@@ -285,7 +285,7 @@ namespace uel {
                 if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                     if (pl->Data) {
                         const std::string path = static_cast<const char*>(pl->Data);
-                        const bool ok = LoadAnimGraph(path, an->params, an->graph);
+                        const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
                         if (ok) { an->graphPath = path; reloaded = true; }
                         graphMsg = ok ? "Loaded" : "Load failed (file?)";
                         graphMsgTimer = 3.0f;
@@ -296,7 +296,7 @@ namespace uel {
             ImGui::SameLine();
             if (ImGui::Button("Save")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
-                const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get());
+                const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
                 if (ok) { an->graphPath = path; RequestAssetRescan(); }
                 graphMsg = ok ? "Saved" : (an->graph ? "Save failed (name?)" : "No graph to save");
                 graphMsgTimer = 3.0f;
@@ -304,7 +304,7 @@ namespace uel {
             ImGui::SameLine();
             if (ImGui::Button("Load")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
-                const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph);
+                const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
                 if (ok) { an->graphPath = path; reloaded = true; }
                 graphMsg = ok ? "Loaded" : "Load failed (file?)";
                 graphMsgTimer = 3.0f;
@@ -321,7 +321,7 @@ namespace uel {
         // =====================================================================
         //  左の欄：パラメータ（グラフに渡す値）
         // =====================================================================
-        void DrawParamsPane(AnimatorComponent* an)
+        void DrawParamsPane(AnimatorComponent* an, const SkinnedModel* model)
         {
             ImGui::BeginChild("ag_params", ImVec2(kParamsW, 0.0f), true);
             ImGui::TextUnformatted("Parameters");
@@ -389,6 +389,82 @@ namespace uel {
             ImGui::Spacing();
             if (!an->lastEvent.empty() && an->lastEventAge < 1.0f) ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "Notify: %s", an->lastEvent.c_str());
             else ImGui::TextDisabled("Notify: -");
+
+            // ---- モンタージュ：グラフの上に、1回だけ重ねて再生するクリップ（ゲーム側は PlayMontage("名前") で呼ぶ）----
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::TextUnformatted("Montages");
+            ImGui::PushID("montages");      // パラメータの行と ID が重ならないように
+            static int montageSel = -1;     // 編集欄を開いているモンタージュの番号（-1 = 閉じている）
+            if (montageSel >= (int)an->montages.size()) montageSel = -1;
+            int removeM = -1;
+            for (int i = 0; i < (int)an->montages.size(); ++i) {
+                AnimMontage& mt = an->montages[i];
+                ImGui::PushID(i);
+                const bool playingThis = an->IsMontagePlaying(mt.name);
+                std::string label = (mt.name.empty() ? std::string("(no name)") : mt.name) + (playingThis ? "  *" : "");
+                if (ImGui::Selectable(label.c_str(), i == montageSel, 0, ImVec2(130.0f, 0.0f))) montageSel = (i == montageSel) ? -1 : i;
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Play")) an->PlayMontage(mt);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("x")) removeM = i;
+                ImGui::PopID();
+            }
+            if (removeM >= 0) { an->montages.erase(an->montages.begin() + removeM); montageSel = -1; }
+            if (ImGui::SmallButton("+ Montage")) {
+                AnimMontage mt;
+                for (int n = (int)an->montages.size(); ; ++n) {     // ほかと重ならない名前を付ける
+                    mt.name = "Montage" + std::to_string(n);
+                    if (!an->FindMontage(mt.name)) break;
+                }
+                if (model && !model->clips.empty()) mt.clipName = model->clips[0].name;
+                an->montages.push_back(mt);
+                montageSel = (int)an->montages.size() - 1;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Stop")) an->StopMontage();
+
+            // 再生中のモンタージュ
+            const AnimatorComponent::MontageState& ms = an->montage;
+            if (ms.active) ImGui::Text("%s%s  %.2f s  w %.2f", ms.name.empty() ? ms.clip.clipName.c_str() : ms.name.c_str(), ms.stopping ? " (out)" : "", ms.clip.time, ms.weight);
+            else ImGui::TextDisabled("not playing");
+
+            // 選んでいるモンタージュの編集欄
+            if (montageSel >= 0) {
+                AnimMontage& mt = an->montages[montageSel];
+                ImGui::Separator();
+                char nb[64]; strncpy_s(nb, sizeof(nb), mt.name.c_str(), _TRUNCATE);
+                ImGui::SetNextItemWidth(150.0f);
+                if (ImGui::InputText("Name", nb, sizeof(nb))) mt.name = nb;
+                ImGui::SetNextItemWidth(150.0f);
+                if (ImGui::BeginCombo("Clip", mt.clipName.empty() ? "(none)" : mt.clipName.c_str())) {
+                    if (model) {
+                        for (int i = 0; i < (int)model->clips.size(); ++i) {
+                            ImGui::PushID(i);
+                            if (ImGui::Selectable(model->clips[i].name.c_str(), model->clips[i].name == mt.clipName)) mt.clipName = model->clips[i].name;
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SetNextItemWidth(150.0f);
+                ImGui::DragFloat("Blend In", &mt.blendIn, 0.01f, 0.0f, 2.0f, "%.2f s");
+                ImGui::SetNextItemWidth(150.0f);
+                ImGui::DragFloat("Blend Out", &mt.blendOut, 0.01f, 0.0f, 2.0f, "%.2f s");
+                ImGui::SetNextItemWidth(150.0f);
+                ImGui::DragFloat("Rate", &mt.rate, 0.01f, 0.05f, 4.0f, "%.2f");
+
+                // クリップの長さ（タイムラインの横幅）と、このモンタージュを再生中ならその位置
+                float dur = 0.0f;
+                if (model) for (const AnimationClip& c : model->clips) if (c.name == mt.clipName) { dur = c.duration; break; }
+                if (dur <= 0.0f) ImGui::TextDisabled("clip not found in this model");
+                else ImGui::TextDisabled("length %.2f s", dur);
+                const float playTime = an->IsMontagePlaying(mt.name) ? ms.clip.time : -1.0f;
+                ImGui::TextUnformatted("Notifies");
+                DrawNotifyEditor(mt.notifies, dur, playTime);
+                ImGui::TextDisabled("(changes apply from the next Play)");
+            }
+            ImGui::PopID();
             ImGui::EndChild();
         }
 
@@ -1032,7 +1108,7 @@ namespace uel {
         }
 
         // ---- 左：パラメータ ----
-        DrawParamsPane(an);
+        DrawParamsPane(an, model);
         ImGui::SameLine();
 
         // ---- 中央と右：見ている階層 ----

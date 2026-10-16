@@ -17,7 +17,9 @@ namespace uel {
         // ファイルの版。項目を足すときは +1 して、読む側で「その版以降だけ読む」ようにする
         //   1 … 最初の形
         //   2 … ノードエディタ上の位置（状態の x / y、Any の箱の anyX / anyY）
-        constexpr int kAnimGraphVersion = 3;
+        //   3 … クリップの通知（notifies）
+        //   4 … モンタージュの定義（montages）
+        constexpr int kAnimGraphVersion = 4;
         int g_loadVersion = kAnimGraphVersion;     // 読み込み中のファイルの版（保存するときは最新）
 
         struct ParamDTO {
@@ -35,6 +37,14 @@ namespace uel {
         struct NotifyDTO {
             float time = 0.0f; std::string name;
             template<class A> void serialize(A& ar) { ar(CEREAL_NVP(time), CEREAL_NVP(name)); }
+        };
+        struct MontageDTO {
+            std::string name, clip;
+            float blendIn = 0.1f, blendOut = 0.2f, rate = 1.0f;
+            std::vector<NotifyDTO> notifies;
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(name), CEREAL_NVP(clip), CEREAL_NVP(blendIn), CEREAL_NVP(blendOut), CEREAL_NVP(rate), CEREAL_NVP(notifies));
+            }
         };
         struct TransitionDTO {
             int from = -1, to = 0; float blendTime = 0.2f; bool waitForEnd = false;
@@ -170,7 +180,7 @@ namespace uel {
         return std::string(kAssetRoot) + "/Anim/" + nameOrPath + ".animgraph.json";
     }
 
-    bool SaveAnimGraph(const std::string& path, const AnimParams& params, const AnimNode* root)
+    bool SaveAnimGraph(const std::string& path, const AnimParams& params, const AnimNode* root, const std::vector<AnimMontage>& montages)
     {
         if (path.empty() || !root) return false;
 
@@ -183,6 +193,13 @@ namespace uel {
             pd.push_back({ p.name, (int)p.type, (p.type == AnimParamType::Trigger) ? 0.0f : p.value });
         std::vector<NodeDTO> rd;        // 根は1個だけだが、「無い」も表せるように配列にしておく
         rd.push_back(ToDTO(*root));
+        std::vector<MontageDTO> md;
+        for (const AnimMontage& m : montages) {
+            MontageDTO d;
+            d.name = m.name; d.clip = m.clipName; d.blendIn = m.blendIn; d.blendOut = m.blendOut; d.rate = m.rate;
+            for (const auto& nt : m.notifies) d.notifies.push_back({ nt.time, nt.name });
+            md.push_back(std::move(d));
+        }
 
         std::ofstream ofs(path);
         if (!ofs) return false;
@@ -191,11 +208,12 @@ namespace uel {
         cereal::JSONOutputArchive ar(ofs);
         ar(cereal::make_nvp("version", version),
             cereal::make_nvp("params", pd),
-            cereal::make_nvp("root", rd));
+            cereal::make_nvp("root", rd),
+            cereal::make_nvp("montages", md));
         return true;    // ar が破棄されるときに書き出される
     }
 
-    bool LoadAnimGraph(const std::string& path, AnimParams& params, AnimNodePtr& root)
+    bool LoadAnimGraph(const std::string& path, AnimParams& params, AnimNodePtr& root, std::vector<AnimMontage>& montages)
     {
         std::ifstream ifs(path);
         if (!ifs) return false;
@@ -203,12 +221,14 @@ namespace uel {
         int version = 0;
         std::vector<ParamDTO> pd;
         std::vector<NodeDTO> rd;
+        std::vector<MontageDTO> md;
         try {
             cereal::JSONInputArchive ar(ifs);
             ar(cereal::make_nvp("version", version));
             g_loadVersion = version;            // このファイルの版にある項目だけを読む（古いファイルもそのまま読める）
             ar(cereal::make_nvp("params", pd),
                 cereal::make_nvp("root", rd));
+            if (version >= 4) ar(cereal::make_nvp("montages", md));
         }
         catch (...) {
             g_loadVersion = kAnimGraphVersion;
@@ -226,6 +246,13 @@ namespace uel {
             params.items.push_back(ap);
         }
         root = std::move(loaded);
+        montages.clear();                       // 版 3 以前のファイルには無い：空になる
+        for (const MontageDTO& d : md) {
+            AnimMontage m;
+            m.name = d.name; m.clipName = d.clip; m.blendIn = d.blendIn; m.blendOut = d.blendOut; m.rate = d.rate;
+            for (const auto& nd : d.notifies) m.notifies.push_back({ nd.time, nd.name });
+            montages.push_back(std::move(m));
+        }
         return true;
     }
 

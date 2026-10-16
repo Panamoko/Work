@@ -94,25 +94,9 @@ namespace uel {
                 // ---- 通知：再生位置がこの時刻を通り過ぎたら、名前をゲーム側へ知らせる ----
                 ImGui::Separator();
                 ImGui::TextUnformatted("Notifies");
-                int removeN = -1;
-                for (int i = 0; i < (int)cn->notifies.size(); ++i) {
-                    AnimClipNode::Notify& n = cn->notifies[i];
-                    ImGui::PushID(i);
-                    ImGui::SetNextItemWidth(80);
-                    ImGui::DragFloat("##t", &n.time, 0.005f, 0.0f, (ndur > 0.0f) ? ndur : 100.0f, "%.2f s");
-                    ImGui::SameLine();
-                    char nb[48]; strncpy_s(nb, sizeof(nb), n.name.c_str(), _TRUNCATE);
-                    ImGui::SetNextItemWidth(110);
-                    if (ImGui::InputText("##n", nb, sizeof(nb))) n.name = nb;
-                    ImGui::SameLine();
-                    if (ImGui::SmallButton("x")) removeN = i;
-                    ImGui::PopID();
-                }
-                if (removeN >= 0) cn->notifies.erase(cn->notifies.begin() + removeN);
-                if (ImGui::SmallButton("+ Notify at current time")) {
-                    AnimClipNode::Notify n; n.time = cn->time; n.name = "Hit";
-                    cn->notifies.push_back(n);
-                }
+
+
+                DrawNotifyEditor(cn->notifies, ndur, cn->time);     // タイムライン＋一覧（モンタージュの編集欄と同じもの）
             }
             else if (auto* bs = dynamic_cast<AnimBlendSpace1DNode*>(node)) {
                 paramCombo("Axis Param", bs->param, true);
@@ -309,6 +293,96 @@ namespace uel {
         DrawAnimNodeInspector(node, model, params);
     }
 
+    // 通知の編集欄（タイムライン＋一覧）。クリップのノードと、モンタージュの両方から使う。
+    //   duration … クリップの長さ（秒）。0 以下ならタイムラインを出さない（一覧だけ）
+    //   playTime … いまの再生位置（秒）。赤い線で出す。マイナスなら出さない
+    void DrawNotifyEditor(std::vector<AnimClipNode::Notify>& notifies, float duration, float playTime)
+    {
+        // タイムライン：横がクリップの長さ。赤い線が今の再生位置、黄色い印が通知。印はドラッグで動かせる
+        if (duration > 0.0f) {
+            static const void* dragOwner = nullptr;     // 印をつかんでいる一覧（つかんでいなければ nullptr）
+            static int         dragIndex = -1;
+            const void* self = &notifies;
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            float w = ImGui::GetContentRegionAvail().x; if (w < 60.0f) w = 60.0f;
+            const float h = 34.0f;
+            ImGui::InvisibleButton("notify_bar", ImVec2(w, h));     // マウスを受け取る部品。線や印は、この上に描くだけ
+            const bool barActive = ImGui::IsItemActive();
+            const bool barActivated = ImGui::IsItemActivated();
+            const bool barHovered = ImGui::IsItemHovered();
+            const float mouseX = ImGui::GetIO().MousePos.x;
+            auto toX = [&](float t) { return p0.x + (t / duration) * w; };
+            auto toT = [&](float x) {
+                float t = (x - p0.x) / w * duration;
+                if (t < 0.0f) t = 0.0f;
+                if (t > duration) t = duration;
+                return t;
+                };
+
+            // マウスにいちばん近い印（6 ピクセル以内）
+            int hoverIndex = -1; float best = 6.0f;
+            for (int i = 0; i < (int)notifies.size(); ++i) {
+                float d = toX(notifies[i].time) - mouseX; if (d < 0.0f) d = -d;
+                if (d <= best) { best = d; hoverIndex = i; }
+            }
+            if (barActivated) {
+                dragOwner = self; dragIndex = hoverIndex;
+                if (hoverIndex < 0 && ImGui::IsMouseDoubleClicked(0)) {     // 何もない所をダブルクリック：そこに通知を足す
+                    AnimClipNode::Notify n; n.time = toT(mouseX); n.name = "Hit";
+                    notifies.push_back(n);
+                    dragIndex = (int)notifies.size() - 1;                   // そのままドラッグで位置を直せる
+                }
+            }
+            if (barActive && dragOwner == self && dragIndex >= 0 && dragIndex < (int)notifies.size())
+                notifies[dragIndex].time = toT(mouseX);
+            if (!barActive && dragOwner == self) { dragOwner = nullptr; dragIndex = -1; }
+
+            // 描画
+            const ImVec2 p1(p0.x + w, p0.y + h);
+            dl->AddRectFilled(p0, p1, IM_COL32(30, 32, 38, 255), 4.0f);
+            dl->AddRect(p0, p1, IM_COL32(80, 84, 92, 255), 4.0f);
+            if (playTime >= 0.0f) {
+                const float pt = (playTime > duration) ? duration : playTime;
+                dl->AddLine(ImVec2(toX(pt), p0.y), ImVec2(toX(pt), p1.y), IM_COL32(255, 90, 90, 255), 2.0f);     // 今の再生位置
+            }
+            dl->PushClipRect(p0, p1, true);
+            for (int i = 0; i < (int)notifies.size(); ++i) {
+                const float x = toX(notifies[i].time);
+                const bool hot = (i == hoverIndex && barHovered) || (dragOwner == self && i == dragIndex);
+                const ImU32 col = hot ? IM_COL32(255, 255, 255, 255) : IM_COL32(255, 210, 90, 255);
+                dl->AddLine(ImVec2(x, p0.y + 14), ImVec2(x, p1.y), col, 2.0f);
+                dl->AddTriangleFilled(ImVec2(x - 5, p0.y + 14), ImVec2(x + 5, p0.y + 14), ImVec2(x, p0.y + 21), col);
+                dl->AddText(ImVec2(x + 4, p0.y + 1), col, notifies[i].name.c_str());
+            }
+            dl->PopClipRect();
+            if (barHovered && !barActive && hoverIndex >= 0)
+                ImGui::SetTooltip("%s   %.2f s", notifies[hoverIndex].name.c_str(), notifies[hoverIndex].time);
+            ImGui::TextDisabled("drag a marker / double-click to add");
+        }
+
+        // 一覧：時刻と名前を数字と文字で直す、消す
+        int removeN = -1;
+        for (int i = 0; i < (int)notifies.size(); ++i) {
+            AnimClipNode::Notify& n = notifies[i];
+            ImGui::PushID(i);
+            ImGui::SetNextItemWidth(80);
+            ImGui::DragFloat("##t", &n.time, 0.005f, 0.0f, (duration > 0.0f) ? duration : 100.0f, "%.2f s");
+            ImGui::SameLine();
+            char nb[48]; strncpy_s(nb, sizeof(nb), n.name.c_str(), _TRUNCATE);
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::InputText("##n", nb, sizeof(nb))) n.name = nb;
+            ImGui::SameLine();
+            if (ImGui::SmallButton("x")) removeN = i;
+            ImGui::PopID();
+        }
+        if (removeN >= 0) notifies.erase(notifies.begin() + removeN);
+        if (ImGui::SmallButton("+ Notify at current time")) {
+            AnimClipNode::Notify n; n.time = (playTime > 0.0f) ? playTime : 0.0f; n.name = "Hit";
+            notifies.push_back(n);
+        }
+    }
+
     void DrawHierarchyPanel(World& world, EntityId& selected, CommandHistory& history)
     {
         ImGui::Begin("Hierarchy");
@@ -378,7 +452,7 @@ namespace uel {
                     renameFocus = true;
                 }
             }
-        
+
         }
         ImGui::End();
     }
@@ -756,7 +830,7 @@ namespace uel {
                         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                             if (pl->Data) {
                                 const std::string path = static_cast<const char*>(pl->Data);
-                                const bool ok = LoadAnimGraph(path, an->params, an->graph);
+                                const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
                                 if (ok) an->graphPath = path;
                                 graphMsg = ok ? "Loaded" : "Load failed (file?)";
                                 graphMsgTimer = 3.0f;
@@ -766,7 +840,7 @@ namespace uel {
                     }
                     if (ImGui::SmallButton("Save Graph")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
-                        const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get());
+                        const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
                         if (ok) { an->graphPath = path; g_assetRescan = true; }
                         graphMsg = ok ? "Saved" : (an->graph ? "Save failed (name?)" : "No graph to save");
                         graphMsgTimer = 3.0f;
@@ -774,7 +848,7 @@ namespace uel {
                     ImGui::SameLine();
                     if (ImGui::SmallButton("Load Graph")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
-                        const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph);
+                        const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
                         if (ok) an->graphPath = path;
                         graphMsg = ok ? "Loaded" : "Load failed (file?)";
                         graphMsgTimer = 3.0f;

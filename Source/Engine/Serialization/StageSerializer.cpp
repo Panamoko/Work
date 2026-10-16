@@ -129,10 +129,10 @@ namespace uel {
                     ar(CEREAL_NVP(shToonThreshold), CEREAL_NVP(shToonSoftness), CEREAL_NVP(shToonShade));       // v13
                 if (g_loadSchema >= 14) ar(CEREAL_NVP(shOutlineWidth), CEREAL_NVP(shOutlineColor));             // v14
                 if (g_loadSchema >= 15) ar(CEREAL_NVP(shToonTexSteps), CEREAL_NVP(shToonTexSmooth));            // v15
-                if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));   
+                if (g_loadSchema >= 16) ar(CEREAL_NVP(shMetallic), CEREAL_NVP(shRoughness));
                 if (g_loadSchema >= 17)
                     ar(CEREAL_NVP(hasAnimator), CEREAL_NVP(anClip), CEREAL_NVP(anSpeed), CEREAL_NVP(anLoop), CEREAL_NVP(anBlendTime)); // v17// v16
-                if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));    
+                if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));
                 if (g_loadSchema >= 19) ar(CEREAL_NVP(skFpHide));                                               // v19// v18
             }
         };
@@ -277,7 +277,7 @@ namespace uel {
                 auto* an = e.AddComponent<AnimatorComponent>();
                 an->clipIndex = ed.anClip; an->speed = ed.anSpeed; an->loop = ed.anLoop; an->blendTime = ed.anBlendTime;
                 an->graphPath = ed.anGraph;
-                if (!an->graphPath.empty()) LoadAnimGraph(an->graphPath, an->params, an->graph);    // ファイルが無ければ、クリップ1つの再生になる
+                if (!an->graphPath.empty()) LoadAnimGraph(an->graphPath, an->params, an->graph, an->montages);    // ファイルが無ければ、クリップ1つの再生になる
             }
         }
 

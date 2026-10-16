@@ -70,6 +70,54 @@ namespace uel {
             an.lastPose = pose;     // 次に Play() が呼ばれたとき、ここから混ぜられるように覚えておく
         }
 
+        float Clamp01(float v) { return (v < 0.0f) ? 0.0f : (v > 1.0f) ? 1.0f : v; }
+        float SmoothStep01(float v) { v = Clamp01(v); return v * v * (3.0f - 2.0f * v); }
+
+        // モンタージュ：グラフ（またはクリップ1つ）の出した姿勢 pose の上に、モンタージュのクリップを重ねる
+        void ApplyMontage(AnimatorComponent& an, const SkinnedModel& cpu, float dt, LocalPose& pose, LocalPose& scratch)
+        {
+            AnimatorComponent::MontageState& m = an.montage;
+            if (!m.active) { m.weight = 0.0f; return; }
+
+            const AnimationClip* clip = m.clip.FindClip(cpu);
+            if (!clip || clip->duration <= 0.0f) { m.active = false; m.weight = 0.0f; return; }   // このモデルに無いクリップ：取り消す
+
+            // 1) 時間を進める（通知も、グラフの通知と同じ events に入る）
+            AnimContext ctx{ cpu, an.params, an.playing ? dt * an.speed : 0.0f };
+            ctx.events = &an.events;
+            m.clip.Update(ctx);
+            if (an.playing) {
+                m.elapsed += dt;
+                if (m.stopping) m.stopElapsed += dt;
+            }
+
+            // 2) 重み。入る・終わりで抜ける・Stop で抜ける、の3つのうち一番小さいもの
+            const float wIn = (m.fromSnapshot || m.blendIn <= 0.0f) ? 1.0f : m.elapsed / m.blendIn;
+            const float rate = m.clip.speed * an.speed;
+            const float left = (rate >= 0.0f) ? clip->duration - m.clip.time : m.clip.time;      // 端までの残り（クリップの秒数。逆再生なら頭まで）
+            const float remain = (std::fabs(rate) > 1e-4f) ? left / std::fabs(rate) : 1e9f;       // それを実際の秒数にしたもの
+            const float wEnd = (m.blendOut > 0.0f) ? remain / m.blendOut : (m.clip.finished ? 0.0f : 1.0f);
+            const float wStop = !m.stopping ? 1.0f : (m.stopTime > 0.0f) ? 1.0f - m.stopElapsed / m.stopTime : 0.0f;
+            float w = Clamp01(wIn);
+            if (wEnd < w) w = Clamp01(wEnd);
+            if (wStop < w) w = Clamp01(wStop);
+            if ((m.clip.finished && wEnd <= 0.0f) || (m.stopping && wStop <= 0.0f)) {   // 抜け終わった
+                m.active = false; m.weight = 0.0f; m.fromSnapshot = false;
+                return;
+            }
+            m.weight = w;
+
+            // 3) 下の姿勢とモンタージュの姿勢を混ぜる
+            m.clip.Evaluate(ctx, scratch);
+            BlendPose(pose, scratch, SmoothStep01(w), pose);
+
+            // 再生中のモンタージュに割り込んだ直後：止めた姿勢から、いまの結果へ blendIn 秒かけて移る
+            if (m.fromSnapshot) {
+                if (m.elapsed < m.blendIn && m.fromPose.size() == pose.size())
+                    BlendPose(m.fromPose, pose, SmoothStep01(m.elapsed / m.blendIn), pose);
+                else m.fromSnapshot = false;
+            }
+        }
     } // namespace
 
     void AnimationSystem::Update(World& world, float dt, SkinnedModelCache& cache, ID3D11Device* device)
@@ -98,6 +146,10 @@ namespace uel {
             if (an && an->graph) EvaluateGraph(*an, cpu, dt, pose);
             else if (an)         EvaluateAnimator(*an, cpu, dt, pose, scratch);
             else                 EvaluateSingleClip(*sk, cpu, dt, pose);
+            if (an) {
+                ApplyMontage(*an, cpu, dt, pose, scratch);  // モンタージュを上に重ねる（再生していなければ何もしない）
+                an->finalPose = pose;                       // 次にモンタージュへ割り込んだとき、ここから混ぜる
+            }
             // 一人称のとき：指定した骨（頭など）を潰して、カメラの前に自分の頭が映らないようにする。
 // スケールをほぼ 0 にすると、その骨と子の骨（髪や顔）に付いた頂点が1点に集まり、描かれなくなる
             if (sk->firstPerson && !sk->fpHideBone.empty()) {

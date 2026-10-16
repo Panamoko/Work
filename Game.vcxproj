@@ -131,6 +131,7 @@
     <ClInclude Include="Source\Engine\Animation\AnimationClip.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationPose.h" />
     <ClInclude Include="Source\Engine\Animation\AnimBlendSpaceNode.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimMontage.h" />
     <ClInclude Include="Source\Engine\Animation\AnimNode.h" />
     <ClInclude Include="Source\Engine\Animation\AnimParams.h" />
     <ClInclude Include="Source\Engine\Animation\AnimStateMachineNode.h" />
