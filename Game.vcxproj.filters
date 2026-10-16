@@ -308,6 +308,9 @@
     <ClInclude Include="Source\Engine\Animation\AnimMontage.h">
       <Filter>Source\Engine\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\AnimGraphPanelInternal.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -458,6 +461,21 @@
       <Filter>Source\Engine\Serialization</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Editor\AnimGraphPanel.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\AnimEditorPanels.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\AssetBrowserPanel.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\InspectorPanel.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\AnimGraphCanvas.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\AnimGraphStateMachineView.cpp">
       <Filter>Source\Engine\Editor</Filter>
     </ClCompile>
   </ItemGroup>
