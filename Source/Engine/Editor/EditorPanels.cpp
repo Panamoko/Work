@@ -5,6 +5,7 @@
 #include "Engine/Components/TransformComponent.h"
 #include "Engine/Components/PrefabInstanceComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
+#include "Engine/Config/EngineConfig.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Graphics/SceneLighting.h"
@@ -26,18 +27,18 @@ namespace uel {
     {
         ImGui::Begin("Hierarchy");
 
-        if (ImGui::Button("+ Create"))
+        if (ImGui::Button(u8"+ 作成"))
             selected = EditorCreateEntity(world, history, "Entity");
 
         ImGui::SameLine();
-        if (ImGui::Button("Duplicate")) {
+        if (ImGui::Button(u8"複製")) {
             if (world.Get(selected)) {
                 EntityId id = EditorDuplicateEntity(world, history, selected);
                 if (id.IsValid()) selected = id;
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Delete")) {
+        if (ImGui::Button(u8"削除")) {
             if (world.Get(selected)) {
                 EditorDeleteEntity(world, history, selected);
                 selected = EntityId{};
@@ -111,27 +112,27 @@ namespace uel {
     {
         static char sceneRenameBuf[64] = "";
         // 現在のSceneごとに保存先を変える
-        std::string kPath = (activeScene >= 0 && activeScene < (int)sceneNames.size())
-            ? (sceneNames[activeScene] + ".json") : std::string("Stage.json");
+        std::string kPath = SceneFilePath((activeScene >= 0 && activeScene < (int)sceneNames.size())
+            ? (sceneNames[activeScene] + ".json") : std::string("Stage.json"));
         bool doSave = false, doLoad = false;
 
         if (ImGui::BeginMainMenuBar())
         {
-            if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("Save Scene", "Ctrl+S")) doSave = true;
-                if (ImGui::MenuItem("Load Scene", "Ctrl+L")) doLoad = true;
+            if (ImGui::BeginMenu(u8"ファイル")) {
+                if (ImGui::MenuItem(u8"Scene を保存", "Ctrl+S")) doSave = true;
+                if (ImGui::MenuItem(u8"Scene を読み込む", "Ctrl+L")) doLoad = true;
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Edit")) {
-                if (ImGui::MenuItem("Undo", "Ctrl+Z", false, history.CanUndo())) history.Undo();
-                if (ImGui::MenuItem("Redo", "Ctrl+Y", false, history.CanRedo())) history.Redo();
+            if (ImGui::BeginMenu(u8"編集")) {
+                if (ImGui::MenuItem(u8"元に戻す", "Ctrl+Z", false, history.CanUndo())) history.Undo();
+                if (ImGui::MenuItem(u8"やり直す", "Ctrl+Y", false, history.CanRedo())) history.Redo();
                 ImGui::EndMenu();
             }
-            if (ImGui::MenuItem(playing ? "Stop" : "Play")) togglePlayRequested = true;
+            if (ImGui::MenuItem(playing ? u8"停止" : u8"再生")) togglePlayRequested = true;
 
             // --- Scene 切替 ---
             ImGui::Separator();
-            ImGui::TextUnformatted("Scene:"); ImGui::SameLine();
+            ImGui::TextUnformatted(u8"Scene："); ImGui::SameLine();
             ImGui::SetNextItemWidth(150);
             const char* cur = (activeScene >= 0 && activeScene < (int)sceneNames.size()) ? sceneNames[activeScene].c_str() : "";
             if (ImGui::BeginCombo("##scene", cur)) {
@@ -140,20 +141,20 @@ namespace uel {
                 ImGui::EndCombo();
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("+Scene")) addSceneRequested = true;
+            if (ImGui::SmallButton(u8"+ Scene")) addSceneRequested = true;
             ImGui::SameLine();
-            if (!playing && ImGui::SmallButton("Rename")) {
+            if (!playing && ImGui::SmallButton(u8"名前を変更")) {
                 strncpy_s(sceneRenameBuf, sizeof(sceneRenameBuf), cur, _TRUNCATE);
                 ImGui::OpenPopup("RenameScenePopup");
             }
             if (ImGui::BeginPopup("RenameScenePopup")) {
-                ImGui::TextUnformatted("New scene name");
+                ImGui::TextUnformatted(u8"新しい Scene の名前");
                 if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
                 bool ok = ImGui::InputText("##scenename", sceneRenameBuf, sizeof(sceneRenameBuf),
                     ImGuiInputTextFlags_EnterReturnsTrue);
                 if (ImGui::Button("OK")) ok = true;
                 ImGui::SameLine();
-                if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+                if (ImGui::Button(u8"キャンセル")) ImGui::CloseCurrentPopup();
                 if (ok) { renameSceneRequested = sceneRenameBuf; ImGui::CloseCurrentPopup(); }
                 ImGui::EndPopup();
             }
@@ -167,7 +168,7 @@ namespace uel {
         }
         if (doSave) {
             StageSerializer::Save(world, kPath.c_str());
-            StageSerializer::SaveSceneList(sceneNames, "Scenes.json");   // ★Scene一覧も保存
+            StageSerializer::SaveSceneList(sceneNames, SceneFilePath("Scenes.json").c_str());   // ★Scene一覧も保存
             sceneSaved = true;   // Engine saves Environment.json when it sees this
         }
         if (doLoad && StageSerializer::Load(world, kPath.c_str())) { selected = EntityId{}; history.Clear(); }
@@ -176,30 +177,30 @@ namespace uel {
     void DrawEnvironmentPanel(SceneLighting& light, PostProcessSettings& post)
     {
         ImGui::Begin("Environment");
-        ImGui::DragFloat3("Light Dir", &light.direction.x, 0.02f, -1.0f, 1.0f);
-        ImGui::ColorEdit3("Light Color", &light.color.x);
-        ImGui::DragFloat("Ambient", &light.ambient, 0.01f, 0.0f, 1.0f);
-        ImGui::DragFloat("Intensity", &light.intensity, 0.01f, 0.0f, 5.0f);
-        ImGui::DragFloat("Shadow Range", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
+        ImGui::DragFloat3(u8"光の向き", &light.direction.x, 0.02f, -1.0f, 1.0f);
+        ImGui::ColorEdit3(u8"光の色", &light.color.x);
+        ImGui::DragFloat(u8"環境光", &light.ambient, 0.01f, 0.0f, 1.0f);
+        ImGui::DragFloat(u8"光の強さ", &light.intensity, 0.01f, 0.0f, 5.0f);
+        ImGui::DragFloat(u8"影の範囲", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
 
         ImGui::Separator();
-        ImGui::TextUnformatted("Post Process");
-        ImGui::DragFloat("Saturation", &post.saturation, 0.01f, 0.0f, 2.0f);
-        const char* viewNames[] = { "Final", "Normal", "Depth", "Edge" };   // same order as PostDebugView
+        ImGui::TextUnformatted(u8"ポストプロセス");
+        ImGui::DragFloat(u8"彩度", &post.saturation, 0.01f, 0.0f, 2.0f);
+        const char* viewNames[] = { u8"完成", u8"法線", u8"深度", u8"エッジ" };   // same order as PostDebugView
         int view = (int)post.debugView;
-        if (ImGui::Combo("View", &view, viewNames, 4)) post.debugView = (PostDebugView)view;
+        if (ImGui::Combo(u8"表示", &view, viewNames, 4)) post.debugView = (PostDebugView)view;
 
-        ImGui::Checkbox("Edge Outline", &post.edgeEnabled);
+        ImGui::Checkbox(u8"エッジの輪郭線", &post.edgeEnabled);
         if (post.edgeEnabled || post.debugView == PostDebugView::Edge) {
-            ImGui::ColorEdit3("Edge Color", post.edgeColor);
-            ImGui::DragFloat("Edge Thickness", &post.edgeThickness, 0.05f, 0.5f, 4.0f);
-            ImGui::DragFloat("Depth Threshold", &post.edgeDepthThreshold, 0.001f, 0.001f, 1.0f, "%.3f");
-            ImGui::DragFloat("Normal Threshold", &post.edgeNormalThreshold, 0.005f, 0.01f, 2.0f);
-            ImGui::DragFloat("Fade Distance", &post.edgeFadeDistance, 0.5f, 1.0f, 100.0f);
+            ImGui::ColorEdit3(u8"線の色", post.edgeColor);
+            ImGui::DragFloat(u8"線の太さ", &post.edgeThickness, 0.05f, 0.5f, 4.0f);
+            ImGui::DragFloat(u8"深度のしきい値", &post.edgeDepthThreshold, 0.001f, 0.001f, 1.0f, "%.3f");
+            ImGui::DragFloat(u8"法線のしきい値", &post.edgeNormalThreshold, 0.005f, 0.01f, 2.0f);
+            ImGui::DragFloat(u8"線が消える距離", &post.edgeFadeDistance, 0.5f, 1.0f, 100.0f);
         }
 
         ImGui::Separator();
-        ImGui::TextDisabled("Saved to Environment.json by Save Scene (Ctrl+S)");
+        ImGui::TextDisabled(u8"Scene を保存（Ctrl+S）すると %s に保存されます", SceneFilePath("Environment.json").c_str());
         ImGui::End();
     }
 
@@ -211,10 +212,10 @@ namespace uel {
         static float center[3] = { 0.0f, 0.0f, 0.0f };
 
         ImGui::Begin("NavGrid");
-        ImGui::SetNextItemWidth(120); ImGui::DragFloat("CellSize", &cell, 0.05f, 0.1f, 10.0f);
-        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt("Cols", &cols, 1, 4, 256);
-        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt("Rows", &rows, 1, 4, 256);
-        ImGui::DragFloat3("Center(XYZ)", center, 0.1f);
+        ImGui::SetNextItemWidth(120); ImGui::DragFloat(u8"マスの大きさ", &cell, 0.05f, 0.1f, 10.0f);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt(u8"列", &cols, 1, 4, 256);
+        ImGui::SameLine(); ImGui::SetNextItemWidth(90); ImGui::DragInt(u8"行", &rows, 1, 4, 256);
+        ImGui::DragFloat3(u8"中心（XYZ）", center, 0.1f);
 
         nav.Configure({ center[0], center[1], center[2] }, cell, cols, rows);
         nav.Bake(world);
@@ -232,7 +233,7 @@ namespace uel {
             auto* ot = opp->GetComponent<TransformComponent>();
             if (pt && ot) nav.FindPath(ot->position, pt->position, path);
         }
-        ImGui::Text("path waypoints: %d", (int)path.size());
+        ImGui::Text(u8"経路の点の数：%d", (int)path.size());
 
         // トップダウン描画
         ImDrawList* dl = ImGui::GetWindowDrawList();

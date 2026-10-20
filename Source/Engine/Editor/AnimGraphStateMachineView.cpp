@@ -204,16 +204,16 @@ namespace uel {
                     if (g.ctxKind == SelKind::State && g.ctxIndex >= 0 && g.ctxIndex < (int)sm->states.size()) {
                         ImGui::TextDisabled("%s", sm->states[g.ctxIndex].name.c_str());
                         ImGui::Separator();
-                        if (ImGui::MenuItem("Open")) openState = g.ctxIndex;
-                        if (ImGui::MenuItem("Add Transition from here")) g.linkFrom = g.ctxIndex;
-                        if (ImGui::MenuItem("Set as Entry", nullptr, false, sm->entry != g.ctxIndex)) sm->entry = g.ctxIndex;
-                        if (ImGui::MenuItem("Delete State")) { sm->RemoveState(g.ctxIndex); g.ClearSelection(); openState = -1; }
+                        if (ImGui::MenuItem(u8"開く")) openState = g.ctxIndex;
+                        if (ImGui::MenuItem(u8"ここから遷移を追加")) g.linkFrom = g.ctxIndex;
+                        if (ImGui::MenuItem(u8"開始状態にする", nullptr, false, sm->entry != g.ctxIndex)) sm->entry = g.ctxIndex;
+                        if (ImGui::MenuItem(u8"状態を削除")) { sm->RemoveState(g.ctxIndex); g.ClearSelection(); openState = -1; }
                     }
                     else if (g.ctxKind == SelKind::Transition && g.ctxIndex >= 0 && g.ctxIndex < (int)sm->transitions.size()) {
-                        if (ImGui::MenuItem("Delete Transition")) { sm->transitions.erase(sm->transitions.begin() + g.ctxIndex); g.ClearSelection(); }
+                        if (ImGui::MenuItem(u8"遷移を削除")) { sm->transitions.erase(sm->transitions.begin() + g.ctxIndex); g.ClearSelection(); }
                     }
                     else {
-                        if (ImGui::MenuItem("Add State")) {
+                        if (ImGui::MenuItem(u8"状態を追加")) {
                             SM::State st;
                             st.name = "State" + std::to_string(sm->states.size());
                             st.node = MakeClipNode(model);
@@ -222,8 +222,8 @@ namespace uel {
                             sm->states.push_back(std::move(st));
                             g.selKind = SelKind::State; g.selIndex = (int)sm->states.size() - 1;
                         }
-                        if (ImGui::MenuItem("Add Transition from Any", nullptr, false, !sm->states.empty())) g.linkFrom = -1;
-                        if (ImGui::MenuItem("Fit to view  (F)")) g.fitRequested = true;
+                        if (ImGui::MenuItem(u8"Any から遷移を追加（どの状態からでも）", nullptr, false, !sm->states.empty())) g.linkFrom = -1;
+                        if (ImGui::MenuItem(u8"全体を表示（F）")) g.fitRequested = true;
                     }
                     ImGui::EndPopup();
                 }
@@ -238,11 +238,11 @@ namespace uel {
                         ImGui::TextDisabled("%s", NodeSummary(st.node.get()).c_str());
                         if (auto* cn = dynamic_cast<AnimClipNode*>(st.node.get())) {
                             const AnimationClip* clip = model ? cn->FindClip(*model) : nullptr;
-                            if (clip) ImGui::TextDisabled("time %.2f / %.2f s%s", cn->time, clip->duration, cn->loop ? "  (loop)" : "");
-                            else if (model) ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "clip not found in this model");
+                            if (clip) ImGui::TextDisabled(u8"再生位置 %.2f / %.2f 秒%s", cn->time, clip->duration, cn->loop ? u8"（ループ）" : "");
+                            else if (model) ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), u8"このモデルにそのクリップがありません");
                         }
-                        if (hs == sm->current) ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "playing now");
-                        if (hs == sm->entry) ImGui::TextDisabled("entry state");
+                        if (hs == sm->current) ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), u8"再生中");
+                        if (hs == sm->entry) ImGui::TextDisabled(u8"開始状態");
                         ImGui::EndTooltip();
                     }
                 }
@@ -320,14 +320,14 @@ namespace uel {
                     if (i == sm->entry) {
                         const float cy = mn.y + halfNode.y;
                         const ImU32 ec = IM_COL32(110, 200, 255, 255);
-                        const ImVec2 ts = TextSizeZ("Entry", z);
-                        AddTextZ(dl, ImVec2(mn.x - 34 * z - ts.x, cy - ts.y * 0.5f), ec, "Entry", z);
+                        const ImVec2 ts = TextSizeZ(u8"開始", z);
+                        AddTextZ(dl, ImVec2(mn.x - 34 * z - ts.x, cy - ts.y * 0.5f), ec, u8"開始", z);
                         dl->AddLine(ImVec2(mn.x - 30 * z, cy), ImVec2(mn.x - 8 * z, cy), ec, 2.0f);
                         dl->AddTriangleFilled(ImVec2(mn.x - 1, cy), ImVec2(mn.x - 10 * z, cy - 5 * z), ImVec2(mn.x - 10 * z, cy + 5 * z), ec);
                     }
                 }
 
-                if (stateCount == 0) dl->AddText(ImVec2(origin.x + 16, origin.y + 16), IM_COL32(150, 156, 170, 255), "Right-click: Add State");
+                if (stateCount == 0) dl->AddText(ImVec2(origin.x + 16, origin.y + 16), IM_COL32(150, 156, 170, 255), u8"右クリック：状態を追加");
                 dl->PopClipRect();
             }
             ImGui::EndChild();
@@ -340,37 +340,37 @@ namespace uel {
 
                 if (g.selKind == SelKind::State && g.selIndex >= 0 && g.selIndex < (int)sm->states.size()) {
                     SM::State& st = sm->states[g.selIndex];
-                    ImGui::TextUnformatted("State");
+                    ImGui::TextUnformatted(u8"状態");
                     ImGui::Separator();
 
                     char nb[64]; strncpy_s(nb, sizeof(nb), st.name.c_str(), _TRUNCATE);
-                    if (ImGui::InputText("Name", nb, sizeof(nb))) st.name = nb;
+                    if (ImGui::InputText(u8"名前", nb, sizeof(nb))) st.name = nb;
 
-                    if (sm->entry == g.selIndex) ImGui::TextDisabled("This is the entry state.");
-                    else if (ImGui::SmallButton("Set as Entry")) sm->entry = g.selIndex;
+                    if (sm->entry == g.selIndex) ImGui::TextDisabled(u8"これが開始状態です。");
+                    else if (ImGui::SmallButton(u8"開始状態にする")) sm->entry = g.selIndex;
 
                     // 中身の種類（変えると作り直す）
                     const char* nodeTypes[] = { "Clip", "BlendSpace1D" };
                     int ty = (st.node && std::strcmp(st.node->TypeName(), "BlendSpace1D") == 0) ? 1 : 0;
-                    if (ImGui::Combo("Content", &ty, nodeTypes, 2) || !st.node) {
+                    if (ImGui::Combo(u8"中身", &ty, nodeTypes, 2) || !st.node) {
                         if (ty == 0) st.node = MakeClipNode(model);
                         else         st.node = AnimNodePtr(std::make_unique<AnimBlendSpace1DNode>());
                     }
 
                     ImGui::Separator();
                     if (model) DrawAnimNodeDetails(st.node.get(), *model, an->params);      // クリップや Blend Space の中身
-                    else ImGui::TextColored(warn, "No model: set a Skinned GLB to pick clips.");
+                    else ImGui::TextColored(warn, u8"モデルがありません。\nGLB を設定するとクリップを選べます。");
 
                     ImGui::Separator();
-                    if (ImGui::SmallButton("Open")) openState = g.selIndex;
+                    if (ImGui::SmallButton(u8"開く")) openState = g.selIndex;
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Add Transition from here")) g.linkFrom = g.selIndex;
+                    if (ImGui::SmallButton(u8"ここから遷移を追加")) g.linkFrom = g.selIndex;
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Delete State")) { sm->RemoveState(g.selIndex); g.ClearSelection(); openState = -1; }
+                    if (ImGui::SmallButton(u8"状態を削除")) { sm->RemoveState(g.selIndex); g.ClearSelection(); openState = -1; }
                 }
                 else if (g.selKind == SelKind::Transition && g.selIndex >= 0 && g.selIndex < (int)sm->transitions.size()) {
                     SM::Transition& tr = sm->transitions[g.selIndex];
-                    ImGui::TextUnformatted("Transition");
+                    ImGui::TextUnformatted(u8"遷移");
                     ImGui::Separator();
 
                     auto stateName = [&](int i) -> const char* {
@@ -388,23 +388,23 @@ namespace uel {
                             ImGui::EndCombo();
                         }
                         };
-                    stateCombo("From", tr.from, true);
-                    stateCombo("To", tr.to, false);
-                    ImGui::DragFloat("Blend Time", &tr.blendTime, 0.01f, 0.0f, 2.0f, "%.2f s");
-                    ImGui::Checkbox("At End", &tr.waitForEnd);
-                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Wait until the clip of the 'From' state has finished.\nWorks only when that clip has Loop off.");
+                    stateCombo(u8"遷移元", tr.from, true);
+                    stateCombo(u8"遷移先", tr.to, false);
+                    ImGui::DragFloat(u8"ブレンド時間", &tr.blendTime, 0.01f, 0.0f, 2.0f, u8"%.2f 秒");
+                    ImGui::Checkbox(u8"再生が終わったら", &tr.waitForEnd);
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip(u8"遷移元の状態のクリップが、最後まで再生されるのを待ちます。\nそのクリップのループがオフのときだけ働きます。");
 
                     // 条件（すべて成り立ったら移る）
                     ImGui::Separator();
-                    ImGui::TextUnformatted("Conditions (all must be true)");
+                    ImGui::TextUnformatted(u8"条件（すべて満たしたとき）");
                     const char* floatOps[] = { ">", "<" };
-                    const char* boolOps[] = { "is true", "is false" };
+                    const char* boolOps[] = { u8"が true", u8"が false" };
                     int removeCond = -1;
                     for (int k = 0; k < (int)tr.conditions.size(); ++k) {
                         SM::Condition& c = tr.conditions[k];
                         ImGui::PushID(k);
                         ImGui::SetNextItemWidth(110);
-                        if (ImGui::BeginCombo("##p", c.param.empty() ? "(none)" : c.param.c_str())) {
+                        if (ImGui::BeginCombo("##p", c.param.empty() ? u8"（なし）" : c.param.c_str())) {
                             for (int i = 0; i < (int)an->params.items.size(); ++i) {
                                 ImGui::PushID(i);
                                 if (ImGui::Selectable(an->params.items[i].name.c_str(), an->params.items[i].name == c.param)) c.param = an->params.items[i].name;
@@ -425,28 +425,28 @@ namespace uel {
                             ImGui::SameLine(); ImGui::SetNextItemWidth(85);
                             if (ImGui::Combo("##op", &op, boolOps, 2)) c.op = op ? SM::CondOp::IsFalse : SM::CondOp::IsTrue;
                         }
-                        else if (pi >= 0) { ImGui::SameLine(); ImGui::TextDisabled("is fired"); }
-                        else { ImGui::SameLine(); ImGui::TextColored(warn, "(pick a parameter)"); }
+                        else if (pi >= 0) { ImGui::SameLine(); ImGui::TextDisabled(u8"が発火したら"); }
+                        else { ImGui::SameLine(); ImGui::TextColored(warn, u8"（パラメータを選ぶ）"); }
                         ImGui::SameLine();
                         if (ImGui::SmallButton("x")) removeCond = k;
                         ImGui::PopID();
                     }
                     if (removeCond >= 0) tr.conditions.erase(tr.conditions.begin() + removeCond);
-                    if (ImGui::SmallButton("+ Condition")) tr.conditions.push_back(SM::Condition{});
-                    if (an->params.items.empty()) ImGui::TextColored(warn, "No parameters yet. Add them on the left.");
-                    if (tr.conditions.empty() && !tr.waitForEnd) ImGui::TextColored(warn, "Never fires: add a condition or At End.");
+                    if (ImGui::SmallButton(u8"+ 条件")) tr.conditions.push_back(SM::Condition{});
+                    if (an->params.items.empty()) ImGui::TextColored(warn, u8"パラメータがありません（左で追加）");
+                    if (tr.conditions.empty() && !tr.waitForEnd) ImGui::TextColored(warn, u8"このままでは遷移しません。\n条件か「再生が終わったら」を設定。");
 
                     ImGui::Separator();
-                    if (ImGui::SmallButton("Delete Transition")) { sm->transitions.erase(sm->transitions.begin() + g.selIndex); g.ClearSelection(); }
+                    if (ImGui::SmallButton(u8"遷移を削除")) { sm->transitions.erase(sm->transitions.begin() + g.selIndex); g.ClearSelection(); }
                 }
                 else {
-                    ImGui::TextUnformatted("Nothing selected");
+                    ImGui::TextUnformatted(u8"何も選んでいません");
                     ImGui::Separator();
-                    ImGui::TextDisabled("Click a state or an arrow to edit it.");
-                    ImGui::TextDisabled("Double-click a state to open it.");
-                    ImGui::TextDisabled("Right-click the background: Add State.");
-                    ImGui::TextDisabled("Right-click a state: Add Transition.");
-                    ImGui::TextDisabled("Mouse wheel: zoom.  F: fit to view.");
+                    ImGui::TextDisabled(u8"状態か矢印をクリックで編集");
+                    ImGui::TextDisabled(u8"状態をダブルクリックで中を開く");
+                    ImGui::TextDisabled(u8"背景を右クリック：状態を追加");
+                    ImGui::TextDisabled(u8"状態を右クリック：遷移を追加");
+                    ImGui::TextDisabled(u8"ホイール：拡大縮小　F：全体を表示");
                 }
             }
             ImGui::EndChild();

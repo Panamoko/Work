@@ -6,6 +6,7 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
+#include "Engine/Config/EngineConfig.h"
 #include "Engine/Assets/GltfSkinnedLoader.h"
 #include "Engine/Components/ScreenUIComponent.h"
 #include "Engine/Systems/AnimationSystem.h"
@@ -42,9 +43,12 @@ namespace uel {
         viewport = std::make_unique<ViewportPanel>();
         viewport->Initialize(graphics->GetDevice());
 
+        // Scene の保存先フォルダ（無ければ作る。保存のときに失敗しないように）
+        { std::error_code ec; std::filesystem::create_directories(kSceneDir, ec); }
+
         // --- Scene一覧：Scenes.json があればそれを使う。無ければ初回用のデモ2Sceneを作る ---
         std::vector<std::string> savedScenes;
-        if (StageSerializer::LoadSceneList(savedScenes, "Scenes.json") && !savedScenes.empty()) {
+        if (StageSerializer::LoadSceneList(savedScenes, SceneFilePath("Scenes.json").c_str()) && !savedScenes.empty()) {
             for (const auto& n : savedScenes) scenes.push_back({ n, World{}, EntityId{} });
         }
         else {
@@ -97,8 +101,8 @@ namespace uel {
 
         // 保存済みファイルがあれば読み込む（無ければデモ配置のまま）
         for (auto& s : scenes)
-            StageSerializer::Load(s.world, (s.name + ".json").c_str());
-            StageSerializer::LoadEnvironment(lighting, postSettings, "Environment.json");   // 無ければ既定値のまま
+            StageSerializer::Load(s.world, SceneFilePath(s.name + ".json").c_str());
+        StageSerializer::LoadEnvironment(lighting, postSettings, SceneFilePath("Environment.json").c_str());   // 無ければ既定値のまま
         {
             SkinnedModel sm;
             if (LoadSkinnedModel("Data/YourRiggedModel.glb", sm)) {
@@ -142,7 +146,7 @@ namespace uel {
             std::string renameScene;
             DrawMainMenuBar(scenes[activeScene].world, scenes[activeScene].selected, history,
                 mode == EditorMode::Play, togglePlay, names, activeScene, addScene, renameScene, sceneSaved);
-            if (sceneSaved) StageSerializer::SaveEnvironment(lighting, postSettings, "Environment.json");
+            if (sceneSaved) StageSerializer::SaveEnvironment(lighting, postSettings, SceneFilePath("Environment.json").c_str());
             if (addScene) {
                 auto taken = [&](const std::string& nm) { for (auto& s : scenes) if (s.name == nm) return true; return false; };
                 int n = (int)scenes.size();
@@ -242,15 +246,15 @@ namespace uel {
 
         EditorScene& sc = scenes[activeScene];
         std::error_code ec;
-        std::filesystem::path oldFile = sc.name + ".json";
-        std::filesystem::path newFile = newName + ".json";
+        std::filesystem::path oldFile = SceneFilePath(sc.name + ".json");
+        std::filesystem::path newFile = SceneFilePath(newName + ".json");
         if (std::filesystem::exists(oldFile, ec)) std::filesystem::rename(oldFile, newFile, ec);          // 保存ファイルも改名
         if (ec) return false;
 
         sc.name = newName;
         std::vector<std::string> names;
         for (auto& s : scenes) names.push_back(s.name);
-        StageSerializer::SaveSceneList(names, "Scenes.json");                                            // 一覧も更新
+        StageSerializer::SaveSceneList(names, SceneFilePath("Scenes.json").c_str());                     // 一覧も更新
         return true;
     }
 

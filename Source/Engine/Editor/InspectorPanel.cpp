@@ -50,13 +50,13 @@ namespace uel {
     {
         ImGui::Begin("Inspector");
         Entity* e = world.Get(selected);
-        if (!e) { ImGui::TextUnformatted("(No selection)"); ImGui::End(); return; }
+        if (!e) { ImGui::TextUnformatted(u8"（何も選んでいません）"); ImGui::End(); return; }
 
         {
             static std::string renameOld;
             std::string before = e->name;
             char nameBuf[128]; strncpy_s(nameBuf, sizeof(nameBuf), e->name.c_str(), _TRUNCATE);
-            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf))) e->name = nameBuf;
+            if (ImGui::InputText(u8"名前", nameBuf, sizeof(nameBuf))) e->name = nameBuf;
             if (ImGui::IsItemActivated()) renameOld = before;
             if (ImGui::IsItemDeactivatedAfterEdit()) {
                 std::string newName = e->name;
@@ -64,7 +64,7 @@ namespace uel {
                 EditorRenameEntity(world, history, selected, renameOld, newName);   // Undo付きで適用
             }
         }
-        ImGui::Text("Id   : %u (gen %u)", e->id.index, e->id.generation);
+        ImGui::Text(u8"ID：%u（世代 %u）", e->id.index, e->id.generation);
         {
             static std::string prefabMsg;
             static float       prefabMsgTimer = 0.0f;
@@ -72,24 +72,24 @@ namespace uel {
             if (auto* pi = e->GetComponent<PrefabInstanceComponent>()) {
                 // ---- Prefabのインスタンス ----
                 std::string ppath = pi->path;   // Apply/Revertで部品が作り直されるので先にコピー
-                ImGui::TextColored(ImVec4(0.45f, 0.70f, 1.0f, 1.0f), "Prefab: %s", ppath.c_str());
-                if (ImGui::Button("Apply to Prefab")) {
+                ImGui::TextColored(ImVec4(0.45f, 0.70f, 1.0f, 1.0f), u8"Prefab：%s", ppath.c_str());
+                if (ImGui::Button(u8"Prefab に反映")) {
                     bool ok = StageSerializer::SavePrefab(*e, ppath.c_str());
                     if (ok) g_prefabRefresh = ppath;                   // 全Sceneの同じPrefabへ反映
-                    prefabMsg = ok ? "Applied" : "Apply failed";
+                    prefabMsg = ok ? u8"反映しました" : u8"反映に失敗しました";
                     prefabMsgTimer = 3.0f;
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Revert")) {
+                if (ImGui::Button(u8"元に戻す")) {
                     bool ok = StageSerializer::RevertPrefabInstance(*e);
-                    prefabMsg = ok ? "Reverted" : "Revert failed (prefab missing?)";
+                    prefabMsg = ok ? u8"元に戻しました" : u8"戻せませんでした（Prefab が見つからない？）";
                     prefabMsgTimer = 3.0f;
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Unpack")) e->RemoveComponent<PrefabInstanceComponent>();
-                ImGui::TextDisabled("Per-instance: Name/Transform only. Apply to keep other changes.");
+                if (ImGui::Button(u8"リンクを解除")) e->RemoveComponent<PrefabInstanceComponent>();
+                ImGui::TextDisabled(u8"個別に持てるのは名前と Transform だけ。ほかの変更は「Prefab に反映」で保存。");
             }
-            else if (ImGui::Button("Save as Prefab")) {
+            else if (ImGui::Button(u8"Prefab として保存")) {
                 // ---- 普通のEntity → Prefabとして保存し、このEntityをそのインスタンスにする ----
                 std::string file;
                 for (char ch : e->name)
@@ -101,7 +101,7 @@ namespace uel {
                     e->AddComponent<PrefabInstanceComponent>()->path = path;
                     g_prefabRefresh = path;                          // 同名Prefabの既存インスタンスも更新
                 }
-                prefabMsg = ok ? ("Saved: " + path) : std::string("Save failed");
+                prefabMsg = ok ? (u8"保存しました：" + path) : std::string(u8"保存に失敗しました");
                 prefabMsgTimer = 3.0f;
                 RequestAssetRescan();
             }
@@ -114,13 +114,13 @@ namespace uel {
         if (TransformComponent* t = e->GetComponent<TransformComponent>())
         {
             ImGui::Separator(); ImGui::TextUnformatted("Transform");
-            ImGui::DragFloat3("Position", &t->position.x, 0.05f);
+            ImGui::DragFloat3(u8"位置", &t->position.x, 0.05f);
             if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
             if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
-            ImGui::DragFloat3("Rotation", &t->rotationEuler.x, 0.5f);
+            ImGui::DragFloat3(u8"回転", &t->rotationEuler.x, 0.5f);
             if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
             if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
-            ImGui::DragFloat3("Scale", &t->scale.x, 0.05f, 0.001f, 1000.0f);
+            ImGui::DragFloat3(u8"スケール", &t->scale.x, 0.05f, 0.001f, 1000.0f);
             if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
             if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
         }
@@ -129,17 +129,17 @@ namespace uel {
         {
             ImGui::PushID("cmp_meshrenderer");
             ImGui::Separator(); ImGui::TextUnformatted("MeshRenderer"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<MeshRendererComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<MeshRendererComponent>();
             else {
                 char buf[260]; strncpy_s(buf, sizeof(buf), m->assetId.c_str(), _TRUNCATE);
-                if (ImGui::InputText("Asset (GLB path)", buf, sizeof(buf))) m->assetId = buf;
+                if (ImGui::InputText(u8"モデル（GLB）", buf, sizeof(buf))) m->assetId = buf;
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の GLB をここへドロップ
                     if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_GLB"))
                         if (pl->Data) m->assetId = static_cast<const char*>(pl->Data);
                     ImGui::EndDragDropTarget();
                 }
-                ImGui::Checkbox("Visible", &m->visible);
-                ImGui::ColorEdit4("Color", &m->color.x);
+                ImGui::Checkbox(u8"表示", &m->visible);
+                ImGui::ColorEdit4(u8"色", &m->color.x);
 
                 // サブメッシュ：役割割当＋可視（このインスタンス）
                 if (!m->assetId.empty()) {
@@ -150,10 +150,10 @@ namespace uel {
                         if (m->submeshRole.size() < subs.size()) m->submeshRole.resize(subs.size(), 0);
 
                         ImGui::Separator();
-                        ImGui::TextUnformatted("Submeshes / Roles (this instance)");
-                        ImGui::Checkbox("First-person (hide FP-hidden)", &m->firstPerson);
+                        ImGui::TextUnformatted(u8"サブメッシュと役割（この Entity だけ）");
+                        ImGui::Checkbox(u8"一人称表示（「一人称で隠す」を表示しない）", &m->firstPerson);
 
-                        if (ImGui::Button("Auto-detect head role")) {
+                        if (ImGui::Button(u8"頭を自動で判定")) {
                             for (size_t i = 0; i < subs.size(); ++i) {
                                 std::string low = subs[i].name;
                                 for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
@@ -164,7 +164,7 @@ namespace uel {
                             }
                         }
 
-                        const char* roleNames[] = { "None", "FP-Hidden" };
+                        const char* roleNames[] = { u8"なし", u8"一人称で隠す" };
                         for (size_t i = 0; i < subs.size(); ++i) {
                             ImGui::PushID((int)i);
                             bool vis = (m->hiddenSubmesh[i] == 0);
@@ -174,7 +174,7 @@ namespace uel {
                             ImGui::SetNextItemWidth(110);
                             if (ImGui::Combo("##role", &role, roleNames, 2)) m->submeshRole[i] = (uint8_t)role;
                             ImGui::SameLine();
-                            std::string nm = subs[i].name.empty() ? ("submesh " + std::to_string(i)) : subs[i].name;
+                            std::string nm = subs[i].name.empty() ? (u8"サブメッシュ " + std::to_string(i)) : subs[i].name;
                             ImGui::TextUnformatted(nm.c_str());
                             ImGui::PopID();
                         }
@@ -188,11 +188,11 @@ namespace uel {
         if (SkinnedMeshComponent* sk = e->GetComponent<SkinnedMeshComponent>())
         {
             ImGui::PushID("cmp_skinnedmesh");
-            ImGui::Separator(); ImGui::TextUnformatted("SkinnedMesh (Animation)"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<SkinnedMeshComponent>();
+            ImGui::Separator(); ImGui::TextUnformatted(u8"SkinnedMesh（アニメ付きメッシュ）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SkinnedMeshComponent>();
             else {
                 char sbuf[260]; strncpy_s(sbuf, sizeof(sbuf), sk->assetPath.c_str(), _TRUNCATE);
-                if (ImGui::InputText("Skinned GLB", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;
+                if (ImGui::InputText(u8"モデル（GLB）", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の GLB をここへドロップ
                     if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_GLB"))
                         if (pl->Data) { sk->assetPath = static_cast<const char*>(pl->Data); sk->clipIndex = 0; sk->time = 0.0f; }
@@ -206,7 +206,7 @@ namespace uel {
                     if (!sk->assetPath.empty()) am = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                     const std::vector<int>* counts = (am && am->Valid()) ? &am->Cpu().clipsFromAnimFiles : nullptr;
 
-                    ImGui::TextUnformatted("Anim GLB (option)");
+                    ImGui::TextUnformatted(u8"追加のアニメ（GLB）");
                     int removeAnim = -1;
                     for (int i = 0; i < (int)animFiles.size(); ++i) {
                         const std::string& f = animFiles[i];
@@ -217,15 +217,15 @@ namespace uel {
                         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", f.c_str());         // 重ねるとフルパス
                         if (counts && i < (int)counts->size()) {
                             ImGui::SameLine();
-                            if ((*counts)[i] > 0) ImGui::TextDisabled("+%d clips", (*counts)[i]);
-                            else ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), "+0 (bones do not match, or same clip names)");
+                            if ((*counts)[i] > 0) ImGui::TextDisabled(u8"+%d クリップ", (*counts)[i]);
+                            else ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), u8"+0（骨が合わない、またはクリップ名が重複）");
                         }
                         ImGui::PopID();
                     }
                     bool animChanged = false;
                     if (removeAnim >= 0) { animFiles.erase(animFiles.begin() + removeAnim); animChanged = true; }
 
-                    ImGui::Button("Drop Anim GLB here to add", ImVec2(-1.0f, 0.0f));         // ドロップの受け取り先（押しても何もしない）
+                    ImGui::Button(u8"ここにアニメの GLB をドロップして追加", ImVec2(-1.0f, 0.0f));         // ドロップの受け取り先（押しても何もしない）
                     if (ImGui::BeginDragDropTarget()) {
                         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_GLB")) {
                             if (pl->Data) {
@@ -240,16 +240,16 @@ namespace uel {
                     if (animChanged) { sk->animPath = JoinAnimPaths(animFiles); sk->clipIndex = 0; sk->time = 0.0f; }
                 }
 
-                ImGui::Checkbox("Visible##sk", &sk->visible);
-                ImGui::ColorEdit4("Tint##sk", &sk->color.x);
+                ImGui::Checkbox(u8"表示##sk", &sk->visible);
+                ImGui::ColorEdit4(u8"色##sk", &sk->color.x);
 
                 // ---- 一人称で潰す骨（Play 中、プレイヤーのときだけ効く）----
                 {
                     std::shared_ptr<SkinnedRenderModel> fm;
                     if (!sk->assetPath.empty()) fm = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                     const bool haveBones = fm && fm->Valid();
-                    if (ImGui::BeginCombo("FP Hide Bone", sk->fpHideBone.empty() ? "(none)" : sk->fpHideBone.c_str())) {
-                        if (ImGui::Selectable("(none)", sk->fpHideBone.empty())) sk->fpHideBone.clear();
+                    if (ImGui::BeginCombo(u8"一人称で隠す骨", sk->fpHideBone.empty() ? u8"（なし）" : sk->fpHideBone.c_str())) {
+                        if (ImGui::Selectable(u8"（なし）", sk->fpHideBone.empty())) sk->fpHideBone.clear();
                         if (haveBones) {
                             const auto& bones = fm->Cpu().skeleton.bones;
                             for (int i = 0; i < (int)bones.size(); ++i) {
@@ -260,7 +260,7 @@ namespace uel {
                         }
                         ImGui::EndCombo();
                     }
-                    if (ImGui::SmallButton("Auto (head)") && haveBones) {
+                    if (ImGui::SmallButton(u8"自動（頭）") && haveBones) {
                         // 名前に "head" を含む最初の骨を選ぶ（骨は親が先に並んでいるので、いちばん根元に近いものになる）
                         for (const auto& b : fm->Cpu().skeleton.bones) {
                             std::string low = b.name;
@@ -269,42 +269,42 @@ namespace uel {
                         }
                     }
                     ImGui::SameLine();
-                    ImGui::Checkbox("Preview##fp", &sk->firstPerson);      // 編集中に結果を見るためのもの（保存されない）
+                    ImGui::Checkbox(u8"確認用に表示##fp", &sk->firstPerson);      // 編集中に結果を見るためのもの（保存されない）
                 }
                 if (!sk->assetPath.empty()) {
                     auto model = GlobalSkinnedCache().GetOrLoad(device, sk->assetPath, sk->animPath);
                     if (model && model->Valid()) {
                         const auto& clips = model->Cpu().clips;
-                        ImGui::Text("Bones: %d  Clips: %d",
+                        ImGui::Text(u8"骨：%d　クリップ：%d",
                             (int)model->Cpu().skeleton.bones.size(), (int)clips.size());
                         if (e->GetComponent<AnimatorComponent>()) {
                             // 再生の状態は AnimatorComponent が持つので、ここでは編集しない
-                            ImGui::TextDisabled("Clip / Time are driven by AnimatorComponent.");
+                            ImGui::TextDisabled(u8"クリップと再生位置は AnimatorComponent が動かしています。");
                         }
                         else if (!clips.empty()) {
                             if (sk->clipIndex < 0 || sk->clipIndex >= (int)clips.size()) sk->clipIndex = 0;
                             const std::string& preview = clips[sk->clipIndex].name;
-                            if (ImGui::BeginCombo("Clip", preview.c_str())) {
+                            if (ImGui::BeginCombo(u8"クリップ", preview.c_str())) {
                                 for (int i = 0; i < (int)clips.size(); ++i) {
                                     bool seld = (i == sk->clipIndex);
-                                    std::string label = clips[i].name.empty() ? ("clip " + std::to_string(i)) : clips[i].name;
+                                    std::string label = clips[i].name.empty() ? (u8"クリップ " + std::to_string(i)) : clips[i].name;
                                     if (ImGui::Selectable(label.c_str(), seld)) { sk->clipIndex = i; sk->time = 0.0f; }
                                     if (seld) ImGui::SetItemDefaultFocus();
                                 }
                                 ImGui::EndCombo();
                             }
                             float dur = clips[sk->clipIndex].duration;
-                            ImGui::Checkbox("Play", &sk->playing); ImGui::SameLine();
-                            ImGui::Checkbox("Loop", &sk->loop);
-                            ImGui::DragFloat("Speed", &sk->speed, 0.01f, -4.0f, 4.0f);
-                            ImGui::SliderFloat("Time", &sk->time, 0.0f, dur > 0.0f ? dur : 1.0f, "%.3f s");
+                            ImGui::Checkbox(u8"再生", &sk->playing); ImGui::SameLine();
+                            ImGui::Checkbox(u8"ループ", &sk->loop);
+                            ImGui::DragFloat(u8"速度", &sk->speed, 0.01f, -4.0f, 4.0f);
+                            ImGui::SliderFloat(u8"再生位置", &sk->time, 0.0f, dur > 0.0f ? dur : 1.0f, u8"%.3f 秒");
                         }
                         else {
-                            ImGui::TextDisabled("No clips in this model.");
+                            ImGui::TextDisabled(u8"このモデルにはクリップがありません。");
                         }
                     }
                     else {
-                        ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), "load failed");
+                        ImGui::TextColored(ImVec4(1, 0.5f, 0.3f, 1), u8"読み込みに失敗しました");
                     }
                 }
             }
@@ -313,17 +313,17 @@ namespace uel {
 
         // ---- Game Components（UE風の追加/削除）----
         ImGui::Separator();
-        ImGui::TextUnformatted("Components");
+        ImGui::TextUnformatted(u8"コンポーネント");
 
         // PlayerComponent
         if (auto* pc = e->GetComponent<PlayerComponent>()) {
             ImGui::PushID("cmp_player");
             ImGui::BulletText("PlayerComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<PlayerComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PlayerComponent>();
             else {
-                ImGui::DragFloat("MoveSpeed##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
-                ImGui::DragFloat("EyeHeight", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
-                ImGui::DragFloat("EyeForward", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"移動速度##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat(u8"目の高さ", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
+                ImGui::DragFloat(u8"目の前方へのずれ", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
             }
             ImGui::PopID();
         }
@@ -332,10 +332,10 @@ namespace uel {
         if (auto* ec = e->GetComponent<OpponentComponent>()) {
             ImGui::PushID("cmp_opponent");
             ImGui::BulletText("OpponentComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<OpponentComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<OpponentComponent>();
             else {
-                ImGui::DragFloat("MoveSpeed##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
-                ImGui::DragFloat("StopRange", &ec->stopRange, 0.1f, 0.0f, 20.0f);
+                ImGui::DragFloat(u8"移動速度##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat(u8"止まる距離", &ec->stopRange, 0.1f, 0.0f, 20.0f);
             }
             ImGui::PopID();
         }
@@ -344,10 +344,10 @@ namespace uel {
         if (auto* hpc = e->GetComponent<HPComponent>()) {
             ImGui::PushID("cmp_hp");
             ImGui::BulletText("HPComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<HPComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HPComponent>();
             else {
                 ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
-                ImGui::DragFloat("MaxHP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
+                ImGui::DragFloat(u8"最大HP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
             }
             ImGui::PopID();
         }
@@ -356,7 +356,7 @@ namespace uel {
         if (auto* an = e->GetComponent<AnimatorComponent>()) {
             ImGui::PushID("cmp_animator");
             ImGui::BulletText("AnimatorComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<AnimatorComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<AnimatorComponent>();
             else {
                 SkinnedMeshComponent* ask = e->GetComponent<SkinnedMeshComponent>();
                 std::shared_ptr<SkinnedRenderModel> amodel;
@@ -364,20 +364,20 @@ namespace uel {
                 const bool hasClips = amodel && amodel->Valid() && !amodel->Cpu().clips.empty();
 
                 if (!ask) {
-                    ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), "Needs a SkinnedMeshComponent on the same Entity.");
+                    ImGui::TextColored(ImVec4(1, 0.8f, 0.3f, 1), u8"同じ Entity に SkinnedMeshComponent が必要です。");
                 }
                 else if (!hasClips) {
-                    ImGui::TextDisabled("No clips to play.");
+                    ImGui::TextDisabled(u8"再生できるクリップがありません。");
                 }
                 else if (an->graph) {
                     // ---- グラフで動かしているとき ----
-                    ImGui::Text("Graph root: %s node", an->graph->TypeName());
+                    ImGui::Text(u8"グラフの根：%s ノード", an->graph->TypeName());
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Clear Graph")) an->graph.reset();
+                    if (ImGui::SmallButton(u8"グラフを消す")) an->graph.reset();
                     if (an->graph) {
                         if (dynamic_cast<AnimStateMachineNode*>(an->graph.get())) {
                             // ステートマシンは、ノードエディタで編集する
-                            ImGui::TextDisabled("Edit states and transitions in the Anim Graph panel.");
+                            ImGui::TextDisabled(u8"状態と遷移は Anim Graph パネルで編集します。");
                         }
                         else {
                             ImGui::PushID("graph");     // グラフの中の部品が、下の Parameters の部品と同じ ID にならないように分ける
@@ -391,21 +391,21 @@ namespace uel {
                     const auto& clips = amodel->Cpu().clips;
                     if (an->clipIndex < 0 || an->clipIndex >= (int)clips.size()) an->clipIndex = 0;
                     const std::string& preview = clips[an->clipIndex].name;
-                    if (ImGui::BeginCombo("Clip", preview.c_str())) {
+                    if (ImGui::BeginCombo(u8"クリップ", preview.c_str())) {
                         for (int i = 0; i < (int)clips.size(); ++i) {
                             bool seld = (i == an->clipIndex);
-                            std::string label = clips[i].name.empty() ? ("clip " + std::to_string(i)) : clips[i].name;
+                            std::string label = clips[i].name.empty() ? (u8"クリップ " + std::to_string(i)) : clips[i].name;
                             if (ImGui::Selectable(label.c_str(), seld)) an->Play(i);      // Blend Time かけて切り替わる
                             if (seld) ImGui::SetItemDefaultFocus();
                         }
                         ImGui::EndCombo();
                     }
-                    ImGui::DragFloat("Blend Time", &an->blendTime, 0.01f, 0.0f, 2.0f, "%.2f s");
-                    ImGui::Checkbox("Loop", &an->loop);
-                    if (an->IsFading()) ImGui::Text("Blending  %.0f%%", an->fadeElapsed / an->fadeDuration * 100.0f);
-                    else                ImGui::TextDisabled("Blending  -");
+                    ImGui::DragFloat(u8"ブレンド時間", &an->blendTime, 0.01f, 0.0f, 2.0f, u8"%.2f 秒");
+                    ImGui::Checkbox(u8"ループ", &an->loop);
+                    if (an->IsFading()) ImGui::Text(u8"ブレンド中　%.0f%%", an->fadeElapsed / an->fadeDuration * 100.0f);
+                    else                ImGui::TextDisabled(u8"ブレンド中　-");
 
-                    ImGui::TextDisabled("To use a graph: right-click the canvas in the Anim Graph panel.");
+                    ImGui::TextDisabled(u8"グラフを使うには：Anim Graph パネルのキャンバスを右クリック。");
 
                 }
                 // ---- グラフのアセット（Data/Anim/<名前>.animgraph.json）----
@@ -413,46 +413,46 @@ namespace uel {
                     static std::string graphMsg;
                     static float       graphMsgTimer = 0.0f;
                     char gb[200]; strncpy_s(gb, sizeof(gb), an->graphPath.c_str(), _TRUNCATE);
-                    if (ImGui::InputText("Graph Asset", gb, sizeof(gb))) an->graphPath = gb;     // 名前だけでもよい（例：Enemy）
+                    if (ImGui::InputText(u8"グラフのファイル", gb, sizeof(gb))) an->graphPath = gb;     // 名前だけでもよい（例：Enemy）
                     if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の [Graph] をここへドロップすると読み込む
                         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                             if (pl->Data) {
                                 const std::string path = static_cast<const char*>(pl->Data);
                                 const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
                                 if (ok) an->graphPath = path;
-                                graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                                graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                                 graphMsgTimer = 3.0f;
                             }
                         }
                         ImGui::EndDragDropTarget();
                     }
-                    if (ImGui::SmallButton("Save Graph")) {
+                    if (ImGui::SmallButton(u8"グラフを保存")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
                         const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
                         if (ok) { an->graphPath = path; RequestAssetRescan(); }
-                        graphMsg = ok ? "Saved" : (an->graph ? "Save failed (name?)" : "No graph to save");
+                        graphMsg = ok ? u8"保存しました" : (an->graph ? u8"保存できませんでした（名前？）" : u8"保存するグラフがありません");
                         graphMsgTimer = 3.0f;
                     }
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Load Graph")) {
+                    if (ImGui::SmallButton(u8"グラフを読み込む")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
                         const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
                         if (ok) an->graphPath = path;
-                        graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                        graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                         graphMsgTimer = 3.0f;
                     }
                     if (graphMsgTimer > 0.0f) {
                         graphMsgTimer -= ImGui::GetIO().DeltaTime;
                         ImGui::SameLine(); ImGui::TextUnformatted(graphMsg.c_str());
                     }
-                    ImGui::TextDisabled("Edits to the graph are kept only after Save Graph.");
+                    ImGui::TextDisabled(u8"グラフの変更は「グラフを保存」を押すまで残りません。");
                 }
-                ImGui::DragFloat("Play Rate (all)", &an->speed, 0.01f, -4.0f, 4.0f);
-                ImGui::Checkbox("Play", &an->playing);
+                ImGui::DragFloat(u8"再生速度（全体）", &an->speed, 0.01f, -4.0f, 4.0f);
+                ImGui::Checkbox(u8"再生", &an->playing);
 
                 // ---- パラメータ（グラフに渡す値）----
                 ImGui::Separator();
-                ImGui::TextUnformatted("Parameters");
+                ImGui::TextUnformatted(u8"パラメータ");
                 const char* typeNames[] = { "Float", "Bool", "Trigger" };   // same order as AnimParamType
                 int removeAt = -1;
                 for (int i = 0; i < (int)an->params.items.size(); ++i) {
@@ -475,15 +475,15 @@ namespace uel {
                         if (ImGui::Checkbox("##val", &b)) p.value = b ? 1.0f : 0.0f;
                     }
                     else {
-                        if (ImGui::SmallButton("Fire")) p.value = 1.0f;
-                        ImGui::SameLine(); ImGui::TextDisabled(p.value > 0.5f ? "(set)" : "(-)");
+                        if (ImGui::SmallButton(u8"発火")) p.value = 1.0f;
+                        ImGui::SameLine(); ImGui::TextDisabled(p.value > 0.5f ? u8"（オン）" : "(-)");
                     }
                     ImGui::SameLine();
                     if (ImGui::SmallButton("x")) removeAt = i;
                     ImGui::PopID();
                 }
                 if (removeAt >= 0) an->params.items.erase(an->params.items.begin() + removeAt);
-                if (ImGui::SmallButton("+ Parameter")) {
+                if (ImGui::SmallButton(u8"+ パラメータ")) {
                     AnimParam p; p.name = "Param" + std::to_string(an->params.items.size());
                     an->params.items.push_back(p);
                 }
@@ -492,20 +492,20 @@ namespace uel {
         }
 
         // + Add Component（UEのドロップダウン）
-        if (ImGui::Button("+ Add Component")) ImGui::OpenPopup("AddComponentPopup");
+        if (ImGui::Button(u8"+ コンポーネントを追加")) ImGui::OpenPopup("AddComponentPopup");
         if (ImGui::BeginPopup("AddComponentPopup")) {
-            if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem("PlayerComponent")) e->AddComponent<PlayerComponent>();
-            if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem("OpponentComponent"))  e->AddComponent<OpponentComponent>();
-            if (!e->GetComponent<HPComponent>() && ImGui::MenuItem("HPComponent"))      e->AddComponent<HPComponent>();
-            if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem("SkinnedMeshComponent")) e->AddComponent<SkinnedMeshComponent>();
-            if (!e->GetComponent<MeshRendererComponent>() && ImGui::MenuItem("MeshRendererComponent")) e->AddComponent<MeshRendererComponent>();
-            if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem("NavObstacleComponent")) e->AddComponent<NavObstacleComponent>();
-            if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem("ScreenUIComponent")) e->AddComponent<ScreenUIComponent>();
-            if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem("GameRuleComponent")) e->AddComponent<GameRuleComponent>();
-            if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem("HitboxComponent")) e->AddComponent<HitboxComponent>();
-            if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem("SpawnerComponent")) e->AddComponent<SpawnerComponent>();
-            if (!e->GetComponent<ShaderComponent>() && ImGui::MenuItem("ShaderComponent")) e->AddComponent<ShaderComponent>();
-            if (!e->GetComponent<AnimatorComponent>() && ImGui::MenuItem("AnimatorComponent")) e->AddComponent<AnimatorComponent>();
+            if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem(u8"PlayerComponent（操作キャラ）")) e->AddComponent<PlayerComponent>();
+            if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem(u8"OpponentComponent（敵）"))  e->AddComponent<OpponentComponent>();
+            if (!e->GetComponent<HPComponent>() && ImGui::MenuItem(u8"HPComponent（体力）"))      e->AddComponent<HPComponent>();
+            if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem(u8"SkinnedMeshComponent（アニメ付きメッシュ）")) e->AddComponent<SkinnedMeshComponent>();
+            if (!e->GetComponent<MeshRendererComponent>() && ImGui::MenuItem(u8"MeshRendererComponent（メッシュ表示）")) e->AddComponent<MeshRendererComponent>();
+            if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem(u8"NavObstacleComponent（経路探索の障害物）")) e->AddComponent<NavObstacleComponent>();
+            if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem(u8"ScreenUIComponent（タイトル・リザルト画面）")) e->AddComponent<ScreenUIComponent>();
+            if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem(u8"GameRuleComponent（勝敗判定）")) e->AddComponent<GameRuleComponent>();
+            if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem(u8"HitboxComponent（当たり判定）")) e->AddComponent<HitboxComponent>();
+            if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem(u8"SpawnerComponent（敵の出現・ウェーブ）")) e->AddComponent<SpawnerComponent>();
+            if (!e->GetComponent<ShaderComponent>() && ImGui::MenuItem(u8"ShaderComponent（描き方・材質）")) e->AddComponent<ShaderComponent>();
+            if (!e->GetComponent<AnimatorComponent>() && ImGui::MenuItem(u8"AnimatorComponent（アニメの制御）")) e->AddComponent<AnimatorComponent>();
 
             ImGui::EndPopup();
         }
@@ -513,8 +513,8 @@ namespace uel {
         if (auto* ob = e->GetComponent<NavObstacleComponent>()) {
             ImGui::PushID("cmp_nav");
             ImGui::BulletText("NavObstacle"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<NavObstacleComponent>();
-            else { ImGui::DragFloat("HalfX", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat("HalfZ", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<NavObstacleComponent>();
+            else { ImGui::DragFloat(u8"半分の幅 X", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat(u8"半分の幅 Z", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
             ImGui::PopID();
         }
 
@@ -525,49 +525,49 @@ namespace uel {
 
         if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
             ImGui::PushID("cmp_ui");
-            ImGui::BulletText("ScreenUI (Title/Result)"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<ScreenUIComponent>();
+            ImGui::BulletText(u8"ScreenUI（タイトル・リザルト画面）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ScreenUIComponent>();
             else {
-                editStr("Title", ui->title);
-                editStr("Subtitle", ui->subtitle);
-                editStr("Button", ui->buttonText);
-                editStr("Next Scene", ui->nextScene);
-                ImGui::Checkbox("Show Result", &ui->showResult);
+                editStr(u8"タイトル", ui->title);
+                editStr(u8"サブタイトル", ui->subtitle);
+                editStr(u8"ボタンの文字", ui->buttonText);
+                editStr(u8"次の Scene", ui->nextScene);
+                ImGui::Checkbox(u8"結果を表示", &ui->showResult);
             }
             ImGui::PopID();
         }
 
         if (auto* gr = e->GetComponent<GameRuleComponent>()) {
             ImGui::PushID("cmp_rule");
-            ImGui::BulletText("GameRule (win/lose)"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<GameRuleComponent>();
+            ImGui::BulletText(u8"GameRule（勝敗判定）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GameRuleComponent>();
             else {
-                editStr("Win Scene", gr->winScene);
-                editStr("Lose Scene", gr->loseScene);
-                ImGui::DragFloat("End Delay", &gr->endDelay, 0.05f, 0.0f, 10.0f);
+                editStr(u8"勝ったときの Scene", gr->winScene);
+                editStr(u8"負けたときの Scene", gr->loseScene);
+                ImGui::DragFloat(u8"決着後の待ち時間", &gr->endDelay, 0.05f, 0.0f, 10.0f);
             }
             ImGui::PopID();
         }
 
         if (auto* hb = e->GetComponent<HitboxComponent>()) {
             ImGui::PushID("cmp_hitbox");
-            ImGui::BulletText("Hitbox (body capsule + head)"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<HitboxComponent>();
+            ImGui::BulletText(u8"Hitbox（胴体のカプセル＋頭の球）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HitboxComponent>();
             else {
-                ImGui::DragFloat("Body Bottom", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat("Body Top", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat("Body Radius", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
-                ImGui::DragFloat("Head Height", &hb->headHeight, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat("Head Radius", &hb->headRadius, 0.01f, 0.01f, 5.0f);
-                ImGui::DragFloat("Head Multiplier", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
+                ImGui::DragFloat(u8"胴体の下端", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"胴体の上端", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"胴体の半径", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat(u8"頭の高さ", &hb->headHeight, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"頭の半径", &hb->headRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat(u8"頭のダメージ倍率", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
             }
             ImGui::PopID();
         }
 
         if (auto* sp = e->GetComponent<SpawnerComponent>()) {
             ImGui::PushID("cmp_spawner");
-            ImGui::BulletText("Spawner (waves)"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<SpawnerComponent>();
+            ImGui::BulletText(u8"Spawner（ウェーブ）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SpawnerComponent>();
             else {
                 editStr("Prefab", sp->prefabPath);
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
@@ -575,13 +575,13 @@ namespace uel {
                         if (pl->Data) sp->prefabPath = static_cast<const char*>(pl->Data);
                     ImGui::EndDragDropTarget();
                 }
-                ImGui::DragInt("Waves", &sp->waveCount, 0.1f, 1, 99);
-                ImGui::DragInt("First Wave Count", &sp->baseCount, 0.1f, 1, 100);
-                ImGui::DragInt("Increase / Wave", &sp->countIncrease, 0.1f, 0, 50);
-                ImGui::DragFloat("Spawn Interval", &sp->spawnInterval, 0.05f, 0.05f, 10.0f);
-                ImGui::DragFloat("First Delay", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
-                ImGui::DragFloat("Wave Delay", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
-                ImGui::DragFloat("Spawn Radius", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
+                ImGui::DragInt(u8"ウェーブ数", &sp->waveCount, 0.1f, 1, 99);
+                ImGui::DragInt(u8"最初のウェーブの数", &sp->baseCount, 0.1f, 1, 100);
+                ImGui::DragInt(u8"ウェーブごとの増加", &sp->countIncrease, 0.1f, 0, 50);
+                ImGui::DragFloat(u8"出現の間隔", &sp->spawnInterval, 0.05f, 0.05f, 10.0f);
+                ImGui::DragFloat(u8"開始までの待ち", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat(u8"ウェーブ間の休憩", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat(u8"出現の半径", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
             }
             ImGui::PopID();
         }
@@ -589,32 +589,32 @@ namespace uel {
         if (auto* shc = e->GetComponent<ShaderComponent>()) {
             ImGui::PushID("cmp_shader");
             ImGui::BulletText("ShaderComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) e->RemoveComponent<ShaderComponent>();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ShaderComponent>();
             else {
                 ShadingParams& p = shc->params;
                 const char* modeNames[] = { "Lit", "Unlit", "Toon" };   // same order as ShadingMode
                 int mode = (int)p.mode;
-                if (ImGui::Combo("Mode", &mode, modeNames, 3)) p.mode = (ShadingMode)mode;
+                if (ImGui::Combo(u8"描き方", &mode, modeNames, 3)) p.mode = (ShadingMode)mode;
                 if (p.mode != ShadingMode::Unlit) {   // Unlit has no lighting, so these do nothing there
-                    ImGui::Checkbox("Receive Shadow", &p.receiveShadow);
+                    ImGui::Checkbox(u8"影を受ける", &p.receiveShadow);
                     if (p.mode == ShadingMode::Toon) {
-                        ImGui::DragFloat("Toon Threshold", &p.toonThreshold, 0.005f, 0.0f, 1.0f);
-                        ImGui::DragFloat("Toon Softness", &p.toonSoftness, 0.002f, 0.001f, 0.5f);
-                        ImGui::ColorEdit3("Shade Color", &p.toonShadeColor.x);
+                        ImGui::DragFloat(u8"トゥーンの境目", &p.toonThreshold, 0.005f, 0.0f, 1.0f);
+                        ImGui::DragFloat(u8"トゥーンのぼかし", &p.toonSoftness, 0.002f, 0.001f, 0.5f);
+                        ImGui::ColorEdit3(u8"陰の色", &p.toonShadeColor.x);
                         // Texture simplification. 0 = off for both.
-                        ImGui::DragFloat("Texture Steps", &p.toonTexSteps, 0.05f, 0.0f, 16.0f, "%.0f");
-                        ImGui::DragFloat("Texture Smooth", &p.toonTexSmooth, 0.0005f, 0.0f, 0.05f, "%.4f");
+                        ImGui::DragFloat(u8"テクスチャの段階数", &p.toonTexSteps, 0.05f, 0.0f, 16.0f, "%.0f");
+                        ImGui::DragFloat(u8"テクスチャのなめらかさ", &p.toonTexSmooth, 0.0005f, 0.0f, 0.05f, "%.4f");
                     }
-                    ImGui::DragFloat("Metallic", &p.metallic, 0.01f, 0.0f, 1.0f);
-                    ImGui::DragFloat("Roughness", &p.roughness, 0.005f, 0.05f, 1.0f);
-                    ImGui::DragFloat("Specular Strength", &p.specularStrength, 0.01f, 0.0f, 4.0f);
-                    ImGui::DragFloat("Rim Strength", &p.rimStrength, 0.01f, 0.0f, 4.0f);
-                    ImGui::DragFloat("Rim Power", &p.rimPower, 0.05f, 0.5f, 16.0f);
-                    ImGui::ColorEdit3("Rim Color", &p.rimColor.x);
+                    ImGui::DragFloat(u8"金属っぽさ", &p.metallic, 0.01f, 0.0f, 1.0f);
+                    ImGui::DragFloat(u8"粗さ", &p.roughness, 0.005f, 0.05f, 1.0f);
+                    ImGui::DragFloat(u8"ハイライトの強さ", &p.specularStrength, 0.01f, 0.0f, 4.0f);
+                    ImGui::DragFloat(u8"リムライトの強さ", &p.rimStrength, 0.01f, 0.0f, 4.0f);
+                    ImGui::DragFloat(u8"リムライトの鋭さ", &p.rimPower, 0.05f, 0.5f, 16.0f);
+                    ImGui::ColorEdit3(u8"リムライトの色", &p.rimColor.x);
                 }
                 // Outline works in every mode. Width 0 = off.
-                ImGui::DragFloat("Outline Width", &p.outlineWidth, 0.001f, 0.0f, 0.2f, "%.3f");
-                ImGui::ColorEdit3("Outline Color", &p.outlineColor.x);
+                ImGui::DragFloat(u8"輪郭線の太さ", &p.outlineWidth, 0.001f, 0.0f, 0.2f, "%.3f");
+                ImGui::ColorEdit3(u8"輪郭線の色", &p.outlineColor.x);
             }
             ImGui::PopID();
         }

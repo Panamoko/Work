@@ -58,18 +58,18 @@ namespace uel {
                     snprintf(buf, sizeof(buf), "%s", c.param.c_str());
                 s += buf;
             }
-            if (tr.waitForEnd) s += s.empty() ? "at end" : " & at end";
-            if (s.empty()) s = "(no condition)";
+            if (tr.waitForEnd) s += s.empty() ? u8"終了時" : u8" & 終了時";
+            if (s.empty()) s = u8"（条件なし）";
             return s;
         }
 
         // ノードの中身を1行で（例： "Clip: walk"、"BlendSpace1D (3)"、"StateMachine (3 states)"）
         std::string NodeSummary(AnimNode* n)
         {
-            if (!n) return "(empty)";
+            if (!n) return u8"（空）";
             if (auto* cn = dynamic_cast<AnimClipNode*>(n)) return "Clip: " + cn->clipName;
-            if (auto* bs = dynamic_cast<AnimBlendSpace1DNode*>(n)) return "BlendSpace1D (" + std::to_string(bs->samples.size()) + ")";
-            if (auto* sm = dynamic_cast<SM*>(n)) return "StateMachine (" + std::to_string(sm->states.size()) + " states)";
+            if (auto* bs = dynamic_cast<AnimBlendSpace1DNode*>(n)) return "BlendSpace1D" + std::string(u8"（") + std::to_string(bs->samples.size()) + u8"）";
+            if (auto* sm = dynamic_cast<SM*>(n)) return "StateMachine" + std::string(u8"（") + std::to_string(sm->states.size()) + u8" 状態）";
             return n->TypeName();
         }
 
@@ -224,14 +224,14 @@ namespace uel {
 
                 // 右クリックのメニュー：ノードを置く／置き換える／消す
                 if (ImGui::BeginPopup("ag_pose_ctx")) {
-                    ImGui::TextDisabled(hasNode ? "Replace the node with" : "Add a node");
+                    ImGui::TextDisabled(hasNode ? u8"ノードを置き換える" : u8"ノードを追加");
                     ImGui::Separator();
                     if (ImGui::MenuItem("Clip")) { slot = MakeClipNode(model); g.poseSelected = true; }
                     if (ImGui::MenuItem("Blend Space 1D")) { slot = AnimNodePtr(std::make_unique<AnimBlendSpace1DNode>()); g.poseSelected = true; }
                     if (allowStateMachine && ImGui::MenuItem("State Machine")) { slot = MakeStateMachineNode(model); g.poseSelected = true; }
                     if (hasNode) {
                         ImGui::Separator();
-                        if (ImGui::MenuItem("Delete node")) { slot.reset(); g.poseSelected = false; }
+                        if (ImGui::MenuItem(u8"ノードを削除")) { slot.reset(); g.poseSelected = false; }
                     }
                     ImGui::EndPopup();
                 }
@@ -247,8 +247,8 @@ namespace uel {
                 // Output Pose の箱
                 dl->AddRectFilled(outMin, outMax, IM_COL32(60, 50, 44, 255), 6.0f * z);
                 dl->AddRect(outMin, outMax, IM_COL32(210, 160, 110, 255), 6.0f * z);
-                AddTextZ(dl, ImVec2(outMin.x + 16 * z, outMin.y + 8 * z), IM_COL32(235, 238, 245, 255), "Output Pose", z);
-                AddTextZ(dl, ImVec2(outMin.x + 16 * z, outMin.y + 30 * z), IM_COL32(150, 156, 170, 255), "Result", z);
+                AddTextZ(dl, ImVec2(outMin.x + 16 * z, outMin.y + 8 * z), IM_COL32(235, 238, 245, 255), u8"出力ポーズ", z);
+                AddTextZ(dl, ImVec2(outMin.x + 16 * z, outMin.y + 30 * z), IM_COL32(150, 156, 170, 255), u8"結果", z);
                 dl->AddCircleFilled(outPin, 5.0f * z, slot ? colWire : IM_COL32(90, 94, 104, 255));
 
                 if (slot) {
@@ -265,14 +265,14 @@ namespace uel {
                     if (g.poseSelected)
                         dl->AddRect(ImVec2(nodeMin.x - 3, nodeMin.y - 3), ImVec2(nodeMax.x + 3, nodeMax.y + 3), IM_COL32(255, 255, 255, 255), 8.0f * z, ImDrawCornerFlags_All, 1.5f);
                     AddTextZ(dl, ImVec2(nodeMin.x + 10 * z, nodeMin.y + 8 * z), IM_COL32(235, 238, 245, 255), n->TypeName(), z);
-                    const std::string sub = isSM ? (NodeSummary(n) + "  (double-click)") : NodeSummary(n);
+                    const std::string sub = isSM ? std::string(u8"ダブルクリックで開く") : NodeSummary(n);
                     dl->PushClipRect(nodeMin, ImVec2(nodeMax.x - 8 * z, nodeMax.y), true);
                     AddTextZ(dl, ImVec2(nodeMin.x + 10 * z, nodeMin.y + 32 * z), IM_COL32(150, 156, 170, 255), sub.c_str(), z);
                     dl->PopClipRect();
                     dl->AddCircleFilled(nodePin, 5.0f * z, colWire);
                 }
                 else {
-                    AddTextZ(dl, ImVec2(nodeMin.x, nodeMin.y + 20 * z), IM_COL32(150, 156, 170, 255), "Right-click: add a node", z);
+                    AddTextZ(dl, ImVec2(nodeMin.x, nodeMin.y + 20 * z), IM_COL32(150, 156, 170, 255), u8"右クリック：ノードを追加", z);
                 }
                 dl->PopClipRect();
             }
@@ -284,22 +284,22 @@ namespace uel {
             {
                 AnimNode* n = slot.get();
                 if (n && g.poseSelected) {
-                    ImGui::Text("%s node", n->TypeName());
+                    ImGui::Text(u8"%s ノード", n->TypeName());
                     ImGui::Separator();
                     if (auto* sm = dynamic_cast<SM*>(n)) {
-                        ImGui::Text("%d states / %d transitions", (int)sm->states.size(), (int)sm->transitions.size());
-                        if (ImGui::Button("Open State Machine")) enter = true;
+                        ImGui::Text(u8"状態 %d　遷移 %d", (int)sm->states.size(), (int)sm->transitions.size());
+                        if (ImGui::Button(u8"State Machine を開く")) enter = true;
                     }
                     else if (model) DrawAnimNodeDetails(n, *model, an->params);     // クリップや Blend Space の中身
-                    else ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "No model: set a Skinned GLB to pick clips.");
+                    else ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), u8"モデルがありません。\nGLB を設定するとクリップを選べます。");
                 }
                 else {
-                    ImGui::TextUnformatted(n ? "Nothing selected" : "No node");
+                    ImGui::TextUnformatted(n ? u8"何も選んでいません" : u8"ノードがありません");
                     ImGui::Separator();
-                    ImGui::TextDisabled("The node on the left feeds Output Pose.");
-                    ImGui::TextDisabled("Click the node to edit it.");
-                    ImGui::TextDisabled("Right-click: add / replace / delete.");
-                    if (allowStateMachine) ImGui::TextDisabled("Double-click a State Machine to open it.");
+                    ImGui::TextDisabled(u8"左のノードが出力ポーズになります");
+                    ImGui::TextDisabled(u8"ノードをクリックで編集");
+                    ImGui::TextDisabled(u8"右クリック：追加／置き換え／削除");
+                    if (allowStateMachine) ImGui::TextDisabled(u8"ダブルクリックで中を開く");
                 }
             }
             ImGui::EndChild();

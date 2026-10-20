@@ -33,7 +33,7 @@ namespace uel {
         const float kAnyW = 70.0f;      // 「Any」の箱
         const float kAnyH = 30.0f;
         const float kDetailsW = 330.0f; // 右の編集欄の幅
-        const float kParamsW = 250.0f;  // 左のパラメータの欄の幅
+        const float kParamsW = 300.0f;  // 左のパラメータの欄の幅
 
         const float kPoseNodeW = 210.0f;    // ポーズグラフのノードの箱
         const float kPoseNodeH = 62.0f;

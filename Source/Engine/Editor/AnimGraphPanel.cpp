@@ -47,33 +47,33 @@ namespace uel {
 
             char gb[200]; strncpy_s(gb, sizeof(gb), an->graphPath.c_str(), _TRUNCATE);
             ImGui::SetNextItemWidth(340.0f);
-            if (ImGui::InputText("Graph Asset", gb, sizeof(gb))) an->graphPath = gb;       // 名前だけでもよい（例：Enemy）
+            if (ImGui::InputText(u8"グラフのファイル", gb, sizeof(gb))) an->graphPath = gb;       // 名前だけでもよい（例：Enemy）
             if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の [Graph] をここへドロップすると読み込む
                 if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                     if (pl->Data) {
                         const std::string path = static_cast<const char*>(pl->Data);
                         const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
                         if (ok) { an->graphPath = path; reloaded = true; }
-                        graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                        graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                         graphMsgTimer = 3.0f;
                     }
                 }
                 ImGui::EndDragDropTarget();
             }
             ImGui::SameLine();
-            if (ImGui::Button("Save")) {
+            if (ImGui::Button(u8"保存")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
                 const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
                 if (ok) { an->graphPath = path; RequestAssetRescan(); }
-                graphMsg = ok ? "Saved" : (an->graph ? "Save failed (name?)" : "No graph to save");
+                graphMsg = ok ? u8"保存しました" : (an->graph ? u8"保存できませんでした（名前？）" : u8"保存するグラフがありません");
                 graphMsgTimer = 3.0f;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Load")) {
+            if (ImGui::Button(u8"読み込む")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
                 const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
                 if (ok) { an->graphPath = path; reloaded = true; }
-                graphMsg = ok ? "Loaded" : "Load failed (file?)";
+                graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                 graphMsgTimer = 3.0f;
             }
             ImGui::SameLine();
@@ -81,7 +81,7 @@ namespace uel {
                 graphMsgTimer -= ImGui::GetIO().DeltaTime;
                 ImGui::TextUnformatted(graphMsg.c_str());
             }
-            else ImGui::TextDisabled("(edits are kept only after Save)");
+            else ImGui::TextDisabled(u8"（変更は「保存」を押すまで残りません）");
             return reloaded;
         }
 
@@ -91,7 +91,7 @@ namespace uel {
         void DrawParamsPane(AnimatorComponent* an, const SkinnedModel* model)
         {
             ImGui::BeginChild("ag_params", ImVec2(kParamsW, 0.0f), true);
-            ImGui::TextUnformatted("Parameters");
+            ImGui::TextUnformatted(u8"パラメータ");
             ImGui::Separator();
             const char* typeNames[] = { "Float", "Bool", "Trigger" };   // same order as AnimParamType
             int removeAt = -1;
@@ -100,7 +100,7 @@ namespace uel {
                 AnimParam& p = an->params.items[i];
                 ImGui::PushID(i);
                 int ty = (int)p.type;
-                ImGui::SetNextItemWidth(66);
+                ImGui::SetNextItemWidth(100);
                 if (ImGui::Combo("##type", &ty, typeNames, 3)) { p.type = (AnimParamType)ty; p.value = 0.0f; }
                 ImGui::SameLine();
 
@@ -132,14 +132,14 @@ namespace uel {
                     if (ImGui::Checkbox("##val", &b)) p.value = b ? 1.0f : 0.0f;
                 }
                 else {
-                    if (ImGui::SmallButton("Fire")) p.value = 1.0f;     // このフレームだけ立つ
+                    if (ImGui::SmallButton(u8"発火")) p.value = 1.0f;     // このフレームだけ立つ
                 }
                 ImGui::SameLine();
                 if (ImGui::SmallButton("x")) removeAt = i;
                 ImGui::PopID();
             }
             if (removeAt >= 0) { an->params.items.erase(an->params.items.begin() + removeAt); g.renameIndex = -1; }
-            if (ImGui::SmallButton("+ Parameter")) {
+            if (ImGui::SmallButton(u8"+ パラメータ")) {
                 // ほかと重ならない名前を付ける
                 std::string name;
                 for (int n = (int)an->params.items.size(); ; ++n) {
@@ -150,17 +150,17 @@ namespace uel {
                 an->params.items.push_back(p);
             }
             ImGui::Spacing();
-            ImGui::TextDisabled("Float : compare with > or <");
-            ImGui::TextDisabled("Bool  : true / false");
-            ImGui::TextDisabled("Trigger : fires once");
+            ImGui::TextDisabled(u8"Float：> か < で比べる");
+            ImGui::TextDisabled(u8"Bool：true / false");
+            ImGui::TextDisabled(u8"Trigger：1回だけ立つ");
             ImGui::Spacing();
-            if (!an->lastEvent.empty() && an->lastEventAge < 1.0f) ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "Notify: %s", an->lastEvent.c_str());
-            else ImGui::TextDisabled("Notify: -");
+            if (!an->lastEvent.empty() && an->lastEventAge < 1.0f) ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), u8"通知：%s", an->lastEvent.c_str());
+            else ImGui::TextDisabled(u8"通知：-");
 
             // ---- モンタージュ：グラフの上に、1回だけ重ねて再生するクリップ（ゲーム側は PlayMontage("名前") で呼ぶ）----
             ImGui::Spacing();
             ImGui::Separator();
-            ImGui::TextUnformatted("Montages");
+            ImGui::TextUnformatted(u8"モンタージュ");
             ImGui::PushID("montages");      // パラメータの行と ID が重ならないように
             static int montageSel = -1;     // 編集欄を開いているモンタージュの番号（-1 = 閉じている）
             if (montageSel >= (int)an->montages.size()) montageSel = -1;
@@ -169,16 +169,16 @@ namespace uel {
                 AnimMontage& mt = an->montages[i];
                 ImGui::PushID(i);
                 const bool playingThis = an->IsMontagePlaying(mt.name);
-                std::string label = (mt.name.empty() ? std::string("(no name)") : mt.name) + (playingThis ? "  *" : "");
+                std::string label = (mt.name.empty() ? std::string(u8"（名前なし）") : mt.name) + (playingThis ? "  *" : "");
                 if (ImGui::Selectable(label.c_str(), i == montageSel, 0, ImVec2(130.0f, 0.0f))) montageSel = (i == montageSel) ? -1 : i;
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Play")) an->PlayMontage(mt);
+                if (ImGui::SmallButton(u8"再生")) an->PlayMontage(mt);
                 ImGui::SameLine();
                 if (ImGui::SmallButton("x")) removeM = i;
                 ImGui::PopID();
             }
             if (removeM >= 0) { an->montages.erase(an->montages.begin() + removeM); montageSel = -1; }
-            if (ImGui::SmallButton("+ Montage")) {
+            if (ImGui::SmallButton(u8"+ モンタージュ")) {
                 AnimMontage mt;
                 for (int n = (int)an->montages.size(); ; ++n) {     // ほかと重ならない名前を付ける
                     mt.name = "Montage" + std::to_string(n);
@@ -189,12 +189,12 @@ namespace uel {
                 montageSel = (int)an->montages.size() - 1;
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Stop")) an->StopMontage();
+            if (ImGui::SmallButton(u8"停止")) an->StopMontage();
 
             // 再生中のモンタージュ
             const AnimatorComponent::MontageState& ms = an->montage;
-            if (ms.active) ImGui::Text("%s%s  %.2f s  w %.2f", ms.name.empty() ? ms.clip.clipName.c_str() : ms.name.c_str(), ms.stopping ? " (out)" : "", ms.clip.time, ms.weight);
-            else ImGui::TextDisabled("not playing");
+            if (ms.active) ImGui::Text(u8"%s%s　%.2f 秒　重み %.2f", ms.name.empty() ? ms.clip.clipName.c_str() : ms.name.c_str(), ms.stopping ? u8"（終了中）" : "", ms.clip.time, ms.weight);
+            else ImGui::TextDisabled(u8"再生していません");
 
             // 選んでいるモンタージュの編集欄
             if (montageSel >= 0) {
@@ -202,9 +202,9 @@ namespace uel {
                 ImGui::Separator();
                 char nb[64]; strncpy_s(nb, sizeof(nb), mt.name.c_str(), _TRUNCATE);
                 ImGui::SetNextItemWidth(150.0f);
-                if (ImGui::InputText("Name", nb, sizeof(nb))) mt.name = nb;
+                if (ImGui::InputText(u8"名前", nb, sizeof(nb))) mt.name = nb;
                 ImGui::SetNextItemWidth(150.0f);
-                if (ImGui::BeginCombo("Clip", mt.clipName.empty() ? "(none)" : mt.clipName.c_str())) {
+                if (ImGui::BeginCombo(u8"クリップ", mt.clipName.empty() ? u8"（なし）" : mt.clipName.c_str())) {
                     if (model) {
                         for (int i = 0; i < (int)model->clips.size(); ++i) {
                             ImGui::PushID(i);
@@ -215,21 +215,21 @@ namespace uel {
                     ImGui::EndCombo();
                 }
                 ImGui::SetNextItemWidth(150.0f);
-                ImGui::DragFloat("Blend In", &mt.blendIn, 0.01f, 0.0f, 2.0f, "%.2f s");
+                ImGui::DragFloat(u8"ブレンドイン", &mt.blendIn, 0.01f, 0.0f, 2.0f, u8"%.2f 秒");
                 ImGui::SetNextItemWidth(150.0f);
-                ImGui::DragFloat("Blend Out", &mt.blendOut, 0.01f, 0.0f, 2.0f, "%.2f s");
+                ImGui::DragFloat(u8"ブレンドアウト", &mt.blendOut, 0.01f, 0.0f, 2.0f, u8"%.2f 秒");
                 ImGui::SetNextItemWidth(150.0f);
-                ImGui::DragFloat("Rate", &mt.rate, 0.01f, 0.05f, 4.0f, "%.2f");
+                ImGui::DragFloat(u8"再生速度", &mt.rate, 0.01f, 0.05f, 4.0f, "%.2f");
 
                 // クリップの長さ（タイムラインの横幅）と、このモンタージュを再生中ならその位置
                 float dur = 0.0f;
                 if (model) for (const AnimationClip& c : model->clips) if (c.name == mt.clipName) { dur = c.duration; break; }
-                if (dur <= 0.0f) ImGui::TextDisabled("clip not found in this model");
-                else ImGui::TextDisabled("length %.2f s", dur);
+                if (dur <= 0.0f) ImGui::TextDisabled(u8"このモデルにそのクリップがありません");
+                else ImGui::TextDisabled(u8"長さ %.2f 秒", dur);
                 const float playTime = an->IsMontagePlaying(mt.name) ? ms.clip.time : -1.0f;
-                ImGui::TextUnformatted("Notifies");
+                ImGui::TextUnformatted(u8"通知（Notify）");
                 DrawNotifyEditor(mt.notifies, dur, playTime);
-                ImGui::TextDisabled("(changes apply from the next Play)");
+                ImGui::TextDisabled(u8"（変更は次の Play から反映）");
             }
             ImGui::PopID();
             ImGui::EndChild();
@@ -243,7 +243,7 @@ namespace uel {
 
         Entity* e = world.Get(selected);
         AnimatorComponent* an = e ? e->GetComponent<AnimatorComponent>() : nullptr;
-        if (!an) { ImGui::TextUnformatted("Select an Entity that has an AnimatorComponent."); ImGui::End(); return; }
+        if (!an) { ImGui::TextUnformatted(u8"AnimatorComponent を持つ Entity を選んでください。"); ImGui::End(); return; }
 
         // クリップの名前を選ぶために、同じ Entity のモデルを取っておく（無ければ nullptr）
         std::shared_ptr<SkinnedRenderModel> modelHolder;
@@ -276,12 +276,12 @@ namespace uel {
             }
             if (rootSM && g.level == Level::State) {
                 ImGui::SameLine(); ImGui::TextDisabled(">"); ImGui::SameLine();
-                ImGui::Text("State: %s", rootSM->states[g.levelState].name.c_str());
+                ImGui::Text(u8"状態：%s", rootSM->states[g.levelState].name.c_str());
             }
 
             ImGui::SameLine(); ImGui::TextDisabled("  |");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Fit")) g.fitRequested = true;
+            if (ImGui::SmallButton(u8"全体を表示")) g.fitRequested = true;
             ImGui::SameLine();
             const float curZoom = (g.level == Level::StateMachine) ? g.zoom : g.poseZoom;
             ImGui::TextDisabled("%d%%", (int)(curZoom * 100.0f + 0.5f));
@@ -289,11 +289,11 @@ namespace uel {
             ImGui::SameLine();
             if (g.level == Level::StateMachine) {
                 const bool nowValid = (rootSM->current >= 0 && rootSM->current < (int)rootSM->states.size());
-                ImGui::Text("   Now: %s", nowValid ? rootSM->states[rootSM->current].name.c_str() : "-");
-                if (g.linkFrom != kNoLink) { ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), "   Click the target state  (Esc / right-click: cancel)"); }
+                ImGui::Text(u8"　再生中：%s", nowValid ? rootSM->states[rootSM->current].name.c_str() : "-");
+                if (g.linkFrom != kNoLink) { ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), u8"　遷移先の状態をクリック（Esc／右クリックで取り消し）"); }
             }
             else ImGui::TextUnformatted("");
-            if (playMode) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), "  PLAY (live, edits are not kept)"); }
+            if (playMode) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.5f, 1.0f), u8"　Play 中（変更は残りません）"); }
         }
 
         // ---- 左：パラメータ ----

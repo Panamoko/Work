@@ -44,7 +44,7 @@ namespace uel {
 
         ImGui::Begin("Asset Browser");
 
-        bool rescanClicked = ImGui::Button("Rescan");
+        bool rescanClicked = ImGui::Button(u8"再読み込み");
         if (!scanned || rescanClicked || g_assetRescan)
         {
             g_assetRescan = false;
@@ -72,15 +72,15 @@ namespace uel {
             scanned = true;
         }
         ImGui::SameLine();
-        ImGui::Text("%d assets", total);
+        ImGui::Text(u8"%d 個", total);
 
-        ImGui::InputTextWithHint("##search", "search...", search, sizeof(search));
+        ImGui::InputTextWithHint("##search", u8"検索...", search, sizeof(search));
 
         bool hasPick = !picked.empty();
         bool pickIsPrefab = hasPick && IsPrefabPath(picked);
         bool pickIsGraph = hasPick && IsAnimGraphPath(picked);
         // Prefab とグラフは、メッシュとして割り当てない
-        if (ImGui::Button("Assign to Selected") && hasPick && !pickIsPrefab && !pickIsGraph) {
+        if (ImGui::Button(u8"選択中に割り当て") && hasPick && !pickIsPrefab && !pickIsGraph) {
             if (Entity* e = world.Get(selected)) {
                 auto* m = e->GetComponent<MeshRendererComponent>();
                 if (!m) m = e->AddComponent<MeshRendererComponent>();
@@ -88,7 +88,7 @@ namespace uel {
             }
         }
         ImGui::SameLine();
-        if (ImGui::Button("Create Entity") && hasPick && !pickIsGraph) {    // グラフからは Entity を作らない
+        if (ImGui::Button(u8"Entity を作成") && hasPick && !pickIsGraph) {    // グラフからは Entity を作らない
             if (pickIsPrefab) {
                 EntityId id = EditorSpawnPrefab(world, history, picked);
                 if (id.IsValid()) selected = id;
@@ -134,7 +134,7 @@ namespace uel {
                     // 種類ごとに、名前の前の印と、ドラッグで運ぶデータの種類を変える
                     const bool prefab = IsPrefabPath(f);
                     const bool graph = IsAnimGraphPath(f);
-                    const char* tag = prefab ? "[Prefab] " : (graph ? "[Graph] " : "");
+                    const char* tag = prefab ? "[Prefab] " : (graph ? u8"[グラフ] " : "");
                     const char* payloadType = prefab ? "ASSET_PREFAB" : (graph ? "ASSET_ANIMGRAPH" : "ASSET_GLB");
                     char item[320];
                     snprintf(item, sizeof(item), "%s%s##%s", tag, name.c_str(), f.c_str());

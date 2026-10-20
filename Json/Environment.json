@@ -8,14 +8,14 @@
         },
         "lightColor": {
             "x": 1.0,
-            "y": 0.9800000190734863,
-            "z": 0.9200000166893005
+            "y": 1.0,
+            "z": 1.0
         },
-        "ambient": 0.25,
-        "intensity": 1.0,
-        "shadowRange": 16.0,
+        "ambient": 0.3799999952316284,
+        "intensity": 0.6000000238418579,
+        "shadowRange": 40.0,
         "saturation": 2.0,
-        "edgeEnabled": true,
+        "edgeEnabled": false,
         "edgeColor": {
             "x": 0.05000000074505806,
             "y": 0.05000000074505806,

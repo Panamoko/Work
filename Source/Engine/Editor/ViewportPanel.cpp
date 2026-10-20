@@ -58,18 +58,18 @@ namespace uel {
                 if (ImGui::SmallButton(label)) gizmoOp = op;
                 if (active) ImGui::PopStyleColor();
                 };
-            modeButton("Translate", ImGuizmo::TRANSLATE); ImGui::SameLine();
-            modeButton("Rotate", ImGuizmo::ROTATE);    ImGui::SameLine();
-            modeButton("Scale", ImGuizmo::SCALE);
-            ImGui::SameLine(); ImGui::Checkbox("Grid", &showGrid);
-            ImGui::SameLine(); ImGui::Checkbox("Snap", &snapEnabled);
+            modeButton(u8"移動", ImGuizmo::TRANSLATE); ImGui::SameLine();
+            modeButton(u8"回転", ImGuizmo::ROTATE);    ImGui::SameLine();
+            modeButton(u8"拡大縮小", ImGuizmo::SCALE);
+            ImGui::SameLine(); ImGui::Checkbox(u8"グリッド", &showGrid);
+            ImGui::SameLine(); ImGui::Checkbox(u8"スナップ", &snapEnabled);
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapT", &snapTranslate, 0.1f, 0.01f, 100.0f, "T:%.2f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapR", &snapRotate, 1.0f, 1.0f, 180.0f, "R:%.0f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapS", &snapScale, 0.05f, 0.01f, 10.0f, "S:%.2f");
-            ImGui::SameLine(); ImGui::Checkbox("Hitbox", &showHitboxes);
+            ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted("PLAY (RMB:look  WASD:move  Space:jump  LMB:shoot)");
+            ImGui::TextUnformatted(u8"プレイ中（右ドラッグ：視点　WASD：移動　Space：ジャンプ　左クリック：射撃）");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();

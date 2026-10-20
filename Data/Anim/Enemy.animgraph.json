@@ -20,6 +20,11 @@
             "name": "Dead",
             "type": 1,
             "value": 0.0
+        },
+        {
+            "name": "Born",
+            "type": 1,
+            "value": 1.0
         }
     ],
     "root": [
@@ -91,6 +96,21 @@
                     ],
                     "x": 471.2891845703125,
                     "y": 9.469879150390625
+                },
+                {
+                    "name": "reborn",
+                    "node": [
+                        {
+                            "type": "Clip",
+                            "clip": "Jump",
+                            "loop": false,
+                            "speed": 1.0,
+                            "speedParam": "",
+                            "notifies": []
+                        }
+                    ],
+                    "x": 160.86563110351563,
+                    "y": -279.74554443359377
                 }
             ],
             "transitions": [
@@ -198,10 +218,37 @@
                             "threshold": 0.0
                         }
                     ]
+                },
+                {
+                    "from": 4,
+                    "to": 4,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": []
+                },
+                {
+                    "from": 3,
+                    "to": 4,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": false,
+                    "conditions": [
+                        {
+                            "param": "Born",
+                            "op": 0,
+                            "threshold": 0.0
+                        }
+                    ]
+                },
+                {
+                    "from": 4,
+                    "to": 1,
+                    "blendTime": 0.20000000298023225,
+                    "waitForEnd": true,
+                    "conditions": []
                 }
             ],
-            "anyX": 226.80723571777345,
-            "anyY": 258.1956787109375
+            "anyX": 70.06343078613281,
+            "anyY": -202.1310577392578
         }
     ],
     "montages": [
