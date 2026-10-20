@@ -311,46 +311,15 @@ namespace uel {
             ImGui::PopID();
         }
 
-        // ---- Game Components（UE風の追加/削除）----
+        // ---- 追加・削除できる Component ----
+        // 並び：見た目・アニメ（Animator / Shader）→ ゲーム（Player 〜 ScreenUI）。一番下の「+ コンポーネントを追加」のメニューも同じ順
         ImGui::Separator();
         ImGui::TextUnformatted(u8"コンポーネント");
 
-        // PlayerComponent
-        if (auto* pc = e->GetComponent<PlayerComponent>()) {
-            ImGui::PushID("cmp_player");
-            ImGui::BulletText("PlayerComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PlayerComponent>();
-            else {
-                ImGui::DragFloat(u8"移動速度##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
-                ImGui::DragFloat(u8"目の高さ", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
-                ImGui::DragFloat(u8"目の前方へのずれ", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
-            }
-            ImGui::PopID();
-        }
-
-        // OpponentComponent
-        if (auto* ec = e->GetComponent<OpponentComponent>()) {
-            ImGui::PushID("cmp_opponent");
-            ImGui::BulletText("OpponentComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<OpponentComponent>();
-            else {
-                ImGui::DragFloat(u8"移動速度##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
-                ImGui::DragFloat(u8"止まる距離", &ec->stopRange, 0.1f, 0.0f, 20.0f);
-            }
-            ImGui::PopID();
-        }
-
-        // HPComponent（表示＋削除）
-        if (auto* hpc = e->GetComponent<HPComponent>()) {
-            ImGui::PushID("cmp_hp");
-            ImGui::BulletText("HPComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HPComponent>();
-            else {
-                ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
-                ImGui::DragFloat(u8"最大HP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
-            }
-            ImGui::PopID();
-        }
+        auto editStr = [](const char* label, std::string& s) {
+            char b[256]; strncpy_s(b, sizeof(b), s.c_str(), _TRUNCATE);
+            if (ImGui::InputText(label, b, sizeof(b))) s = b;
+            };
 
         // AnimatorComponent（クリップの切り替えとクロスフェード）
         if (auto* an = e->GetComponent<AnimatorComponent>()) {
@@ -491,101 +460,7 @@ namespace uel {
             ImGui::PopID();
         }
 
-        // + Add Component（UEのドロップダウン）
-        if (ImGui::Button(u8"+ コンポーネントを追加")) ImGui::OpenPopup("AddComponentPopup");
-        if (ImGui::BeginPopup("AddComponentPopup")) {
-            if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem(u8"PlayerComponent（操作キャラ）")) e->AddComponent<PlayerComponent>();
-            if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem(u8"OpponentComponent（敵）"))  e->AddComponent<OpponentComponent>();
-            if (!e->GetComponent<HPComponent>() && ImGui::MenuItem(u8"HPComponent（体力）"))      e->AddComponent<HPComponent>();
-            if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem(u8"SkinnedMeshComponent（アニメ付きメッシュ）")) e->AddComponent<SkinnedMeshComponent>();
-            if (!e->GetComponent<MeshRendererComponent>() && ImGui::MenuItem(u8"MeshRendererComponent（メッシュ表示）")) e->AddComponent<MeshRendererComponent>();
-            if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem(u8"NavObstacleComponent（経路探索の障害物）")) e->AddComponent<NavObstacleComponent>();
-            if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem(u8"ScreenUIComponent（タイトル・リザルト画面）")) e->AddComponent<ScreenUIComponent>();
-            if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem(u8"GameRuleComponent（勝敗判定）")) e->AddComponent<GameRuleComponent>();
-            if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem(u8"HitboxComponent（当たり判定）")) e->AddComponent<HitboxComponent>();
-            if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem(u8"SpawnerComponent（敵の出現・ウェーブ）")) e->AddComponent<SpawnerComponent>();
-            if (!e->GetComponent<ShaderComponent>() && ImGui::MenuItem(u8"ShaderComponent（描き方・材質）")) e->AddComponent<ShaderComponent>();
-            if (!e->GetComponent<AnimatorComponent>() && ImGui::MenuItem(u8"AnimatorComponent（アニメの制御）")) e->AddComponent<AnimatorComponent>();
-
-            ImGui::EndPopup();
-        }
-
-        if (auto* ob = e->GetComponent<NavObstacleComponent>()) {
-            ImGui::PushID("cmp_nav");
-            ImGui::BulletText("NavObstacle"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<NavObstacleComponent>();
-            else { ImGui::DragFloat(u8"半分の幅 X", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat(u8"半分の幅 Z", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
-            ImGui::PopID();
-        }
-
-        auto editStr = [](const char* label, std::string& s) {
-            char b[256]; strncpy_s(b, sizeof(b), s.c_str(), _TRUNCATE);
-            if (ImGui::InputText(label, b, sizeof(b))) s = b;
-            };
-
-        if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
-            ImGui::PushID("cmp_ui");
-            ImGui::BulletText(u8"ScreenUI（タイトル・リザルト画面）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ScreenUIComponent>();
-            else {
-                editStr(u8"タイトル", ui->title);
-                editStr(u8"サブタイトル", ui->subtitle);
-                editStr(u8"ボタンの文字", ui->buttonText);
-                editStr(u8"次の Scene", ui->nextScene);
-                ImGui::Checkbox(u8"結果を表示", &ui->showResult);
-            }
-            ImGui::PopID();
-        }
-
-        if (auto* gr = e->GetComponent<GameRuleComponent>()) {
-            ImGui::PushID("cmp_rule");
-            ImGui::BulletText(u8"GameRule（勝敗判定）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GameRuleComponent>();
-            else {
-                editStr(u8"勝ったときの Scene", gr->winScene);
-                editStr(u8"負けたときの Scene", gr->loseScene);
-                ImGui::DragFloat(u8"決着後の待ち時間", &gr->endDelay, 0.05f, 0.0f, 10.0f);
-            }
-            ImGui::PopID();
-        }
-
-        if (auto* hb = e->GetComponent<HitboxComponent>()) {
-            ImGui::PushID("cmp_hitbox");
-            ImGui::BulletText(u8"Hitbox（胴体のカプセル＋頭の球）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HitboxComponent>();
-            else {
-                ImGui::DragFloat(u8"胴体の下端", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat(u8"胴体の上端", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat(u8"胴体の半径", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
-                ImGui::DragFloat(u8"頭の高さ", &hb->headHeight, 0.01f, 0.0f, 10.0f);
-                ImGui::DragFloat(u8"頭の半径", &hb->headRadius, 0.01f, 0.01f, 5.0f);
-                ImGui::DragFloat(u8"頭のダメージ倍率", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
-            }
-            ImGui::PopID();
-        }
-
-        if (auto* sp = e->GetComponent<SpawnerComponent>()) {
-            ImGui::PushID("cmp_spawner");
-            ImGui::BulletText(u8"Spawner（ウェーブ）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SpawnerComponent>();
-            else {
-                editStr("Prefab", sp->prefabPath);
-                if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
-                    if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
-                        if (pl->Data) sp->prefabPath = static_cast<const char*>(pl->Data);
-                    ImGui::EndDragDropTarget();
-                }
-                ImGui::DragInt(u8"ウェーブ数", &sp->waveCount, 0.1f, 1, 99);
-                ImGui::DragInt(u8"最初のウェーブの数", &sp->baseCount, 0.1f, 1, 100);
-                ImGui::DragInt(u8"ウェーブごとの増加", &sp->countIncrease, 0.1f, 0, 50);
-                ImGui::DragFloat(u8"出現の間隔", &sp->spawnInterval, 0.05f, 0.05f, 10.0f);
-                ImGui::DragFloat(u8"開始までの待ち", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
-                ImGui::DragFloat(u8"ウェーブ間の休憩", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
-                ImGui::DragFloat(u8"出現の半径", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
-            }
-            ImGui::PopID();
-        }
-
+        // ShaderComponent（描き方・材質）
         if (auto* shc = e->GetComponent<ShaderComponent>()) {
             ImGui::PushID("cmp_shader");
             ImGui::BulletText("ShaderComponent"); ImGui::SameLine();
@@ -617,6 +492,141 @@ namespace uel {
                 ImGui::ColorEdit3(u8"輪郭線の色", &p.outlineColor.x);
             }
             ImGui::PopID();
+        }
+
+        // PlayerComponent
+        if (auto* pc = e->GetComponent<PlayerComponent>()) {
+            ImGui::PushID("cmp_player");
+            ImGui::BulletText("PlayerComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PlayerComponent>();
+            else {
+                ImGui::DragFloat(u8"移動速度##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat(u8"目の高さ", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
+                ImGui::DragFloat(u8"目の前方へのずれ", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // OpponentComponent
+        if (auto* ec = e->GetComponent<OpponentComponent>()) {
+            ImGui::PushID("cmp_opponent");
+            ImGui::BulletText("OpponentComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<OpponentComponent>();
+            else {
+                ImGui::DragFloat(u8"移動速度##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat(u8"止まる距離", &ec->stopRange, 0.1f, 0.0f, 20.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // HPComponent（表示＋削除）
+        if (auto* hpc = e->GetComponent<HPComponent>()) {
+            ImGui::PushID("cmp_hp");
+            ImGui::BulletText("HPComponent"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HPComponent>();
+            else {
+                ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
+                ImGui::DragFloat(u8"最大HP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // HitboxComponent（当たり判定）
+        if (auto* hb = e->GetComponent<HitboxComponent>()) {
+            ImGui::PushID("cmp_hitbox");
+            ImGui::BulletText(u8"Hitbox（胴体のカプセル＋頭の球）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HitboxComponent>();
+            else {
+                ImGui::DragFloat(u8"胴体の下端", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"胴体の上端", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"胴体の半径", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat(u8"頭の高さ", &hb->headHeight, 0.01f, 0.0f, 10.0f);
+                ImGui::DragFloat(u8"頭の半径", &hb->headRadius, 0.01f, 0.01f, 5.0f);
+                ImGui::DragFloat(u8"頭のダメージ倍率", &hb->headMultiplier, 0.05f, 1.0f, 10.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // NavObstacleComponent（NavGrid を塞ぐ箱）
+        if (auto* ob = e->GetComponent<NavObstacleComponent>()) {
+            ImGui::PushID("cmp_nav");
+            ImGui::BulletText("NavObstacle"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<NavObstacleComponent>();
+            else { ImGui::DragFloat(u8"半分の幅 X", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat(u8"半分の幅 Z", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
+            ImGui::PopID();
+        }
+
+        // SpawnerComponent（敵をウェーブで湧かせる）
+        if (auto* sp = e->GetComponent<SpawnerComponent>()) {
+            ImGui::PushID("cmp_spawner");
+            ImGui::BulletText(u8"Spawner（ウェーブ）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SpawnerComponent>();
+            else {
+                editStr("Prefab", sp->prefabPath);
+                if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
+                    if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+                        if (pl->Data) sp->prefabPath = static_cast<const char*>(pl->Data);
+                    ImGui::EndDragDropTarget();
+                }
+                ImGui::DragInt(u8"ウェーブ数", &sp->waveCount, 0.1f, 1, 99);
+                ImGui::DragInt(u8"最初のウェーブの数", &sp->baseCount, 0.1f, 1, 100);
+                ImGui::DragInt(u8"ウェーブごとの増加", &sp->countIncrease, 0.1f, 0, 50);
+                ImGui::DragFloat(u8"出現の間隔", &sp->spawnInterval, 0.05f, 0.05f, 10.0f);
+                ImGui::DragFloat(u8"開始までの待ち", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat(u8"ウェーブ間の休憩", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
+                ImGui::DragFloat(u8"出現の半径", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // GameRuleComponent（勝敗判定 → Scene 遷移）
+        if (auto* gr = e->GetComponent<GameRuleComponent>()) {
+            ImGui::PushID("cmp_rule");
+            ImGui::BulletText(u8"GameRule（勝敗判定）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GameRuleComponent>();
+            else {
+                editStr(u8"勝ったときの Scene", gr->winScene);
+                editStr(u8"負けたときの Scene", gr->loseScene);
+                ImGui::DragFloat(u8"決着後の待ち時間", &gr->endDelay, 0.05f, 0.0f, 10.0f);
+            }
+            ImGui::PopID();
+        }
+
+        // ScreenUIComponent（タイトル・リザルト画面）
+        if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
+            ImGui::PushID("cmp_ui");
+            ImGui::BulletText(u8"ScreenUI（タイトル・リザルト画面）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ScreenUIComponent>();
+            else {
+                editStr(u8"タイトル", ui->title);
+                editStr(u8"サブタイトル", ui->subtitle);
+                editStr(u8"ボタンの文字", ui->buttonText);
+                editStr(u8"次の Scene", ui->nextScene);
+                ImGui::Checkbox(u8"結果を表示", &ui->showResult);
+            }
+            ImGui::PopID();
+        }
+
+        // + コンポーネントを追加（UEのドロップダウン）
+        // ※ Inspector の一番下に置く。新しい Component の編集欄は、これより上（ScreenUI の後ろ）に足す
+        ImGui::Separator();
+        if (ImGui::Button(u8"+ コンポーネントを追加")) ImGui::OpenPopup("AddComponentPopup");
+        if (ImGui::BeginPopup("AddComponentPopup")) {
+            if (!e->GetComponent<MeshRendererComponent>() && ImGui::MenuItem(u8"MeshRendererComponent（メッシュ表示）")) e->AddComponent<MeshRendererComponent>();
+            if (!e->GetComponent<SkinnedMeshComponent>() && ImGui::MenuItem(u8"SkinnedMeshComponent（アニメ付きメッシュ）")) e->AddComponent<SkinnedMeshComponent>();
+            if (!e->GetComponent<AnimatorComponent>() && ImGui::MenuItem(u8"AnimatorComponent（アニメの制御）")) e->AddComponent<AnimatorComponent>();
+            if (!e->GetComponent<ShaderComponent>() && ImGui::MenuItem(u8"ShaderComponent（描き方・材質）")) e->AddComponent<ShaderComponent>();
+            ImGui::Separator();
+            if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem(u8"PlayerComponent（操作キャラ）")) e->AddComponent<PlayerComponent>();
+            if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem(u8"OpponentComponent（敵）"))  e->AddComponent<OpponentComponent>();
+            if (!e->GetComponent<HPComponent>() && ImGui::MenuItem(u8"HPComponent（体力）"))      e->AddComponent<HPComponent>();
+            if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem(u8"HitboxComponent（当たり判定）")) e->AddComponent<HitboxComponent>();
+            if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem(u8"NavObstacleComponent（経路探索の障害物）")) e->AddComponent<NavObstacleComponent>();
+            if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem(u8"SpawnerComponent（敵の出現・ウェーブ）")) e->AddComponent<SpawnerComponent>();
+            if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem(u8"GameRuleComponent（勝敗判定）")) e->AddComponent<GameRuleComponent>();
+            if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem(u8"ScreenUIComponent（タイトル・リザルト画面）")) e->AddComponent<ScreenUIComponent>();
+
+            ImGui::EndPopup();
         }
         ImGui::End();
     }

@@ -17,6 +17,7 @@
 #include "Engine/Components/ScreenUIComponent.h"
 #include "Engine/Components/HitboxComponent.h"
 #include "Engine/Components/SpawnerComponent.h"
+#include "Engine/Config/EngineConfig.h"
 
 #include <cfloat>
 #include <cmath>
@@ -104,7 +105,7 @@ namespace uel {
             in.shootClicked = ImGui::IsMouseClicked(0);
             in.lookActive = io.MouseDown[1];
             in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
-            float dt = (io.DeltaTime > 0.0f) ? io.DeltaTime : (1.0f / 60.0f);
+            float dt = ClampDeltaTime(io.DeltaTime);     // 上限付き（EngineConfig.h）
 
             // 添字でループ（Spawnerが更新中にEntityを増やしても壊れないように）
             for (size_t i = 0; i < world.Slots().size(); ++i) {

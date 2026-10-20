@@ -17,8 +17,51 @@
 #include <filesystem>
 #include <imgui.h>
 #include <cwchar>
+#include <timeapi.h>                    // timeBeginPeriod（Sleep の精度を 1ms にする）
+#pragma comment(lib, "winmm.lib")       // timeBeginPeriod の実体
 
 namespace uel {
+
+    namespace {
+        // FPS を固定する。1フレームの処理が早く終わったら、次のフレームの開始時刻まで待つ。
+        // 待ち方：残りが 2ms 以上なら Sleep で待つ（CPU を休ませる）。最後の少しは時刻を見ながら回す（Sleep は 1ms ほどずれるため）
+        class FrameLimiter {
+        public:
+            explicit FrameLimiter(int fps) {
+                LARGE_INTEGER f; QueryPerformanceFrequency(&f);
+                freq = f.QuadPart;
+                interval = (fps > 0) ? freq / fps : 0;     // 1フレームの長さ（カウント）。0 なら待たない
+                LARGE_INTEGER now; QueryPerformanceCounter(&now);
+                next = now.QuadPart;
+                timeBeginPeriod(1);                         // Sleep(1) が約 1ms で戻るようにする（既定は約 15ms）
+            }
+            ~FrameLimiter() { timeEndPeriod(1); }
+            FrameLimiter(const FrameLimiter&) = delete;
+            FrameLimiter& operator=(const FrameLimiter&) = delete;
+
+            void Wait() {
+                if (interval <= 0) return;
+                next += interval;
+                LARGE_INTEGER now; QueryPerformanceCounter(&now);
+                if (now.QuadPart >= next) {
+                    // 間に合わなかった。1フレーム以上遅れていたら、遅れを取り戻そうとせず、今から数え直す
+                    if (now.QuadPart - next > interval) next = now.QuadPart;
+                    return;
+                }
+                for (;;) {
+                    QueryPerformanceCounter(&now);
+                    const long long remain = next - now.QuadPart;
+                    if (remain <= 0) break;
+                    const long long ms = remain * 1000 / freq;
+                    if (ms >= 2) Sleep((DWORD)(ms - 1));
+                    else         Sleep(0);
+                }
+            }
+
+        private:
+            long long freq = 1, interval = 0, next = 0;
+        };
+    }
 
     Engine::~Engine()
     {
@@ -122,6 +165,7 @@ namespace uel {
 
     int Engine::Run()
     {
+        FrameLimiter limiter(kTargetFps);     // FPS を固定する（値は EngineConfig.h）
         while (window->ProcessMessages())
         {
             graphics->Resize(window->GetWidth(), window->GetHeight());
@@ -188,11 +232,12 @@ namespace uel {
             if (!refreshed.empty())
                 for (auto& s : scenes) StageSerializer::RefreshPrefabInstances(s.world, refreshed.c_str());
             Update();
-            AnimationSystem::Update(aw, ImGui::GetIO().DeltaTime, GlobalSkinnedCache(), graphics->GetDevice());
+            AnimationSystem::Update(aw, ClampDeltaTime(ImGui::GetIO().DeltaTime), GlobalSkinnedCache(), graphics->GetDevice());
             viewport->RenderScene(graphics->GetContext(), aw, meshCache, graphics->GetDevice(), lighting, postSettings);
             graphics->BeginFrame(0.10f, 0.12f, 0.15f, 1.0f);
             imgui->EndFrame();
             graphics->EndFrame();
+            limiter.Wait();                     // 次のフレームの開始時刻まで待つ
         }
         return 0;
     }
