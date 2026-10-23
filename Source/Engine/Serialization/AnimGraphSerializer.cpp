@@ -19,7 +19,8 @@ namespace uel {
         //   2 … ノードエディタ上の位置（状態の x / y、Any の箱の anyX / anyY）
         //   3 … クリップの通知（notifies）
         //   4 … モンタージュの定義（montages）
-        constexpr int kAnimGraphVersion = 4;
+        //   5 … モンタージュの重ねる範囲（maskBone / maskBlendDepth）
+        constexpr int kAnimGraphVersion = 5;
         int g_loadVersion = kAnimGraphVersion;     // 読み込み中のファイルの版（保存するときは最新）
 
         struct ParamDTO {
@@ -41,9 +42,11 @@ namespace uel {
         struct MontageDTO {
             std::string name, clip;
             float blendIn = 0.1f, blendOut = 0.2f, rate = 1.0f;
+            std::string maskBone; int maskBlendDepth = 0;
             std::vector<NotifyDTO> notifies;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(clip), CEREAL_NVP(blendIn), CEREAL_NVP(blendOut), CEREAL_NVP(rate), CEREAL_NVP(notifies));
+                if (g_loadVersion >= 5) ar(CEREAL_NVP(maskBone), CEREAL_NVP(maskBlendDepth));
             }
         };
         struct TransitionDTO {
@@ -197,6 +200,7 @@ namespace uel {
         for (const AnimMontage& m : montages) {
             MontageDTO d;
             d.name = m.name; d.clip = m.clipName; d.blendIn = m.blendIn; d.blendOut = m.blendOut; d.rate = m.rate;
+            d.maskBone = m.maskBone; d.maskBlendDepth = m.maskBlendDepth;
             for (const auto& nt : m.notifies) d.notifies.push_back({ nt.time, nt.name });
             md.push_back(std::move(d));
         }
@@ -250,6 +254,7 @@ namespace uel {
         for (const MontageDTO& d : md) {
             AnimMontage m;
             m.name = d.name; m.clipName = d.clip; m.blendIn = d.blendIn; m.blendOut = d.blendOut; m.rate = d.rate;
+            m.maskBone = d.maskBone; m.maskBlendDepth = d.maskBlendDepth;
             for (const auto& nd : d.notifies) m.notifies.push_back({ nd.time, nd.name });
             montages.push_back(std::move(m));
         }

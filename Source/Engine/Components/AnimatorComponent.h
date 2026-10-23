@@ -76,6 +76,10 @@ namespace uel {
             float weight = 0.0f;            // いまの重み 0～1（AnimationSystem が書く。表示用）
             bool  fromSnapshot = false;     // 再生中のモンタージュに割り込んだ：止めた姿勢（fromPose）から混ぜる
             LocalPose fromPose;
+            std::string maskBone;           // 空 = 全身。骨の名前なら、その骨から先だけに重ねる
+            int   maskBlendDepth = 0;       // 境目を何段の骨でなじませるか
+            BoneMask mask;                  // maskBone から作った骨ごとの重み（AnimationSystem が作る）
+            bool  maskDirty = true;         // mask を作り直す必要がある（再生し直したとき）
         };
         MontageState montage;
         LocalPose finalPose;        // 直前のフレームに最終的に出した姿勢（モンタージュ込み。AnimationSystem が書く）
@@ -95,6 +99,9 @@ namespace uel {
             m.clip.notifies.clear();
             m.clip.Reset();
             m.name.clear();
+            m.maskBone.clear();             // クリップ名で始めたときは全身
+            m.maskBlendDepth = 0;
+            m.maskDirty = true;
             m.active = true;
             m.stopping = false;
             m.blendIn = blendIn;
@@ -121,12 +128,14 @@ namespace uel {
             return nullptr;
         }
 
-        // 定義どおりにモンタージュを再生する（クリップ・入り方・抜け方・速度・通知）
+        // 定義どおりにモンタージュを再生する（クリップ・入り方・抜け方・速度・通知・重ねる範囲）
         void PlayMontage(const AnimMontage& def)
         {
             PlayMontageClip(def.clipName, def.blendIn, def.blendOut, def.rate);
             montage.clip.notifies = def.notifies;
             montage.name = def.name;
+            montage.maskBone = def.maskBone;
+            montage.maskBlendDepth = def.maskBlendDepth;
         }
 
         // 名前で指定してモンタージュを再生する（ゲーム側はこれを使う）。その名前の定義が無ければ何もせず false

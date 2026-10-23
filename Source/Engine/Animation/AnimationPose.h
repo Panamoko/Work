@@ -121,5 +121,51 @@ namespace uel {
         }
     }
 
+    // 骨ごとの重み（0～1）。skeleton.bones と同じ並び。
+    // 「上半身だけ別の動きを重ねる」のように、混ぜる割合を骨ごとに変えるときに使う（UE の Layered blend per bone）。
+    using BoneMask = std::vector<float>;
+
+    // rootBone とその子孫を 1、それ以外を 0 にしたマスクを作る。
+    // blendDepth が 1 以上なら、rootBone から blendDepth 段かけて 0 → 1 に上げる（境目の骨がカクッと折れないように）。
+    // rootBone が見つからなければ、全部 0（何も重ならない）にして false を返す。
+    inline bool BuildBoneMask(const Skeleton& skel, const std::string& rootBone, int blendDepth, BoneMask& out)
+    {
+        const int n = (int)skel.bones.size();
+        out.assign(n, 0.0f);
+        const int root = skel.Find(rootBone);
+        if (root < 0) return false;
+
+        std::vector<int> depth(n, -1);      // rootBone から何段下か（-1 = 子孫ではない）
+        depth[root] = 0;
+        for (int i = root + 1; i < n; ++i) {    // 親が先に並ぶので、前から1回見れば子孫が全部分かる
+            const int p = skel.bones[i].parent;
+            if (p >= 0 && depth[p] >= 0) depth[i] = depth[p] + 1;
+        }
+        for (int i = 0; i < n; ++i) {
+            if (depth[i] < 0) continue;
+            const float w = (blendDepth <= 0) ? 1.0f : (float)(depth[i] + 1) / (float)blendDepth;
+            out[i] = (w > 1.0f) ? 1.0f : w;
+        }
+        return true;
+    }
+
+    // a に b を、骨ごとに「alpha × mask[i]」の割合で混ぜる。out は a や b と同じ変数でもよい。
+    // mask が骨の数より短いときは、足りない骨を 0（a のまま）とみなす。
+    inline void BlendPoseMasked(const LocalPose& a, const LocalPose& b, float alpha, const BoneMask& mask, LocalPose& out)
+    {
+        using namespace DirectX;
+        const size_t n = (a.size() < b.size()) ? a.size() : b.size();
+        out.resize(n);
+        for (size_t i = 0; i < n; ++i) {
+            const float w = alpha * ((i < mask.size()) ? mask[i] : 0.0f);
+            if (w <= 0.0f) { out[i] = a[i]; continue; }
+            if (w >= 1.0f) { out[i] = b[i]; continue; }
+            XMVECTOR t = XMVectorLerp(XMLoadFloat3(&a[i].t), XMLoadFloat3(&b[i].t), w);
+            XMVECTOR r = XMQuaternionNormalize(XMQuaternionSlerp(XMLoadFloat4(&a[i].r), XMLoadFloat4(&b[i].r), w));
+            XMVECTOR s = XMVectorLerp(XMLoadFloat3(&a[i].s), XMLoadFloat3(&b[i].s), w);
+            XMStoreFloat3(&out[i].t, t); XMStoreFloat4(&out[i].r, r); XMStoreFloat3(&out[i].s, s);
+        }
+    }
+
 
 } // namespace uel

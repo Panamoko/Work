@@ -37,16 +37,29 @@ namespace uel {
         float dt = ctx.dt;
         AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // 無くても動く（アニメが変わらないだけ）
 
+        HPComponent* myHp = self.GetComponent<HPComponent>();
+
         // 死亡：HP が 0 になったら、すぐには消さず「倒れている最中」にする
         if (!dying) {
-            auto* myHp = self.GetComponent<HPComponent>();
             if (myHp && myHp->hp <= 0.0f) {
                 dying = true;
                 deathTimer = an ? deathDelay : 0.0f;    // アニメの無い敵は、待たずに消える（今までと同じ）
                 hitTimer = -1.0f;                       // 出かかっていた攻撃は取り消す
                 path.clear();
+                if (an) an->StopMontage(0.1f);          // ひるみの途中でも、すぐ倒れる動きへ移る
             }
         }
+
+        // ひるみ：HP が減っていたら（撃たれた）、モンタージュ "HitReact" を頭から再生する。
+        // ひるんでいる間は動かず、出かかっていた攻撃も取り消す（ひるみの最中に殴られないように）
+        if (hitReactTimer > 0.0f) hitReactTimer -= dt;
+        if (!dying && myHp && lastHp >= 0.0f && myHp->hp < lastHp) {
+            if (an && an->PlayMontage(kMontageHitReact)) {     // モンタージュが無ければ、ひるまない
+                hitReactTimer = hitReactTime;
+                hitTimer = -1.0f;
+            }
+        }
+        if (myHp) lastHp = myHp->hp;
         if (dying) {
             SetAnimValue(an, kAnimDead, 1.0f);          // アニメーションへ：倒れた（Bool。消えるまで true のまま）
             deathTimer -= dt;
@@ -91,7 +104,7 @@ namespace uel {
                 float dx = target.x - t->position.x;
                 float dz = target.z - t->position.z;
                 float l = sqrtf(dx * dx + dz * dz);
-                if (distPlayer > stopRange && l > 1e-4f && moveLockTimer <= 0.0f) {    // 攻撃のあいだ（moveLockTimer）は動かない
+                if (distPlayer > stopRange && l > 1e-4f && moveLockTimer <= 0.0f && hitReactTimer <= 0.0f) {    // 攻撃のあいだ（moveLockTimer）とひるんでいる間は動かない
                     float step = moveSpeed * dt;
                     t->position.x += dx / l * step;
                     t->position.z += dz / l * step;
@@ -113,7 +126,7 @@ namespace uel {
             // 接触攻撃：届く距離にいて、前の攻撃から時間がたっていれば、攻撃を始める
             attackTimer -= dt;
             moveLockTimer -= dt;
-            if (player && distPlayer <= attackRange && attackTimer <= 0.0f) {
+            if (player && distPlayer <= attackRange && attackTimer <= 0.0f && hitReactTimer <= 0.0f) {     // ひるんでいる間は攻撃しない
                 attackTimer = attackInterval;
                 moveLockTimer = attackMoveLock;             // 攻撃のあいだは、その場に止まる
                 SetAnimValue(an, kAnimAttack, 1.0f);        // アニメーションへ：攻撃を始めた（Trigger）

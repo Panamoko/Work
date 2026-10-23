@@ -17,6 +17,8 @@ namespace uel {
         float blendIn = 0.1f;           // 入るのにかける秒数
         float blendOut = 0.2f;          // クリップの終わりで抜けるのにかける秒数
         float rate = 1.0f;              // 再生速度
+        std::string maskBone;           // 空 = 全身に重ねる。骨の名前（"spine" など）を入れると、その骨から先（上半身）だけに重ねる
+        int   maskBlendDepth = 0;       // 境目を何段の骨でなじませるか（0 = 境目の骨から全部 100%）
         std::vector<AnimClipNode::Notify> notifies;     // 通知（クリップの頭からの秒数）
     };
 

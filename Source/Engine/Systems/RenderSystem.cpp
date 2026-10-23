@@ -1,4 +1,4 @@
-#include "Engine/Systems/RenderSystem.h"
+ï»¿#include "Engine/Systems/RenderSystem.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Components/TransformComponent.h"
 #include "Engine/Components/MeshRendererComponent.h"
@@ -26,7 +26,7 @@ namespace uel {
             auto* m = e->GetComponent<MeshRendererComponent>();
             if (!t || !m || !m->visible) continue;
 
-            const Mesh* meshToDraw = &fallbackMesh;   // assetId ‚ª–³‚¯‚ê‚Î—§•û‘Ì
+            const Mesh* meshToDraw = &fallbackMesh;   // assetId         Î—     
             if (!m->assetId.empty()) {
                 std::shared_ptr<Mesh> gm = cache.GetOrLoad(device, m->assetId);
                 if (gm && gm->IsValid()) meshToDraw = gm.get();
@@ -53,8 +53,8 @@ namespace uel {
     }
 
     namespace {
-        // AnimationSystem ‚ªŒvZ‚µ‚½p¨‚ª‚ ‚ê‚Î‚»‚ê‚ğg‚¤B
-        // ‚Ü‚¾–³‚¢‚Æ‚«iƒWƒ‡ƒCƒ“ƒg‚Ì”‚ª‡‚í‚È‚¢‚Æ‚«j‚¾‚¯A‚»‚Ìê‚ÅŒvZ‚·‚éB
+        // AnimationSystem    v Z     p        Î‚    g   B
+        //  Ü‚      Æ‚  i W   C   g Ì       È‚  Æ‚  j     A   Ì ÅŒv Z    B
         const std::vector<DirectX::XMFLOAT4X4>& PaletteOf(const SkinnedMeshComponent& sk, const SkinnedModel& cpu,
             std::vector<DirectX::XMFLOAT4X4>& fallback)
         {
@@ -101,7 +101,7 @@ namespace uel {
             auto model = cache.GetOrLoad(device, sk->assetPath, sk->animPath);
             if (!model || !model->Valid()) continue;
 
-            // –{•`‰æ‚Æ“¯‚¶p¨‚Å‰e‚ğ—‚Æ‚·iŒvZ‚Í‚µ‚È‚¢BAnimationSystem ‚ÌŒ‹‰Ê‚ğ“Ç‚Ş‚¾‚¯j
+            //  { `  Æ“    p   Å‰e ğ—‚Æ‚  i v Z Í‚  È‚  BAnimationSystem  ÌŒ  Ê‚ Ç‚Ş‚    j
             shadow.DrawSkinned(context, *model, t->GetWorldMatrix(), PaletteOf(*sk, model->Cpu(), fallback));
         }
     }

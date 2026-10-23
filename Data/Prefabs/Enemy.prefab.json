@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 18,
+    "schemaVersion": 19,
     "prefab": {
         "name": "Enemy",
         "transform": {
@@ -116,6 +116,7 @@
         "anSpeed": 1.0,
         "anLoop": true,
         "anBlendTime": 0.20000000298023225,
-        "anGraph": "Data/Anim/Enemy.animgraph.json"
+        "anGraph": "Data/Anim/Enemy.animgraph.json",
+        "skFpHide": ""
     }
 }

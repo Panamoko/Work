@@ -221,6 +221,29 @@ namespace uel {
                 ImGui::SetNextItemWidth(150.0f);
                 ImGui::DragFloat(u8"再生速度", &mt.rate, 0.01f, 0.05f, 4.0f, "%.2f");
 
+                // 重ねる範囲：骨を選ぶと、その骨から先（上半身など）だけにモンタージュが掛かる。下半身は移動の動きのまま
+                ImGui::SetNextItemWidth(150.0f);
+                if (ImGui::BeginCombo(u8"重ねる範囲", mt.maskBone.empty() ? u8"全身" : mt.maskBone.c_str())) {
+                    if (ImGui::Selectable(u8"全身", mt.maskBone.empty())) mt.maskBone.clear();
+                    if (model) {
+                        const auto& bones = model->skeleton.bones;
+                        std::vector<int> depth(bones.size(), 0);    // 親子の段を字下げで見せる（親が先に並ぶ）
+                        for (int i = 0; i < (int)bones.size(); ++i) {
+                            if (bones[i].parent >= 0 && bones[i].parent < i) depth[i] = depth[bones[i].parent] + 1;
+                            const std::string label = std::string(depth[i] * 2, ' ') + bones[i].name;
+                            ImGui::PushID(i);
+                            if (ImGui::Selectable(label.c_str(), bones[i].name == mt.maskBone)) mt.maskBone = bones[i].name;
+                            ImGui::PopID();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (!mt.maskBone.empty()) {
+                    ImGui::SetNextItemWidth(150.0f);
+                    ImGui::SliderInt(u8"なじませる段数", &mt.maskBlendDepth, 0, 5);
+                    if (model && model->skeleton.Find(mt.maskBone) < 0) ImGui::TextDisabled(u8"このモデルにその骨がありません");
+                }
+
                 // クリップの長さ（タイムラインの横幅）と、このモンタージュを再生中ならその位置
                 float dur = 0.0f;
                 if (model) for (const AnimationClip& c : model->clips) if (c.name == mt.clipName) { dur = c.duration; break; }

@@ -108,8 +108,16 @@ namespace uel {
             m.weight = w;
 
             // 3) 下の姿勢とモンタージュの姿勢を混ぜる
+            //    maskBone があれば、その骨から先（上半身など）だけに重ねる。下半身は下のグラフの動き（移動）のまま
             m.clip.Evaluate(ctx, scratch);
-            BlendPose(pose, scratch, SmoothStep01(w), pose);
+            if (m.maskBone.empty()) BlendPose(pose, scratch, SmoothStep01(w), pose);
+            else {
+                if (m.maskDirty || m.mask.size() != pose.size()) {      // 再生し直した、またはモデルが変わった
+                    BuildBoneMask(cpu.skeleton, m.maskBone, m.maskBlendDepth, m.mask);    // 骨が見つからなければ全部 0（重ならない）
+                    m.maskDirty = false;
+                }
+                BlendPoseMasked(pose, scratch, SmoothStep01(w), m.mask, pose);
+            }
 
             // 再生中のモンタージュに割り込んだ直後：止めた姿勢から、いまの結果へ blendIn 秒かけて移る
             if (m.fromSnapshot) {

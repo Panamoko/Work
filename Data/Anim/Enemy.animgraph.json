@@ -1,5 +1,5 @@
 {
-    "version": 4,
+    "version": 5,
     "params": [
         {
             "name": "Speed",
@@ -96,21 +96,6 @@
                     ],
                     "x": 471.2891845703125,
                     "y": 9.469879150390625
-                },
-                {
-                    "name": "reborn",
-                    "node": [
-                        {
-                            "type": "Clip",
-                            "clip": "Jump",
-                            "loop": false,
-                            "speed": 1.0,
-                            "speedParam": "",
-                            "notifies": []
-                        }
-                    ],
-                    "x": 160.86563110351563,
-                    "y": -279.74554443359377
                 }
             ],
             "transitions": [
@@ -218,33 +203,6 @@
                             "threshold": 0.0
                         }
                     ]
-                },
-                {
-                    "from": 4,
-                    "to": 4,
-                    "blendTime": 0.20000000298023225,
-                    "waitForEnd": false,
-                    "conditions": []
-                },
-                {
-                    "from": 3,
-                    "to": 4,
-                    "blendTime": 0.20000000298023225,
-                    "waitForEnd": false,
-                    "conditions": [
-                        {
-                            "param": "Born",
-                            "op": 0,
-                            "threshold": 0.0
-                        }
-                    ]
-                },
-                {
-                    "from": 4,
-                    "to": 1,
-                    "blendTime": 0.20000000298023225,
-                    "waitForEnd": true,
-                    "conditions": []
                 }
             ],
             "anyX": 70.06343078613281,
@@ -254,20 +212,22 @@
     "montages": [
         {
             "name": "HitReact",
-            "clip": "Melee_Unarmed_Punch",
+            "clip": "Hit_A",
             "blendIn": 0.30000001192092898,
             "blendOut": 0.1599999964237213,
             "rate": 1.25,
             "notifies": [
                 {
-                    "time": 0.6503030061721802,
+                    "time": 0.0,
                     "name": "Hit"
                 },
                 {
                     "time": 0.7960606217384338,
                     "name": "Hit"
                 }
-            ]
+            ],
+            "maskBone": "spine",
+            "maskBlendDepth": 2
         }
     ]
 }
