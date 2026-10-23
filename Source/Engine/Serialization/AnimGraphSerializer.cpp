@@ -1,6 +1,7 @@
 #include "Engine/Serialization/AnimGraphSerializer.h"
 #include "Engine/Animation/AnimBlendSpaceNode.h"
 #include "Engine/Animation/AnimStateMachineNode.h"
+#include "Engine/Animation/AnimLayeredBlendNode.h"
 #include "Engine/Config/EngineConfig.h"
 
 #include <fstream>
@@ -20,7 +21,8 @@ namespace uel {
         //   3 … クリップの通知（notifies）
         //   4 … モンタージュの定義（montages）
         //   5 … モンタージュの重ねる範囲（maskBone / maskBlendDepth）
-        constexpr int kAnimGraphVersion = 5;
+        //   6 … LayeredBlend ノード（骨ごとに2つの姿勢を混ぜる）
+        constexpr int kAnimGraphVersion = 6;
         int g_loadVersion = kAnimGraphVersion;     // 読み込み中のファイルの版（保存するときは最新）
 
         struct ParamDTO {
@@ -67,7 +69,7 @@ namespace uel {
 
         // ノード1つ。type を先に読み書きし、その種類の項目だけを続ける。
         struct NodeDTO {
-            std::string type;               // "Clip" / "BlendSpace1D" / "StateMachine"
+            std::string type;               // "Clip" / "BlendSpace1D" / "StateMachine" / "LayeredBlend"
 
             // Clip
             std::string clip; bool loop = true; float speed = 1.0f; std::string speedParam;
@@ -77,6 +79,9 @@ namespace uel {
             // StateMachine
             std::vector<StateDTO> states; std::vector<TransitionDTO> transitions; int entry = 0;
             float anyX = -190.0f, anyY = 8.0f;      // ノードエディタ上の「Any」の箱の位置（版 2 から）
+            // LayeredBlend（版 6 から）
+            std::vector<NodeDTO> basePose, blendPose;       // 0個か1個
+            std::string maskBone; int maskBlendDepth = 0; float weight = 1.0f; std::string weightParam;
 
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(type));
@@ -92,6 +97,9 @@ namespace uel {
                     ar(CEREAL_NVP(entry), CEREAL_NVP(states), CEREAL_NVP(transitions));
                     if (g_loadVersion >= 2) ar(CEREAL_NVP(anyX), CEREAL_NVP(anyY));
                 }
+                else if (type == "LayeredBlend")    // 版 6 で増えた種類（それより古いファイルには出てこない）
+                    ar(CEREAL_NVP(maskBone), CEREAL_NVP(maskBlendDepth), CEREAL_NVP(weight), CEREAL_NVP(weightParam),
+                        CEREAL_NVP(basePose), CEREAL_NVP(blendPose));
             }
         };
         template<class A> void StateDTO::serialize(A& ar) {
@@ -130,6 +138,12 @@ namespace uel {
                     d.transitions.push_back(std::move(td));
                 }
             }
+            else if (auto* lb = dynamic_cast<const AnimLayeredBlendNode*>(&n)) {
+                d.type = "LayeredBlend";
+                d.maskBone = lb->maskBone; d.maskBlendDepth = lb->maskBlendDepth; d.weight = lb->weight; d.weightParam = lb->weightParam;
+                if (lb->basePose)  d.basePose.push_back(ToDTO(*lb->basePose.get()));
+                if (lb->blendPose) d.blendPose.push_back(ToDTO(*lb->blendPose.get()));
+            }
             return d;
         }
 
@@ -166,6 +180,13 @@ namespace uel {
                         tr.conditions.push_back({ c.param, (AnimStateMachineNode::CondOp)c.op, c.threshold });
                     n->transitions.push_back(std::move(tr));
                 }
+                return AnimNodePtr(std::move(n));
+            }
+            if (d.type == "LayeredBlend") {
+                auto n = std::make_unique<AnimLayeredBlendNode>();
+                n->maskBone = d.maskBone; n->maskBlendDepth = d.maskBlendDepth; n->weight = d.weight; n->weightParam = d.weightParam;
+                if (!d.basePose.empty())  n->basePose = FromDTO(d.basePose[0]);
+                if (!d.blendPose.empty()) n->blendPose = FromDTO(d.blendPose[0]);
                 return AnimNodePtr(std::move(n));
             }
             return AnimNodePtr();

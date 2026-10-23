@@ -5,6 +5,7 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Animation/AnimBlendSpaceNode.h"
 #include "Engine/Animation/AnimStateMachineNode.h"
+#include "Engine/Animation/AnimLayeredBlendNode.h"
 
 #include <imgui.h>
 #include <cstdio>
@@ -236,6 +237,74 @@ namespace uel {
                     tr.to = (sm->states.size() > 1) ? 1 : 0;
                     sm->transitions.push_back(std::move(tr));
                 }
+            }
+            else if (auto* lb = dynamic_cast<AnimLayeredBlendNode*>(node)) {
+                const ImVec4 warn(1.0f, 0.8f, 0.3f, 1.0f);
+
+                // 重ねる範囲：この骨から先だけに「重ねる側」が効く（空 = 全身）
+                ImGui::SetNextItemWidth(170);
+                if (ImGui::BeginCombo(u8"重ねる範囲", lb->maskBone.empty() ? u8"全身" : lb->maskBone.c_str())) {
+                    if (ImGui::Selectable(u8"全身", lb->maskBone.empty())) lb->maskBone.clear();
+                    const auto& bones = model.skeleton.bones;
+                    std::vector<int> depth(bones.size(), 0);    // 親子の段を字下げで見せる（親が先に並ぶ）
+                    for (int i = 0; i < (int)bones.size(); ++i) {
+                        if (bones[i].parent >= 0 && bones[i].parent < i) depth[i] = depth[bones[i].parent] + 1;
+                        const std::string label = std::string(depth[i] * 2, ' ') + bones[i].name;
+                        ImGui::PushID(i);
+                        if (ImGui::Selectable(label.c_str(), bones[i].name == lb->maskBone)) lb->maskBone = bones[i].name;
+                        ImGui::PopID();
+                    }
+                    ImGui::EndCombo();
+                }
+                if (!lb->maskBone.empty()) {
+                    ImGui::SetNextItemWidth(170);
+                    ImGui::SliderInt(u8"なじませる段数", &lb->maskBlendDepth, 0, 5);
+                    if (model.skeleton.Find(lb->maskBone) < 0) ImGui::TextColored(warn, u8"このモデルにその骨がありません");
+                }
+                ImGui::SetNextItemWidth(170);
+                ImGui::SliderFloat(u8"重み", &lb->weight, 0.0f, 1.0f, "%.2f");
+                ImGui::SetNextItemWidth(170);
+                paramCombo(u8"重みの値", lb->weightParam, true);
+                ImGui::TextDisabled(u8"いまの重み %.2f", lb->lastWeight);
+
+                // 2つの入力：種類を選ぶと、その種類の新しいノードに置き換わる
+                auto makeNode = [&](int type) -> AnimNodePtr {
+                    auto clip = [&]() {
+                        auto c = std::make_unique<AnimClipNode>();
+                        if (!model.clips.empty()) c->clipName = model.clips[0].name;
+                        return AnimNodePtr(std::move(c));
+                        };
+                    if (type == 1) return AnimNodePtr(std::make_unique<AnimBlendSpace1DNode>());
+                    if (type == 2) {
+                        auto s = std::make_unique<AnimStateMachineNode>();
+                        AnimStateMachineNode::State st;
+                        st.name = "Idle";
+                        st.node = clip();
+                        s->states.push_back(std::move(st));
+                        return AnimNodePtr(std::move(s));
+                    }
+                    return clip();
+                    };
+                auto drawInput = [&](const char* title, const char* id, AnimNodePtr& child) {
+                    ImGui::Separator();
+                    ImGui::PushID(id);
+                    ImGui::TextUnformatted(title);
+                    const char* types[] = { "Clip", "BlendSpace1D", "StateMachine" };
+                    int cur = -1;
+                    if (dynamic_cast<AnimClipNode*>(child.get())) cur = 0;
+                    else if (dynamic_cast<AnimBlendSpace1DNode*>(child.get())) cur = 1;
+                    else if (dynamic_cast<AnimStateMachineNode*>(child.get())) cur = 2;
+                    int sel = cur;
+                    ImGui::SetNextItemWidth(170);
+                    if (ImGui::Combo(u8"種類", &sel, types, 3) && sel != cur) child = makeNode(sel);
+                    if (child && ImGui::TreeNodeEx(u8"中身", ImGuiTreeNodeFlags_DefaultOpen)) {
+                        DrawAnimNodeInspector(child.get(), model, params);     // 入力のノードの編集欄（ステートマシンなら一覧の形）
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                    };
+                drawInput(u8"下地（全身。移動など）", "base", lb->basePose);
+                drawInput(u8"重ねる側（範囲の骨から先だけ）", "blend", lb->blendPose);
             }
         }
     }

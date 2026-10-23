@@ -7,6 +7,7 @@
 #include "Engine/Assets/SkinnedModelCache.h"
 #include "Engine/Animation/AnimBlendSpaceNode.h"
 #include "Engine/Serialization/AnimGraphSerializer.h"
+#include "Engine/Animation/AnimLayeredBlendNode.h"
 
 #include <imgui.h>
 #include <cstring>
@@ -33,6 +34,11 @@ namespace uel {
                 for (SM::Transition& tr : sm->transitions)
                     for (SM::Condition& c : tr.conditions) if (c.param == oldName) c.param = newName;
                 for (SM::State& st : sm->states) RenameParamRefs(st.node.get(), oldName, newName);
+            }
+            else if (auto* lb = dynamic_cast<AnimLayeredBlendNode*>(n)) {
+                if (lb->weightParam == oldName) lb->weightParam = newName;
+                RenameParamRefs(lb->basePose.get(), oldName, newName);
+                RenameParamRefs(lb->blendPose.get(), oldName, newName);
             }
         }
 
@@ -285,21 +291,28 @@ namespace uel {
             return;
         }
 
+        // ---- 開いているステートマシン：根そのもの、または根の LayeredBlend の入力（下地・重ねる側）----
+        AnimLayeredBlendNode* rootLayer = dynamic_cast<AnimLayeredBlendNode*>(an->graph.get());
+        SM* openSM = nullptr;
+        if (g.smSlot == 0) openSM = dynamic_cast<SM*>(an->graph.get());
+        else if (g.smSlot == 1 && rootLayer) openSM = dynamic_cast<SM*>(rootLayer->basePose.get());
+        else if (g.smSlot == 2 && rootLayer) openSM = dynamic_cast<SM*>(rootLayer->blendPose.get());
+        const char* smLabel = (g.smSlot == 1) ? u8"下地の State Machine" : (g.smSlot == 2) ? u8"重ねる側の State Machine" : "State Machine";
+
         // ---- 見ている階層が、今のグラフでまだ成り立つかを確かめる ----
-        SM* rootSM = dynamic_cast<SM*>(an->graph.get());
-        if (!rootSM) g.level = Level::AnimGraph;                                    // 根がステートマシンでなければ、中には入れない
-        if (g.level == Level::State && (g.levelState < 0 || g.levelState >= (int)rootSM->states.size())) g.level = Level::StateMachine;
+        if (!openSM) { g.level = Level::AnimGraph; g.smSlot = 0; }                 // そのステートマシンが無くなった：一番上へ戻る
+        if (g.level == Level::State && (g.levelState < 0 || g.levelState >= (int)openSM->states.size())) g.level = Level::StateMachine;
 
         // ---- 上の2行目：いまの場所（押すと、その階層へ戻る）と、表示の操作 ----
         {
             if (ImGui::SmallButton("AnimGraph")) g.level = Level::AnimGraph;
-            if (rootSM && g.level != Level::AnimGraph) {
+            if (openSM && g.level != Level::AnimGraph) {
                 ImGui::SameLine(); ImGui::TextDisabled(">"); ImGui::SameLine();
-                if (ImGui::SmallButton("State Machine")) g.level = Level::StateMachine;
+                if (ImGui::SmallButton(smLabel)) g.level = Level::StateMachine;
             }
-            if (rootSM && g.level == Level::State) {
+            if (openSM && g.level == Level::State) {
                 ImGui::SameLine(); ImGui::TextDisabled(">"); ImGui::SameLine();
-                ImGui::Text(u8"状態：%s", rootSM->states[g.levelState].name.c_str());
+                ImGui::Text(u8"状態：%s", openSM->states[g.levelState].name.c_str());
             }
 
             ImGui::SameLine(); ImGui::TextDisabled("  |");
@@ -311,8 +324,8 @@ namespace uel {
 
             ImGui::SameLine();
             if (g.level == Level::StateMachine) {
-                const bool nowValid = (rootSM->current >= 0 && rootSM->current < (int)rootSM->states.size());
-                ImGui::Text(u8"　再生中：%s", nowValid ? rootSM->states[rootSM->current].name.c_str() : "-");
+                const bool nowValid = (openSM->current >= 0 && openSM->current < (int)openSM->states.size());
+                ImGui::Text(u8"　再生中：%s", nowValid ? openSM->states[openSM->current].name.c_str() : "-");
                 if (g.linkFrom != kNoLink) { ImGui::SameLine(); ImGui::TextColored(ImVec4(1.0f, 0.82f, 0.35f, 1.0f), u8"　遷移先の状態をクリック（Esc／右クリックで取り消し）"); }
             }
             else ImGui::TextUnformatted("");
@@ -325,14 +338,18 @@ namespace uel {
 
         // ---- 中央と右：見ている階層 ----
         if (g.level == Level::StateMachine) {
-            const int open = DrawStateMachineView(an, rootSM, model);
-            if (open >= 0 && open < (int)rootSM->states.size()) { g.level = Level::State; g.levelState = open; g.poseSelected = true; }
+            const int open = DrawStateMachineView(an, openSM, model);
+            if (open >= 0 && open < (int)openSM->states.size()) { g.level = Level::State; g.levelState = open; g.poseSelected = true; g.poseInput = -1; }
         }
         else if (g.level == Level::State) {
-            DrawPoseView(an, rootSM->states[g.levelState].node, false, model);     // 状態の中には、ステートマシンを置かない
+            DrawPoseView(an, openSM->states[g.levelState].node, false, model);     // 状態の中には、ステートマシンを置かない
         }
         else {
-            if (DrawPoseView(an, an->graph, true, model)) { g.level = Level::StateMachine; g.ClearSelection(); g.fitRequested = true; }
+            const int open = DrawPoseView(an, an->graph, true, model);             // 0 = 根、1 = 下地、2 = 重ねる側
+            if (open >= 0) {
+                g.smSlot = open;
+                g.level = Level::StateMachine; g.ClearSelection(); g.linkFrom = kNoLink; g.fitRequested = true;
+            }
         }
 
         ImGui::End();

@@ -130,6 +130,7 @@
     <ClInclude Include="Source\Engine\Animation\AnimationClip.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationPose.h" />
     <ClInclude Include="Source\Engine\Animation\AnimBlendSpaceNode.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimLayeredBlendNode.h" />
     <ClInclude Include="Source\Engine\Animation\AnimMontage.h" />
     <ClInclude Include="Source\Engine\Animation\AnimNode.h" />
     <ClInclude Include="Source\Engine\Animation\AnimParams.h" />
@@ -206,6 +207,7 @@
     <ClCompile Include="External\Tracy\TracyClient.cpp" />
     <ClCompile Include="Source\Engine\AI\EngineNavGrid.cpp" />
     <ClCompile Include="Source\Engine\Animation\AnimBlendSpaceNode.cpp" />
+    <ClCompile Include="Source\Engine\Animation\AnimLayeredBlendNode.cpp" />
     <ClCompile Include="Source\Engine\Animation\AnimNode.cpp" />
     <ClCompile Include="Source\Engine\Animation\AnimStateMachineNode.cpp" />
     <ClCompile Include="Source\Engine\Assets\GltfMeshLoader.cpp" />

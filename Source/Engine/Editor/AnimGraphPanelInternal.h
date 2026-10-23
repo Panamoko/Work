@@ -8,7 +8,7 @@
 // ノードエディタは3つの階層を行き来する（UE の Animation Blueprint と同じ分け方）。
 //
 //   AnimGraph        … 根のノード → Output Pose。ここで「何が最終の姿勢を出すか」を決める
-//    └ State Machine … 状態（箱）と遷移（矢印）。根がステートマシンのときだけ入れる
+//    └ State Machine … 状態（箱）と遷移（矢印）。根がステートマシンのとき、または根の LayeredBlend の入力がステートマシンのときに入れる
 //       └ State      … その状態の中身のノード → Output Pose
 //
 // AnimGraph と State は「ノードの出力を Output Pose へつなぐ」同じ形なので、同じ関数（DrawPoseView）で描く。
@@ -83,6 +83,8 @@ namespace uel {
             bool     posePanning = false;
             ImVec2   poseRightDownPos = ImVec2(0.0f, 0.0f);
             bool     poseSelected = false;          // ノードの箱を選んでいるか
+            int      poseInput = -1;                // 選んでいるのが LayeredBlend の入力の箱なら 0（下地）か 1（重ねる側）。ノード本体なら -1
+            int      smSlot = 0;                    // 開いているステートマシンの場所：0 = 根、1 = 根の LayeredBlend の下地、2 = 重ねる側
 
             // パラメータの名前を打っている途中の内容（打ち終わったときに、まとめて反映する）
             int      renameIndex = -1;
@@ -91,7 +93,8 @@ namespace uel {
             void ClearSelection() { selKind = SelKind::None; selIndex = -1; }
             void ResetForNewGraph() {
                 ClearSelection(); linkFrom = kNoLink; dragTarget = kDragNothing;
-                level = Level::AnimGraph; levelState = -1; poseSelected = false; renameIndex = -1;
+                level = Level::AnimGraph; levelState = -1; poseSelected = false; poseInput = -1; smSlot = 0; renameIndex = -1;
+                fitRequested = true;        // 新しいグラフは、全体が見えるように合わせて開く
             }
         };
         extern PanelState g;     // 実体は AnimGraphCanvas.cpp
@@ -110,8 +113,8 @@ namespace uel {
         AnimNodePtr MakeStateMachineNode(const SkinnedModel* model);
 
         // ---- 各階層の表示 ----
-        // ポーズグラフ（AnimGraph / State）。ステートマシンのノードをダブルクリックしたら true（AnimGraphCanvas.cpp）
-        bool DrawPoseView(AnimatorComponent* an, AnimNodePtr& slot, bool allowStateMachine, const SkinnedModel* model);
+        // ポーズグラフ（AnimGraph / State）。開くステートマシン（0 = ノード本体、1 = 下地、2 = 重ねる側）を返す。無ければ -1（AnimGraphCanvas.cpp）
+        int  DrawPoseView(AnimatorComponent* an, AnimNodePtr& slot, bool allowStateMachine, const SkinnedModel* model);
         // ステートマシン。開く状態の番号を返す（無ければ -1）（AnimGraphStateMachineView.cpp）
         int  DrawStateMachineView(AnimatorComponent* an, SM* sm, const SkinnedModel* model);
 
