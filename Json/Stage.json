@@ -208,7 +208,7 @@
             "spWaveDelay": 3.0,
             "spRadius": 2.0,
             "hasShader": true,
-            "shMode": 0,
+            "shMode": 2,
             "shReceiveShadow": true,
             "shSpecStrength": 0.0,
             "shRimStrength": 0.0,

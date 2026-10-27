@@ -1,63 +1,30 @@
 #include "Engine/Graphics/SkinnedMeshShader.h"
 #include "Engine/Graphics/SkinnedRenderModel.h"
 #include "Engine/Graphics/ShaderCommon.h"
-#include <string>
+#include "Engine/Graphics/ShaderLoader.h"
 #include <cstdint>
-
-#pragma comment(lib, "d3dcompiler.lib")
+#include <vector>
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
 namespace uel {
     namespace {
+        // Shader/SkinnedVertex.hlsli の cbuffer Bones（float4x4 bones[128]）と合わせる。
         constexpr int kMaxBones = 128;
         struct BoneCB { XMFLOAT4X4 bones[kMaxBones]; };
-
-        // スキンドメッシュ専用の部分（ボーンの定数バッファと頂点シェーダだけ）。
-        // b0 の定数バッファ・影・ピクセルシェーダは ShaderCommon.h の kShaderCommonHLSL にある。
-        // ToWorld でスキニング後のワールド位置と法線を求め、通常用とアウトライン用の両方で使う。
-        const char* kSkinnedVS = R"(
-cbuffer Bones : register(b1) { float4x4 bones[128]; };
-struct VSIn {
-    float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD;
-    uint4 bidx:BLENDINDICES; float4 bw:BLENDWEIGHT;
-};
-void ToWorld(VSIn i, out float3 wpos, out float3 wnrm) {
-    float4 p = float4(i.pos, 1.0);
-    float3 sp = 0; float3 sn = 0; float wsum = 0;
-    [unroll] for (int k = 0; k < 4; ++k) {
-        float w = i.bw[k]; uint b = i.bidx[k];
-        sp += w * mul(p, bones[b]).xyz;
-        sn += w * mul(i.nrm, (float3x3)bones[b]);
-        wsum += w;
-    }
-    if (wsum < 1e-4) { sp = i.pos; sn = i.nrm; }
-    wpos = mul(float4(sp, 1.0), world).xyz;
-    wnrm = mul(sn, (float3x3)world);
-}
-PSIn VSMain(VSIn i)    { float3 p; float3 n; ToWorld(i, p, n); return MakePSIn(p, n, i.col, i.uv); }
-PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlinePSIn(p, n, i.col, i.uv); }
-)";
     }
 
     bool SkinnedMeshShader::Initialize(ID3D11Device* device)
     {
-        // 共通部分 ＋ 自分の頂点シェーダ、の順に連結する（PSIn が先に宣言されている必要がある）
-        const std::string source = std::string(kShaderCommonHLSL) + kSkinnedVS;
-
-        ComPtr<ID3DBlob> vsB, psB;
-        if (!CompileShaderSource(source, "skinned", "VSMain", "vs_5_0", vsB.GetAddressOf())) return false;
-        if (!CompileShaderSource(source, "skinned", "PSMain", "ps_5_0", psB.GetAddressOf())) return false;
-        if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
-        if (FAILED(device->CreatePixelShader(psB->GetBufferPointer(), psB->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
-
-        // アウトライン用（頂点の形は同じなので、入力レイアウトは下の1つを共用する）
-        ComPtr<ID3DBlob> vsOutlineB, psOutlineB;
-        if (!CompileShaderSource(source, "skinned", "VSOutline", "vs_5_0", vsOutlineB.GetAddressOf())) return false;
-        if (!CompileShaderSource(source, "skinned", "PSOutline", "ps_5_0", psOutlineB.GetAddressOf())) return false;
-        if (FAILED(device->CreateVertexShader(vsOutlineB->GetBufferPointer(), vsOutlineB->GetBufferSize(), nullptr, vsOutline.GetAddressOf()))) return false;
-        if (FAILED(device->CreatePixelShader(psOutlineB->GetBufferPointer(), psOutlineB->GetBufferSize(), nullptr, psOutline.GetAddressOf()))) return false;
+        // シェーダは Shader/ の .hlsl（ビルド時に Data/Shader/*.cso へコンパイルされる）。
+        //   SkinnedMeshVS / SkinnedMeshOutlineVS … スキニングしてワールドへ変換。通常用とアウトライン用
+        //   SurfacePS / OutlinePS               … ピクセル。静的メッシュと共用
+        std::vector<char> vsCode;   // 入力レイアウトを作るのに、頂点シェーダのバイトコードが要る
+        if (!CreateVertexShaderFromCso(device, "SkinnedMeshVS", vs, &vsCode)) return false;
+        if (!CreatePixelShaderFromCso(device, "SurfacePS", ps)) return false;
+        if (!CreateVertexShaderFromCso(device, "SkinnedMeshOutlineVS", vsOutline)) return false;   // 頂点の形は同じなので、入力レイアウトは下の1つを共用する
+        if (!CreatePixelShaderFromCso(device, "OutlinePS", psOutline)) return false;
 
         D3D11_INPUT_ELEMENT_DESC il[] = {
             { "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -67,7 +34,7 @@ PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlin
             { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "BLENDWEIGHT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 64, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
-        if (FAILED(device->CreateInputLayout(il, 6, vsB->GetBufferPointer(), vsB->GetBufferSize(), layout.GetAddressOf()))) return false;
+        if (FAILED(device->CreateInputLayout(il, 6, vsCode.data(), vsCode.size(), layout.GetAddressOf()))) return false;
 
         D3D11_BUFFER_DESC od = {}; od.Usage = D3D11_USAGE_DEFAULT; od.ByteWidth = sizeof(ObjectCB); od.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         if (FAILED(device->CreateBuffer(&od, nullptr, objCB.GetAddressOf()))) return false;

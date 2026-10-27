@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 11,
+    "schemaVersion": 19,
     "prefab": {
         "name": "ExampleStage.glb",
         "transform": {
@@ -88,7 +88,39 @@
         "spWaveDelay": 3.0,
         "spRadius": 2.0,
         "hasShader": true,
-        "shMode": 1,
-        "shReceiveShadow": true
+        "shMode": 2,
+        "shReceiveShadow": true,
+        "shSpecStrength": 0.0,
+        "shRimStrength": 0.0,
+        "shRimPower": 3.0,
+        "shRimColor": {
+            "x": 1.0,
+            "y": 1.0,
+            "z": 1.0
+        },
+        "shToonThreshold": 0.5,
+        "shToonSoftness": 0.019999999552965165,
+        "shToonShade": {
+            "x": 0.6000000238418579,
+            "y": 0.6000000238418579,
+            "z": 0.699999988079071
+        },
+        "shOutlineWidth": 0.0,
+        "shOutlineColor": {
+            "x": 0.05000000074505806,
+            "y": 0.05000000074505806,
+            "z": 0.05000000074505806
+        },
+        "shToonTexSteps": 0.0,
+        "shToonTexSmooth": 0.0,
+        "shMetallic": 0.0,
+        "shRoughness": 0.4924790561199188,
+        "hasAnimator": false,
+        "anClip": 0,
+        "anSpeed": 1.0,
+        "anLoop": true,
+        "anBlendTime": 0.20000000298023225,
+        "anGraph": "",
+        "skFpHide": ""
     }
 }

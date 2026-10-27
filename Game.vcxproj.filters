@@ -69,6 +69,9 @@
     <Filter Include="Source\Engine\Components">
       <UniqueIdentifier>{20452f5c-5925-4f0a-b772-4435608a27a5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shader">
+      <UniqueIdentifier>{605323fd-8862-42b4-9bdc-7ddc43e4f6d9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\imgui-docking\imconfig.h">
@@ -311,6 +314,9 @@
     <ClInclude Include="Source\Engine\Animation\AnimAimOffset.h">
       <Filter>Source\Engine\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\ShaderLoader.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -478,5 +484,75 @@
     <ClCompile Include="Source\Engine\Animation\AnimLayeredBlendNode.cpp">
       <Filter>Source\Engine\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\ShaderLoader.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shader\SkyColor.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Skybox.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\PostProcess.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Common.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Lighting.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\MeshVertex.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\SkinnedVertex.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Shadow.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+    <None Include="Shader\Skinning.hlsli">
+      <Filter>Shader</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shader\SkyboxVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\SkyboxPS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\PostProcessVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\PostProcessPS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\MeshVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\MeshOutlineVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\SkinnedMeshVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\SkinnedMeshOutlineVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\SurfacePS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\OutlinePS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ShadowSkinnedVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
+    <FxCompile Include="Shader\ShadowVS.hlsl">
+      <Filter>Shader</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

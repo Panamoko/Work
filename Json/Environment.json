@@ -15,7 +15,7 @@
         "intensity": 0.6000000238418579,
         "shadowRange": 40.0,
         "saturation": 2.0,
-        "edgeEnabled": false,
+        "edgeEnabled": true,
         "edgeColor": {
             "x": 0.05000000074505806,
             "y": 0.05000000074505806,
@@ -23,7 +23,7 @@
         },
         "edgeThickness": 0.5,
         "edgeDepthThreshold": 0.5339999794960022,
-        "edgeNormalThreshold": 0.11500000208616257,
+        "edgeNormalThreshold": 0.3149999976158142,
         "edgeFadeDistance": 100.0
     }
 }

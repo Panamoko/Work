@@ -1,139 +1,26 @@
 #include "Engine/Graphics/PostProcess.h"
 #include "Engine/Graphics/RenderTexture.h"
-#include "Engine/Graphics/ShaderCommon.h"   // CompileShaderSource
-#include <string>
-
-#pragma comment(lib, "d3dcompiler.lib")
+#include "Engine/Graphics/ShaderLoader.h"
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
 namespace uel {
     namespace {
-        // HLSL 側の cbuffer PostCB と並びを一致させること。
+        // Shader/PostProcess.hlsli の cbuffer PostCB と、並び・型を必ず一致させること。
         struct PostCB {
             XMFLOAT4 grade;        // x=saturation, y=debugView(PostDebugView)
             XMFLOAT4 depth;        // x=proj._33, y=proj._43（深度を距離に戻す係数）, z=1/幅, w=1/高さ
             XMFLOAT4 edgeColor;    // rgb=輪郭線の色, a=有効なら 1
             XMFLOAT4 edgeParams;   // x=太さ(px), y=深度のしきい値, z=法線のしきい値, w=線を出す最大距離
         };
-
-        // 注意：HLSL の文字列の中には日本語コメントを書かない（ShaderCommon.h の冒頭を参照）。
-        const char* kPostHLSL = R"(
-cbuffer PostCB : register(b0) {
-    float4 grade;        // x=saturation, y=debug view (0=Final, 1=Normal, 2=Depth, 3=Edge)
-    float4 depth;        // x=proj._33, y=proj._43, z=1/width, w=1/height
-    float4 edgeColor;    // rgb=outline color, a=1 when enabled
-    float4 edgeParams;   // x=thickness (pixels), y=depth threshold, z=normal threshold, w=max distance
-};
-Texture2D    sceneTex  : register(t0);   // color
-Texture2D    normalTex : register(t1);   // rgb = world normal * 0.5 + 0.5, a = 1 where something was drawn
-Texture2D    depthTex  : register(t2);   // depth buffer value, 0 (near) .. 1 (far)
-SamplerState samp      : register(s0);
-
-struct VSOut { float4 pos : SV_POSITION; float2 uv : TEXCOORD; };
-
-// One big triangle that covers the whole screen. No vertex buffer: positions come from the vertex id.
-//   id 0 -> uv (0,0) top-left,  id 1 -> uv (2,0),  id 2 -> uv (0,2)
-VSOut VSMain(uint id : SV_VertexID) {
-    VSOut o;
-    float2 uv = float2((id << 1) & 2, id & 2);
-    o.pos = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
-    o.uv  = uv;
-    return o;
-}
-
-float RawDepth(float2 uv) { return depthTex.SampleLevel(samp, uv, 0).r; }
-
-// Depth buffer value -> distance from the camera along its forward axis (world units).
-// The depth buffer is not linear: most of its range is used up close. This undoes the projection.
-float ToDistance(float rawDepth) { return depth.y / (rawDepth - depth.x); }
-
-// 0 below the threshold, rising to 1 at 1.5 x threshold (a short ramp instead of a hard step).
-float OverThreshold(float value, float threshold) {
-    return saturate((value - threshold) / max(threshold * 0.5, 1e-5));
-}
-
-// ---- Edge detection ----
-// Returns 0 (no line) .. 1 (line) for one pixel, by comparing it with its neighbours in 4 directions.
-//
-// Depth: uses the "second difference" of the raw depth value: a + b - 2 * center,
-//   where a and b are the neighbours on opposite sides.
-//   The raw depth value changes at a constant rate across any flat surface, however steeply it is viewed,
-//   so this is exactly 0 on a floor or a wall and only becomes large where the depth jumps.
-//   (Comparing distances directly would draw false lines all over a floor seen at a shallow angle.)
-// Normal: 1 - dot(center, neighbour). 0 when they face the same way, 1 at a right angle.
-//   This finds creases where the depth is continuous, e.g. where a wall meets the floor.
-float EdgeAmount(float2 uv) {
-    float2 pixel = depth.zw * max(edgeParams.x, 0.5);
-
-    float  d0 = RawDepth(uv);
-    float  z  = ToDistance(d0);
-    float4 n0 = normalTex.SampleLevel(samp, uv, 0);
-    float3 nc = n0.rgb * 2.0 - 1.0;
-
-    static const float2 kDirs[4] = { float2(1.0, 0.0), float2(0.0, 1.0), float2(1.0, 1.0), float2(1.0, -1.0) };
-    float depthEdge  = 0.0;
-    float normalEdge = 0.0;
-    [unroll] for (int k = 0; k < 4; ++k) {
-        float2 o = kDirs[k] * pixel;
-
-        depthEdge = max(depthEdge, abs(RawDepth(uv + o) + RawDepth(uv - o) - 2.0 * d0));
-
-        float4 na = normalTex.SampleLevel(samp, uv + o, 0);
-        float4 nb = normalTex.SampleLevel(samp, uv - o, 0);
-        // a = 0 means sky (no normal there): the depth test handles those borders.
-        if (n0.a > 0.5 && na.a > 0.5) normalEdge = max(normalEdge, 1.0 - dot(nc, na.rgb * 2.0 - 1.0));
-        if (n0.a > 0.5 && nb.a > 0.5) normalEdge = max(normalEdge, 1.0 - dot(nc, nb.rgb * 2.0 - 1.0));
-    }
-
-    // Convert the raw depth difference into "size of the depth jump relative to the distance",
-    // so one threshold works both near and far.
-    float relativeJump = depthEdge * z / abs(depth.y);
-
-    float e = max(OverThreshold(relativeJump, edgeParams.y), OverThreshold(normalEdge, edgeParams.z));
-
-    // Far away, lines get too dense and flicker: fade them out before the max distance.
-    e *= 1.0 - smoothstep(edgeParams.w * 0.7, edgeParams.w, z);
-    return e;
-}
-
-float4 PSMain(VSOut i) : SV_TARGET {
-    int view = (int)(grade.y + 0.5);
-
-    // Debug views: show the buffers that the effects read.
-    if (view == 1) return float4(normalTex.SampleLevel(samp, i.uv, 0).rgb, 1.0);
-    if (view == 2) {
-        float g = saturate(ToDistance(RawDepth(i.uv)) / 50.0);   // black at the camera, white at 50 m and beyond
-        return float4(g, g, g, 1.0);
-    }
-    if (view == 3) {
-        float g = 1.0 - EdgeAmount(i.uv);                        // detected lines only: black on white
-        return float4(g, g, g, 1.0);
-    }
-
-    float3 c = sceneTex.SampleLevel(samp, i.uv, 0).rgb;
-
-    // Saturation: blend between the gray version and the original color.
-    float gray = dot(c, float3(0.299, 0.587, 0.114));
-    c = lerp(float3(gray, gray, gray), c, grade.x);
-
-    // Outline: drawn last so that its color is not changed by the grading above.
-    if (edgeColor.a > 0.5) c = lerp(c, edgeColor.rgb, EdgeAmount(i.uv));
-
-    return float4(saturate(c), 1.0);
-}
-)";
     }
 
     bool PostProcess::Initialize(ID3D11Device* device)
     {
-        const std::string source = kPostHLSL;
-        ComPtr<ID3DBlob> vsB, psB;
-        if (!CompileShaderSource(source, "post", "VSMain", "vs_5_0", vsB.GetAddressOf())) return false;
-        if (!CompileShaderSource(source, "post", "PSMain", "ps_5_0", psB.GetAddressOf())) return false;
-        if (FAILED(device->CreateVertexShader(vsB->GetBufferPointer(), vsB->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
-        if (FAILED(device->CreatePixelShader(psB->GetBufferPointer(), psB->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
+        // シェーダは Shader/PostProcessVS.hlsl・PostProcessPS.hlsl。ビルド時に Data/Shader/*.cso へコンパイルされる。
+        if (!CreateVertexShaderFromCso(device, "PostProcessVS", vs)) return false;
+        if (!CreatePixelShaderFromCso(device, "PostProcessPS", ps)) return false;
 
         D3D11_BUFFER_DESC bd = {};
         bd.Usage = D3D11_USAGE_DEFAULT; bd.ByteWidth = sizeof(PostCB); bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;

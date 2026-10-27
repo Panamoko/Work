@@ -1,47 +1,24 @@
 #include "Engine/Graphics/MeshShader.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Graphics/ShaderCommon.h"
-#include <string>
+#include "Engine/Graphics/ShaderLoader.h"
 #include <cstdint>
-
-#pragma comment(lib, "d3dcompiler.lib")
+#include <vector>
 
 using namespace DirectX;
 using Microsoft::WRL::ComPtr;
 
 namespace uel {
-    namespace {
-        // 静的メッシュ専用の部分（頂点シェーダだけ）。
-        // 定数バッファ・影・ピクセルシェーダは ShaderCommon.h の kShaderCommonHLSL にある。
-        // ToWorld でワールド位置と法線を求め、通常用とアウトライン用の両方で使う。
-        const char* kMeshVS = R"(
-struct VSIn { float3 pos:POSITION; float3 nrm:NORMAL; float4 col:COLOR; float2 uv:TEXCOORD; };
-void ToWorld(VSIn i, out float3 wpos, out float3 wnrm) {
-    wpos = mul(float4(i.pos, 1.0), world).xyz;
-    wnrm = mul(i.nrm, (float3x3)world);
-}
-PSIn VSMain(VSIn i)    { float3 p; float3 n; ToWorld(i, p, n); return MakePSIn(p, n, i.col, i.uv); }
-PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlinePSIn(p, n, i.col, i.uv); }
-)";
-    }
-
     bool MeshShader::Initialize(ID3D11Device* device)
     {
-        // 共通部分 ＋ 自分の頂点シェーダ、の順に連結する（PSIn が先に宣言されている必要がある）
-        const std::string source = std::string(kShaderCommonHLSL) + kMeshVS;
-
-        ComPtr<ID3DBlob> vsBlob, psBlob;
-        if (!CompileShaderSource(source, "mesh", "VSMain", "vs_5_0", vsBlob.GetAddressOf())) return false;
-        if (!CompileShaderSource(source, "mesh", "PSMain", "ps_5_0", psBlob.GetAddressOf())) return false;
-        if (FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, vs.GetAddressOf()))) return false;
-        if (FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, ps.GetAddressOf()))) return false;
-
-        // アウトライン用（頂点の形は同じなので、入力レイアウトは下の1つを共用する）
-        ComPtr<ID3DBlob> vsOutlineBlob, psOutlineBlob;
-        if (!CompileShaderSource(source, "mesh", "VSOutline", "vs_5_0", vsOutlineBlob.GetAddressOf())) return false;
-        if (!CompileShaderSource(source, "mesh", "PSOutline", "ps_5_0", psOutlineBlob.GetAddressOf())) return false;
-        if (FAILED(device->CreateVertexShader(vsOutlineBlob->GetBufferPointer(), vsOutlineBlob->GetBufferSize(), nullptr, vsOutline.GetAddressOf()))) return false;
-        if (FAILED(device->CreatePixelShader(psOutlineBlob->GetBufferPointer(), psOutlineBlob->GetBufferSize(), nullptr, psOutline.GetAddressOf()))) return false;
+        // シェーダは Shader/ の .hlsl（ビルド時に Data/Shader/*.cso へコンパイルされる）。
+        //   MeshVS / MeshOutlineVS … 静的メッシュの頂点（ワールドへの変換）。通常用とアウトライン用
+        //   SurfacePS / OutlinePS  … ピクセル（ライティング・Toon・材質 / アウトラインの単色）。スキンドと共用
+        std::vector<char> vsCode;   // 入力レイアウトを作るのに、頂点シェーダのバイトコードが要る
+        if (!CreateVertexShaderFromCso(device, "MeshVS", vs, &vsCode)) return false;
+        if (!CreatePixelShaderFromCso(device, "SurfacePS", ps)) return false;
+        if (!CreateVertexShaderFromCso(device, "MeshOutlineVS", vsOutline)) return false;   // 頂点の形は同じなので、入力レイアウトは下の1つを共用する
+        if (!CreatePixelShaderFromCso(device, "OutlinePS", psOutline)) return false;
 
         D3D11_INPUT_ELEMENT_DESC il[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,  0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -49,7 +26,7 @@ PSIn VSOutline(VSIn i) { float3 p; float3 n; ToWorld(i, p, n); return MakeOutlin
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 40, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         };
-        if (FAILED(device->CreateInputLayout(il, 4, vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), layout.GetAddressOf()))) return false;
+        if (FAILED(device->CreateInputLayout(il, 4, vsCode.data(), vsCode.size(), layout.GetAddressOf()))) return false;
 
         D3D11_BUFFER_DESC cbd = {};
         cbd.Usage = D3D11_USAGE_DEFAULT; cbd.ByteWidth = sizeof(ObjectCB); cbd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
