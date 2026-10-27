@@ -34,7 +34,7 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 - **既知の制限や割り切りも書く。**
 - **行を足す指示の見本には、足す行だけを載せる。** 前後の行も見せるときは「追加後はこうなる」と明記し、すでにある行（`ImGui::End();` など）が二重に貼られないようにする。
 - **1ファイルは 900 行以内を目安にする。** 超えそうなら、役割ごとに別ファイルへ分ける案を出す（今いちばん長いのは `InspectorPanel.cpp` の約 630 行）。
-- 説明は日本語。コード中のコメントも日本語でよい。**ただし HLSL の文字列の中は英語（ASCII）だけ**（理由は9章）。
+- 説明は日本語。コード中のコメントも日本語でよい（`.hlsl` / `.hlsli` も、**UTF-8（BOM なし）で保存するなら**日本語コメントでよい。理由は9章）。
 
 ### 画面に出す文字（ImGui）
 - **エディタの説明・ボタン・メッセージは日本語にする。** 文字列は必ず **`u8"..."`** で書く（Shift-JIS のファイルでも UTF-8 BOM のファイルでも正しく出る）。
@@ -47,10 +47,10 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 
 ### 出す前に、作業用フォルダで確かめる
 - 今の作業ツリーのファイルに変更を当てた複製を、**リポジトリの外の作業用フォルダ**に作ってビルドする。スクリプトは**絶対パス**で書き、リポジトリには書き込まない。終わったら `git status` でリポジトリが変わっていないことを確かめる。
-  - `Source/` と `Game.vcxproj` を複製し、`.vcxproj` の中の `External\...` を絶対パスに書き換えて、`MSBuild Game.vcxproj /p:SolutionDir=<複製先>\` でビルドする（Debug、必要なら Release も）。
-  - 画面を確かめるときは、`Data/Anim`・`Data/Prefabs`・`Data/Model`・`Json` と `imgui.ini` も複製して起動し、スクリーンショットを撮る（ウィンドウを 1920×1040 にして `PrintWindow`）。
-  - 確認のための仮のコード（起動時に Entity を選ぶ、など）は**複製にだけ**入れ、渡すファイルには入れない。
-  - HLSL を変えたときは `fxc` でも検証する。
+  - `Source/`・`Shader/`・`Game.vcxproj` を複製し、`.vcxproj` の中の `External\...` を絶対パスに書き換え、DirectXTex の `ProjectReference` を消して、`MSBuild Game.vcxproj /p:SolutionDir=<複製先>\` でビルドする（Debug、必要なら Release も）。新しい `.hlsl` を足すときは、複製の `.vcxproj` にだけ `FxCompile`（`ShaderType` 付き）を足す。
+  - 画面を確かめるときは、`Data/Anim`・`Data/Prefabs`・`Data/Model`・`Data/Font`・`Json` と `imgui.ini` も複製して起動し、スクリーンショットを撮る（ウィンドウを 1920×1040 にして `PrintWindow`）。**データは複製し直してから比べる**（古い複製の Prefab が Unlit のままで「影が消えた」と誤認したことがある。Prefab のインスタンスは Scene ではなく Prefab の内容で作り直される）。
+  - 確認のための仮のコード（起動時に Entity を選ぶ、90 フレーム後に Play を始める、など）は**複製にだけ**入れ、渡すファイルには入れない。
+  - HLSL を変えたときは `fxc` でも検証する。式を変えないつもりの整理なら、前後を `fxc /Fc` で逆アセンブルして、命令の行（コメント行を除く）が一致することを確かめる。
 - 「どこまで確かめたか（ビルドだけ／画面で確認／Play 中は未確認、など）」を必ず書く。
 
 ### エラー報告を受けたときの進め方
@@ -79,6 +79,7 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 | ファイルを分けたら `min` が見つからない | 元のファイルでは `d3d11.h` 経由の Windows の `min` マクロに頼っていた | `(std::min)(a, b)` と書き、`<algorithm>` を include する |
 | ドッキングの配置が崩れた | ウィンドウ名を日本語にした | ウィンドウ名は英語のまま |
 | 起動時にアサートで止まる | `AddFontFromFileTTF` に存在しないフォントを渡した | 先に `std::filesystem::exists` で確かめる |
+| `Illegal character in shader file`・`unexpected #endif`・「型 〇〇 を解決できません」 | VS で `.hlsl` を新規作成して中身を貼り付けたら、UTF-8 BOM 付き（や Shift-JIS）で保存された | `.hlsl` / `.hlsli` は作業用フォルダで UTF-8（BOM なし）で作り、`cp` コマンドでコピーしてもらう（9章） |
 
 ---
 
@@ -90,6 +91,7 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
   - ほとんどは **Shift-JIS（CP932）・CRLF**。ツールで読むと日本語コメントが文字化けして見えるが、壊れてはいない。
   - **UTF-8（BOM 付き）・CRLF** のもの：`Editor/` の `InspectorPanel.cpp` `EditorPanels.cpp` `AssetBrowserPanel.cpp` `ImGuiLayer.cpp` `AnimEditorPanels.cpp` `AnimGraphPanel.cpp` `AnimGraphCanvas.cpp` `AnimGraphStateMachineView.cpp` `AnimGraphPanelInternal.h`、`Serialization/StageSerializer.cpp`、`Animation/AnimBlendSpaceNode.*` `AnimationPose.h`、`Graphics/RenderTexture.h`。
   - 調べ方：先頭3バイトが `EF BB BF` なら UTF-8 BOM。貼り付けて保存するときに VS が「Unicode で保存しますか」と聞くことがある。
+  - **`Shader/` の `.hlsl` / `.hlsli` だけは別の決まり：UTF-8（BOM なし）**。BOM 付きは fxc がエラーにし、Shift-JIS は日本語コメントで行が消えることがある（9章）。※ 今は VS で貼り付けた分が Shift-JIS のまま残っている（`Common.hlsli` など。行末が `\` になる行は無いので動いている）。直すときは 9章のコマンドで UTF-8 に変換する。
 - 作業ディレクトリ（実行時のカレント）はプロジェクト直下。
   - アセットは `Data/` 以下（`kAssetRoot = "Data"`）。パスは `Data/Model/...` の形。
   - Scene の保存先は `Json/` 以下（`kSceneDir = "Json"`。パスは `SceneFilePath("Stage.json")` で作る）。
@@ -116,7 +118,22 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 ```
 git show 2df15d7:Source/AI/BehaviorTree.cpp
 ```
-**旧 `Shader/` フォルダ（`.hlsl` / `.hlsli`）と `Data/CompiledShader/` も削除済み。** HLSL は C++ 内の文字列を起動時にコンパイルしている（9章）。旧 Toon / PBR の実装は `git show 8781c76:Shader/ToonPS.hlsl` のように読める。
+**シェーダは `Shader/`（プロジェクト直下）の `.hlsl` / `.hlsli`。** ビルド時に VS（FxCompile）が `Data/Shader/<名前>.cso` へコンパイルし、実行時に `ShaderLoader` が読む（9章。コミット `f5ac873` で C++ 内の文字列から移した）。昔の別実装の Toon / PBR（`8781c76` で一度消したもの）は `git show 8781c76:Shader/ToonPS.hlsl` のように読める。移行前の文字列版は `git show 53f5734:Source/Engine/Graphics/ShaderCommon.h`。
+
+```
+Shader/
+  Common.hlsli         b0（ObjectCB）・t0/t1・s0/s1・PSIn・MakePSIn・MakeOutlinePSIn・PSOut（色＋法線の MRT）
+  Lighting.hlsli       影（ShadowFactor）・Toon の段階・テクスチャの単純化・ShadeSurface（見た目の式はここ）
+  SkyColor.hlsli       空の3色と SkyColor(dir)（空の描画と金属の映り込みで共用）
+  MeshVertex.hlsli     静的メッシュの VSIn と ToWorld
+  SkinnedVertex.hlsli  スキンドの VSIn と ToWorld（Skin を呼ぶ）
+  Skinning.hlsli       b1（Bones[128]）と Skin()（本描画と影で共用）
+  Shadow.hlsli         影パスの b0（ShadowCB）
+  Skybox.hlsli / PostProcess.hlsli   それぞれの cbuffer と VS→PS の構造体
+  MeshVS / MeshOutlineVS / SkinnedMeshVS / SkinnedMeshOutlineVS / ShadowVS / ShadowSkinnedVS /
+  SkyboxVS / PostProcessVS  (.hlsl, 頂点)
+  SurfacePS / OutlinePS / SkyboxPS / PostProcessPS  (.hlsl, ピクセル)
+```
 
 ```
 Source/Engine/
@@ -134,7 +151,8 @@ Source/Engine/
   Systems/       RenderSystem（描画）, AnimationSystem（毎フレームの姿勢の計算）
   Graphics/      GraphicsDevice, RenderTexture（シーン用／色だけ の2種類）, Mesh,
                  MeshShader, SkinnedMeshShader, SkinnedRenderModel,
-                 ShaderCommon（共通の HLSL と b0 の形）, ShadingParams（描き方のデータ）,
+                 ShaderCommon（b0 の C++ 側の形 ObjectCB と FillShading）, ShaderLoader（.cso の読み込み）,
+                 ShadingParams（描き方のデータ）,
                  EngineSkybox, EngineShadowMap, SceneLighting, PostProcess, PostProcessSettings
   Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache,
                  TinyGltfImpl（tinygltf / stb_image の実装の埋め込み。プロジェクトで1か所だけ）
@@ -333,22 +351,41 @@ Source/Engine/
 - 面の向き：**外から見て時計回りが表**（D3D の既定）。既定の立方体も、手持ちの GLB も、この向きで確認済み。カメラ行列はすべて左手系（`...LH`）。
 
 ### シェーダの持ち方
-- **HLSL は C++ 内の文字列**を、起動時に `D3DCompile` でコンパイルする（`vs_5_0` / `ps_5_0`）。`.hlsl` ファイルは無い。コンパイルは `ShaderCommon.h` の `CompileShaderSource` を通す（失敗すると VS の「出力」に `[Shader] compile failed: ...` とエラー内容が出る）。
-- **HLSL の文字列の中に日本語コメントを書かない。** Shift-JIS のファイルでは、文字によっては2バイト目が `\` になり、行末にあると次の行までコメント扱いになる。
-- **メッシュ用のシェーダは「共通部分＋各自の頂点シェーダ」を連結してコンパイルする。**
-  - 共通部分＝`ShaderCommon.h` の `kShaderCommonHLSL`：`b0` の宣言、`MakePSIn` / `MakeOutlinePSIn`、影、ライティング（`ShadeSurface`）、ピクセルシェーダ（`PSMain` / `PSOutline`）。
-  - 各自の部分＝`MeshShader.cpp` の `kMeshVS`、`SkinnedMeshShader.cpp` の `kSkinnedVS`：`VSIn` と `ToWorld`（ワールド位置と法線を求める。スキンドはここでスキニング）、`VSMain` / `VSOutline`。
-  - **見た目の式を変えるときは `ShaderCommon.h` だけ直せば、静的・スキンドの両方に効く。**
+- **HLSL は `Shader/` の `.hlsl` / `.hlsli`**（一覧は4章）。**ビルド時に** VS の FxCompile が `Data/Shader/<ファイル名>.cso` にコンパイルし、**実行時に** `ShaderLoader`（`CreateVertexShaderFromCso` / `CreatePixelShaderFromCso`）が読んでシェーダを作る。エンジンのコードに `D3DCompile` は残っていない（`d3dcompiler` を使うのは `imgui_impl_dx11.cpp` だけ）。
+  - プロジェクト全体の既定（`Game.vcxproj` の `ItemDefinitionGroup`）：Shader Model 5.0、出力 `Data\Shader\%(Filename).cso`、エントリ関数は既定の `main`。**1ファイル＝1シェーダ**で、どの `.hlsl` も関数名は `main`。
+  - **「シェーダーの種類」（頂点／ピクセル）はファイルごとのプロパティ**で、ユーザーが VS で設定する（Debug・Release の両方）。`.hlsli` は「ビルドに含めない」（`None`）。
+  - 新しい `.hlsl` を足す手順：作業用フォルダで UTF-8（BOM なし）で作る → ユーザーが `cp` でコピー → ソリューションエクスプローラーで追加 → プロパティで種類を設定。
+  - `.cso` が見つからないと、VS の「出力」に `[Shader] not found: Data/Shader/X.cso (...)` と出て、その部分が描かれない（空なら背景はクリア色のまま）。HLSL の文法エラーは**ビルドエラー**として出る（実行時ではない）。
+  - `Data/Shader/*.cso` は Git 管理下（ビルドで上書きされる）。
+- **`.hlsl` / `.hlsli` の文字コードは UTF-8（BOM なし）**。fxc で確かめた結果：
+  - **BOM 付き** → `error X3000: Illegal character in shader file`。`.hlsli` に BOM があると、それを include した側で `unexpected #endif` や「型を解決できません」になる。
+  - **Shift-JIS** → 日本語コメントの最後の文字の2バイト目が `\`（`表` `ソ` `能` など）だと、**次の行まで黙ってコメントになる**（エラーが出ないぶん危ない）。
+  - **VS で新規作成して貼り付けると BOM 付きか Shift-JIS になる。** だから貼り付けではなく、作業用フォルダのファイルを `cp` でコピーしてもらう。直すときは VS の「保存オプションの詳細設定」／「エンコード付きで保存」で「Unicode (UTF-8 シグネチャなし) - コードページ 65001」。
+  - まとめて変換するコマンド（UTF-8 として読めないファイルだけを Shift-JIS から変換する）：
+    ```
+    cd /c/Users/2240192/Desktop/Work/Shader && for f in *.hlsl *.hlsli; do if ! iconv -f UTF-8 -t UTF-8 "$f" >/dev/null 2>&1; then iconv -f CP932 -t UTF-8 "$f" > "$f.tmp" && mv "$f.tmp" "$f" && echo "converted: $f"; fi; done
+    ```
+- **メッシュ用のシェーダは `#include` で組み立てる。**
+  - 頂点シェーダ（`MeshVS` / `SkinnedMeshVS` と、それぞれの `...OutlineVS`）は、`MeshVertex.hlsli` / `SkinnedVertex.hlsli` の `ToWorld`（ワールド位置と法線。スキンドはここで `Skin()`）を呼び、`Common.hlsli` の `MakePSIn` / `MakeOutlinePSIn` で出力を作る。
+  - ピクセルシェーダは静的・スキンドで共通：`SurfacePS`（`ShadeSurface` の結果＋法線）、`OutlinePS`（単色＋法線）。
+  - **見た目の式を変えるときは `Lighting.hlsli` だけ直せば、静的・スキンドの両方に効く。**
+  - **影のスキニングも `Skinning.hlsli` の `Skin()` を使う**（本描画と同じ計算・同じ `palette`。影は姿勢に合わせて動く。確認済み）。
+- **C++ と HLSL で形をそろえる組**（片方だけ直すと値がずれる。並び・型・16 バイト境界を合わせる）：
+  - `ShaderCommon.h` の `ObjectCB` ⇔ `Common.hlsli` の `cbuffer ObjectCB`
+  - `SkinnedMeshShader.cpp` / `EngineShadowMap.cpp` の `BoneCB` ⇔ `Skinning.hlsli` の `cbuffer Bones`（128 個）
+  - `EngineShadowMap.cpp` の `SCB` ⇔ `Shadow.hlsli` の `cbuffer ShadowCB`
+  - `EngineSkybox.cpp` の `SkyCB` ⇔ `Skybox.hlsli`、`PostProcess.cpp` の `PostCB` ⇔ `PostProcess.hlsli`
+  - 入力レイアウト（`MeshShader.cpp` / `SkinnedMeshShader.cpp` / `EngineShadowMap.cpp`）⇔ 各 `VSIn` のセマンティクス。レイアウトは読み込んだ `.cso` のバイトコードで作る。
 - スロット：`b0`＝`ObjectCB`（オブジェクト＋ライト＋カメラ位置＋描き方）、`b1`＝ボーン、`t0`＝テクスチャ、`t1`＝シャドウマップ、`s0`＝通常（線形・繰り返し）、`s1`＝影用の比較サンプラ。ポストプロセスは別で、`b0`＝`PostCB`、`t0`＝色、`t1`＝法線、`t2`＝深度、`s0`＝ポイント・端で止める。
 - **描き方のデータの流れ**：`ShaderComponent`（Scene）が `ShadingParams`（Graphics）を1つ持つ → `RenderSystem` が取り出して `Draw` に渡す → `FillShading` が `ObjectCB` に詰める。Graphics 側は Component を知らない。
-- **描き方の項目を足すときに直す場所**：`ShadingParams.h` → `ShaderCommon.h`（`ObjectCB`・`FillShading`・HLSL の `cbuffer` と式の3つをそろえる）→ `InspectorPanel.cpp`（Inspector）→ `StageSerializer.cpp`（版を +1）。`MeshShader` / `SkinnedMeshShader` / `RenderSystem` は触らなくてよい。
+- **描き方の項目を足すときに直す場所**：`ShadingParams.h` → `ShaderCommon.h`（`ObjectCB`・`FillShading`）→ `Shader/Common.hlsli`（`cbuffer ObjectCB`）→ `Shader/Lighting.hlsli`（式）→ `InspectorPanel.cpp`（Inspector）→ `StageSerializer.cpp`（版を +1）。`MeshShader` / `SkinnedMeshShader` / `RenderSystem` は触らなくてよい。
 
 ### ライティングと材質（`ShadeSurface`）
 - **Lit**：`下地 ×（アンビエント＋平行光×影）` ＋ スペキュラ（Blinn-Phong）＋ リムライト ＋ 金属の映り込み。
 - **Unlit**：テクスチャ × 色そのまま。
 - **Toon**：ハーフランバートを `toonThreshold` で2色に分ける（陰には `toonShadeColor` を掛ける）。シャドウマップの影も同じ「陰の色」になる。スペキュラ・リムは 0.5 を境に2値化。任意でテクスチャの単純化（周り8点との平均 → 明るさを段階に丸める。色相は保つ）。
 - **metallic / roughness**（簡易版。PBR ではない）：metallic で下地の色（拡散）が消え、ハイライトと映り込みに下地の色が付く。roughness はハイライトの大きさ（`power = 2 / roughness^4 − 2`）と映り込みのぼけ。
-- **映り込みは空の色を式で計算している**（キューブマップは使っていない）。空の3色は `EngineSkybox.cpp` と `ShaderCommon.h` の2か所に同じ値を書いている。
+- **映り込みは空の色を式で計算している**（キューブマップは使っていない）。空の3色と式は `SkyColor.hlsli` の1か所だけ（空の描画 `SkyboxPS` と `Lighting.hlsli` の両方が include する）。
 - **アウトライン（背面法）**：`outlineWidth > 0` の Entity は、本描画の直後に同じ `Draw` の中でもう1回描く。法線方向に押し出した形を `CULL_FRONT`（裏面だけ）で単色描画。定数バッファもボーンも本描画のものを使う。太さはワールドの長さ。
 
 ### 描画の流れ（`ViewportPanel::RenderScene`）
@@ -356,12 +393,12 @@ Source/Engine/
 2. **`rt.Begin`**：シーン用の描画先（色・法線・深度）をクリアし、**色だけ**を描画先にする。
 3. **空**：色だけを描く（空のシェーダは法線を書かないため）。
 4. **`rt.BindSceneTargets`**：色＋法線の2枚を描画先にする（MRT）。
-5. **静的メッシュ → スキンドメッシュ**：`PSMain` / `PSOutline` が色（`SV_TARGET0`）とワールド法線（`SV_TARGET1`。`×0.5+0.5`、a=1 が「物がある」印）を同時に書く。
+5. **静的メッシュ → スキンドメッシュ**：`SurfacePS` / `OutlinePS` が色（`SV_TARGET0`）とワールド法線（`SV_TARGET1`。`×0.5+0.5`、a=1 が「物がある」印）を同時に書く。
 6. **ポストプロセス**：`postProcess.Apply(context, rt, finalRT, postSettings, proj)`。`rt` の色・法線・深度を読んで `finalRT` に書く。**Viewport に表示するのは `finalRT`。**
 
 - **`RenderTexture` は2種類**（`Create` の4つ目の引数 `forScene`）。`true`＝シーン用（色＋法線＋深度。3つとも SRV で読める。深度は `R24G8_TYPELESS` で作り、DSV と SRV で形式を分けている）、`false`＝色だけ（深度なし。`finalRT`）。
 - **同じテクスチャを読みながら書くことはできない。** だから描画先が2枚要る。`Apply` の最後で SRV を外している（次のフレームでまた描画先にするため）。
-- **ポストプロセスの中身**（`PostProcess.cpp`。画面を覆う三角形を1枚描く）：彩度 → エッジ検出の輪郭線（任意）。確認用の表示モード（完成 / 法線 / 深度 / エッジ）がある。
+- **ポストプロセスの中身**（`Shader/PostProcessPS.hlsl`。`PostProcess.cpp` が画面を覆う三角形を1枚描く）：彩度 → エッジ検出の輪郭線（任意）。確認用の表示モード（完成 / 法線 / 深度 / エッジ）がある。
 - **エッジ検出**：周り4方向と比べる。深度は「2階の差分（両隣の合計 − 中心の2倍）」を使う。深度バッファの生の値は平らな面の上で一定の割合で変わるので、床を浅い角度で見ても 0 になる。段差は距離に対する割合に直してからしきい値と比べる。法線は `1 − dot`。遠くの線は薄くして消す。
 - 深度から距離への変換は `proj._43 / (深度 − proj._33)`（near / far を別に渡さず、射影行列の要素から求める）。
 - グリッド・ギズモ・HP バーなどは ImGui で画像の上に重ねているので、ポストプロセスは掛からない。
@@ -381,14 +418,16 @@ Source/Engine/
 - **描画まわり**
   - `ShaderComponent` は Entity 単位。サブメッシュごと（鎧だけ金属、など）には分けられない。
   - glTF のメタリック／ラフネスは読んでいない。手持ちのモデルの値はほぼ変換ツールの既定値（0.2 / 0.8、または未指定）なので、読んでも部位の差は出ない。
-  - 金属の映り込みは空だけ（周りの物は映らない。屋内でも空が映る。影の中でも暗くならない）。空の色を2か所に書いている。
+  - 金属の映り込みは空だけ（周りの物は映らない。屋内でも空が映る。影の中でも暗くならない）。
   - 背面法のアウトラインは、太さがワールドの長さなので遠くで細くなる。角で法線が分かれているメッシュ（立方体）は角で線が途切れる。スケールがマイナスの Entity は塗りつぶされる。
   - エッジ検出の線にアンチエイリアスは無い。色の違いは見ていない。面ごとに法線が分かれたローポリは線が多く出る。
   - Toon の陰は2色だけ。`toonThreshold` を 0.5 より下げるなら `receiveShadow` を外す（自分の影で境目がガタつく）。
   - ライティングは LDR・ガンマ補正なしのまま。強さを上げすぎると白く飛ぶ。
-  - 影：「影の範囲」を広げると粗くなる（30m で約 1.5cm、60m で約 3cm 単位）。中心から光源側へ 25m より高い物は影を落とさない。Toon の影は2値化しているので、範囲の端でやや唐突に消える。シャドウマップの大きさ `2048` は HLSL の中（`texel = 1.0 / 2048.0`）にも書いてあり、変えるときは両方を直す。
-  - `ViewportPanel::Initialize` は各シェーダの `Initialize` の戻り値を見ていない（失敗しても起動は続き、その部分が描かれないだけ）。
-  - `EngineSkybox.cpp` の HLSL の文字列に日本語コメントが1行残っている（今は問題なく動いている）。
+  - 影：「影の範囲」を広げると粗くなる（30m で約 1.5cm、60m で約 3cm 単位）。中心から光源側へ 25m より高い物は影を落とさない。Toon の影は2値化しているので、範囲の端でやや唐突に消える。シャドウマップの大きさ `2048` は `Lighting.hlsli`（`texel = 1.0 / 2048.0`）にも書いてあり、変えるときは C++ と両方を直す。
+  - 影の形は光の角度で決まる。今の光の向き（-0.4, -1.0, 0.35）は高さ約 62° なので、影は足元に短くまとまり、手足の動きが分かりにくい。動きを見せたいなら Environment の「光の向き」で光を低くする（例：(-1.0, -0.45, 0.2) で約 24°、影は身長の約 2.3 倍）。
+  - 一人称のプレイヤーの影は、`fpHideBone` を潰した後の姿勢を使うので、頭が無い。
+  - `ViewportPanel::Initialize` は各シェーダの `Initialize` の戻り値を見ていない（`.cso` が無くても起動は続き、その部分が描かれないだけ）。
+  - シェーダのホットリロードは無い（`.hlsl` を変えたらビルドして起動し直す）。
 - `Data/Sprite/IBL/` に IBL 用の DDS が7つある（約 285MB、Git 管理下）が、**使っていない**。中身は屋外の実写 HDRI から作った正しい一式（キューブ 1024²・RGBA16F・ミップ付き、`specular_pmrem` は事前計算済み）。本格的な PBR をやるなら使えるが、Toon 路線とは絵が合わない。布用の3つ（`sheen_pmrem` / `lut_charlie` / `lut_sheen_e`）は使い道がない。
 - **アニメーション**
   - Blend Space は1軸だけ（2D は無い）。上半身だけ別の動き（ボーンごとのレイヤー）、ルートモーションは無い。
@@ -412,7 +451,8 @@ Source/Engine/
 
 - ~~本格的なシェーダ~~ → **一区切り済み**。残っている候補：
   - 部位ごとの材質（`ShaderComponent` をサブメッシュ単位に）
-  - HLSL を `Data/Shader/*.hlsl` に出して実行時に読む（ホットリロード）
+  - ~~HLSL をファイルに出す~~ → **済み**（`Shader/*.hlsl` → ビルドで `.cso`。コミット `f5ac873`）。残り：ホットリロード（実行中に `.hlsl` を `D3DCompile` し直す）
+  - metallic / roughness の見え方を直す（金属感とラフネスが期待と違う、とユーザーから指摘あり。次にやる）
 - ~~アニメーション（ブレンド、ステートマシンなど）~~ → **一区切り済み**（Animator、クロスフェード、ノードの木、Blend Space 1D、ステートマシン、ノードエディタ、通知、モンタージュ、グラフのアセット）。残っている候補：Blend Space 2D、上半身レイヤー、ルートモーション
 - ~~ファイルの分割・フォルダ整理・エディタの日本語化・FPS 固定~~ → **済み**
 - 当たり判定（ボーン追従のヒットボックスなど）
