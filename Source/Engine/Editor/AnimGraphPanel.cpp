@@ -58,7 +58,7 @@ namespace uel {
                 if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                     if (pl->Data) {
                         const std::string path = static_cast<const char*>(pl->Data);
-                        const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
+                        const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages, an->aim);
                         if (ok) { an->graphPath = path; reloaded = true; }
                         graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                         graphMsgTimer = 3.0f;
@@ -69,7 +69,7 @@ namespace uel {
             ImGui::SameLine();
             if (ImGui::Button(u8"保存")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
-                const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
+                const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages, an->aim);
                 if (ok) { an->graphPath = path; RequestAssetRescan(); }
                 graphMsg = ok ? u8"保存しました" : (an->graph ? u8"保存できませんでした（名前？）" : u8"保存するグラフがありません");
                 graphMsgTimer = 3.0f;
@@ -77,7 +77,7 @@ namespace uel {
             ImGui::SameLine();
             if (ImGui::Button(u8"読み込む")) {
                 const std::string path = AnimGraphPathFromName(an->graphPath);
-                const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
+                const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages, an->aim);
                 if (ok) { an->graphPath = path; reloaded = true; }
                 graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                 graphMsgTimer = 3.0f;
@@ -89,6 +89,78 @@ namespace uel {
             }
             else ImGui::TextDisabled(u8"（変更は「保存」を押すまで残りません）");
             return reloaded;
+        }
+
+        // =====================================================================
+        //  左の欄の下：エイムオフセット（視点の上下・左右に合わせて背骨を曲げる）
+        // =====================================================================
+        void DrawAimPane(AnimatorComponent* an, const SkinnedModel* model)
+        {
+            AnimAimOffset& a = an->aim;
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::TextUnformatted(u8"エイム（上半身の向き）");
+            ImGui::PushID("aim");
+            ImGui::Checkbox(u8"使う", &a.enabled);
+            if (a.enabled) {
+                // 骨を選ぶ（親子の段を字下げで見せる）
+                auto boneCombo = [&](const char* label, std::string& name) {
+                    ImGui::SetNextItemWidth(150.0f);
+                    if (ImGui::BeginCombo(label, name.empty() ? u8"（なし）" : name.c_str())) {
+                        if (model) {
+                            const auto& bones = model->skeleton.bones;
+                            std::vector<int> depth(bones.size(), 0);
+                            for (int i = 0; i < (int)bones.size(); ++i) {
+                                if (bones[i].parent >= 0 && bones[i].parent < i) depth[i] = depth[bones[i].parent] + 1;
+                                const std::string text = std::string(depth[i] * 2, ' ') + bones[i].name;
+                                ImGui::PushID(i);
+                                if (ImGui::Selectable(text.c_str(), bones[i].name == name)) name = bones[i].name;
+                                ImGui::PopID();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    };
+                // Float パラメータを選ぶ。選んだ名前のパラメータが無ければ、作るボタンを出す
+                auto floatParamCombo = [&](const char* label, std::string& name) {
+                    ImGui::SetNextItemWidth(150.0f);
+                    if (ImGui::BeginCombo(label, name.empty() ? u8"（なし）" : name.c_str())) {
+                        if (ImGui::Selectable(u8"（なし）", name.empty())) name.clear();
+                        for (int i = 0; i < (int)an->params.items.size(); ++i) {
+                            if (an->params.items[i].type != AnimParamType::Float) continue;
+                            ImGui::PushID(i);
+                            if (ImGui::Selectable(an->params.items[i].name.c_str(), an->params.items[i].name == name)) name = an->params.items[i].name;
+                            ImGui::PopID();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    if (!name.empty() && an->params.Find(name) < 0) {
+                        ImGui::PushID(label);
+                        if (ImGui::SmallButton((u8"パラメータ " + name + u8" を作る").c_str())) an->params.SetFloat(name, 0.0f);
+                        ImGui::PopID();
+                    }
+                    };
+
+                boneCombo(u8"曲げ始め", a.startBone);
+                boneCombo(u8"曲げ終わり", a.endBone);
+                std::vector<int> chain;
+                if (model && AimChain(model->skeleton, a, chain)) ImGui::TextDisabled(u8"曲げる骨：%d 本", (int)chain.size());
+                else ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), u8"曲げ始め → 曲げ終わり の順につながる骨を選んでください");
+
+                floatParamCombo(u8"上下の値", a.pitchParam);
+                ImGui::SetNextItemWidth(150.0f);
+                ImGui::DragFloat(u8"上下の最大", &a.maxPitch, 0.5f, 0.0f, 90.0f, u8"%.0f 度");
+                ImGui::Checkbox(u8"上下を反対に", &a.invertPitch);
+                floatParamCombo(u8"左右の値", a.yawParam);
+                ImGui::SetNextItemWidth(150.0f);
+                ImGui::DragFloat(u8"左右の最大", &a.maxYaw, 0.5f, 0.0f, 90.0f, u8"%.0f 度");
+                ImGui::Checkbox(u8"左右を反対に", &a.invertYaw);
+
+                const float p = a.pitchParam.empty() ? 0.0f : an->params.GetFloat(a.pitchParam, 0.0f);
+                const float y = a.yawParam.empty() ? 0.0f : an->params.GetFloat(a.yawParam, 0.0f);
+                ImGui::TextDisabled(u8"いま：上下 %.0f 度　左右 %.0f 度", p, y);
+            }
+            ImGui::PopID();
         }
 
         // =====================================================================
@@ -261,6 +333,7 @@ namespace uel {
                 ImGui::TextDisabled(u8"（変更は次の Play から反映）");
             }
             ImGui::PopID();
+            DrawAimPane(an, model);         // エイムオフセット
             ImGui::EndChild();
         }
 

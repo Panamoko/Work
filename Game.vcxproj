@@ -127,6 +127,7 @@
     <ClInclude Include="External\ImGuizmo\ImSequencer.h" />
     <ClInclude Include="External\SphereCast\Include\SphereCast.h" />
     <ClInclude Include="Source\Engine\AI\EngineNavGrid.h" />
+    <ClInclude Include="Source\Engine\Animation\AnimAimOffset.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationClip.h" />
     <ClInclude Include="Source\Engine\Animation\AnimationPose.h" />
     <ClInclude Include="Source\Engine\Animation\AnimBlendSpaceNode.h" />

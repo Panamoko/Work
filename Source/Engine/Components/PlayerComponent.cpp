@@ -1,4 +1,4 @@
-#include "Engine/Components/PlayerComponent.h"
+ï»¿#include "Engine/Components/PlayerComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/InputState.h"
 #include "Engine/Scene/World.h"
@@ -31,9 +31,9 @@ namespace uel {
         if (hitMarker > 0.0f) hitMarker -= dt;
         auto* myHp = self.GetComponent<HPComponent>();
         const bool isDead = (myHp && myHp->hp <= 0.0f);
-        const bool canAct = in.enabled && !isDead;   // €–S’†‚Í‘€ì•s‰Â
+        const bool canAct = in.enabled && !isDead;   //    S   Í‘   s  
 
-        // ‘ÎÛƒƒbƒVƒ…æ“¾iassetId‹ó‚Íè‘±‚«—§•û‘Ìj
+        //  ÎÛƒ  b V   æ“¾ iassetId  Íè‘±       Ìj
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
             auto* gm = ge->GetComponent<MeshRendererComponent>();
             if (!gm) return nullptr;
@@ -41,7 +41,7 @@ namespace uel {
                 : ctx.meshCache.GetOrLoad(ctx.device, gm->assetId);
             };
 
-        // Œ©‰ñ‚µ
+        //     
         if (canAct && in.lookActive) {
             t->rotationEuler.y += in.mouseDX * 0.15f;
             pitch -= in.mouseDY * 0.004f;
@@ -53,7 +53,7 @@ namespace uel {
         float yaw = XMConvertToRadians(t->rotationEuler.y);
         float sy = sinf(yaw), cy = cosf(yaw);
 
-        // ˆÚ“®—Ê
+        //  Ú“   
         float dx = 0.0f, dz = 0.0f;
         float speed = moveSpeed * dt;
         if (canAct) {
@@ -63,7 +63,7 @@ namespace uel {
             if (in.keyA) { dx -= cy * speed; dz += sy * speed; }
         }
 
-        // •Çi…•½ƒŒƒCAselfœŠOAƒXƒ‰ƒCƒhj
+        //  Çi       C Aself   O A X   C h j
         const float bodyH = 0.5f;
         auto wallBlocked = [&](float ox, float oz) -> bool {
             float len = sqrtf(ox * ox + oz * oz);
@@ -88,7 +88,7 @@ namespace uel {
         if (!wallBlocked(dx, dz)) { t->position.x += dx; t->position.z += dz; }
         else { if (!wallBlocked(dx, 0)) t->position.x += dx; if (!wallBlocked(0, dz)) t->position.z += dz; }
 
-        // ’n–Ê‚‚³
+        //  n Ê   
         float ground = groundY;
         for (const auto& slot : ctx.world.Slots()) {
             if (!slot) continue; Entity* ge = slot.get();
@@ -104,7 +104,7 @@ namespace uel {
                 if (gy <= t->position.y + eyeHeight && gy > ground) ground = gy;
         }
 
-        // d—ÍEÚ’nEƒWƒƒƒ“ƒv
+        //  d ÍE Ú’n E W     v
         bool grounded = (t->position.y <= ground + 0.001f);
         const bool jumped = grounded && canAct && in.jumpPressed;
         if (jumped) velY = 6.0f;
@@ -112,7 +112,7 @@ namespace uel {
         t->position.y += velY * dt;
         if (t->position.y < ground) { t->position.y = ground; velY = 0.0f; }
 
-        // ËŒ‚i‘O•ûƒŒƒCA“–‚½‚Á‚½Entity‚ğÔ‚­j
+        //  ËŒ  i O     C A        Entity  Ô‚  j
         float cp = cosf(pitch), sp = sinf(pitch);
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
         const bool shot = canAct && in.shootClicked;
@@ -120,7 +120,7 @@ namespace uel {
             XMFLOAT3 rd = { cp * sy, sp, cp * cy };
             const float baseDamage = 34.0f;
 
-            // (1) ƒqƒbƒgƒ{ƒbƒNƒXi“·‘ÌƒJƒvƒZƒ‹{“ª‚Ì‹…j
+            // (1)  q b g { b N X i   ÌƒJ v Z   {   Ì‹  j
             Entity* hbE = nullptr; float hbT = 1000.0f; bool head = false;
             for (const auto& slot : ctx.world.Slots()) {
                 if (!slot) continue; Entity* ge = slot.get();
@@ -128,20 +128,20 @@ namespace uel {
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* hb = ge->GetComponent<HitboxComponent>();
                 if (!gt || !hb) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // “|‚ê‚Ä‚¢‚éÅ’†‚Ì“G‚É‚Í“–‚½‚ç‚È‚¢
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   //  |  Ä‚   Å’  Ì“G É‚Í“     È‚ 
                 auto ws = hb->GetWorldShapes(*gt);
                 float tt;
                 if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
                 if (RayCapsule(eyePos, rd, ws.bodyA, ws.bodyB, ws.bodyR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = false; }
             }
 
-            // (2) ƒƒbƒVƒ…i•ÇE°‚È‚Ç‚ÌÕ•Á•¨Bƒqƒbƒgƒ{ƒbƒNƒX‚ğ‚Â‚à‚Ì‚Íƒqƒbƒgƒ{ƒbƒNƒX‚Å”»’èÏ‚İ‚È‚Ì‚ÅœŠOj
+            // (2)    b V   i ÇE   È‚Ç‚ÌÕ•    B q b g { b N X    Â‚ Ì‚Íƒq b g { b N X Å”   Ï‚İ‚È‚Ì‚Å  O j
             Entity* meshE = nullptr; float meshT = 1000.0f;
             for (const auto& slot : ctx.world.Slots()) {
                 if (!slot) continue; Entity* ge = slot.get();
                 if (ge == &self) continue;
                 if (ge->GetComponent<HitboxComponent>()) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // “|‚ê‚Ä‚¢‚éÅ’†‚Ì“G‚É‚Í“–‚½‚ç‚È‚¢
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   //  |  Ä‚   Å’  Ì“G É‚Í“     È‚ 
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
                 bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
@@ -154,7 +154,7 @@ namespace uel {
                 if (RaycastMesh(*mp, gw, eyePos, rd, meshT, tt)) { meshT = tt; meshE = ge; }
             }
 
-            // (3) ‹ß‚¢‚Ù‚¤‚É“–‚½‚éi•Ç‚ÌŒü‚±‚¤‚Ìƒqƒbƒgƒ{ƒbƒNƒX‚É‚Í“–‚½‚ç‚È‚¢j
+            // (3)  ß‚  Ù‚  É“     i Ç‚ÌŒ      Ìƒq b g { b N X É‚Í“     È‚  j
             Entity* hitE = nullptr; float mul = 1.0f; bool headHit = false;
             if (hbE && hbT <= meshT) {
                 hitE = hbE; headHit = head;
@@ -166,25 +166,25 @@ namespace uel {
                 if (auto* hpc = hitE->GetComponent<HPComponent>()) {
                     hitMarker = 0.15f;
                     lastHeadshot = headHit;
-                    hpc->hp -= baseDamage * mul;                        // ƒ_ƒ[ƒWi“ª‚Í”{—¦j
+                    hpc->hp -= baseDamage * mul;                        //  _   [ W i   Í”{   j
                     if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
-                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // ”í’e•\¦iÔ‚İj
+                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        //   e \   i Ô‚İj
                     if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
                         sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };
-                    // Œ‚”jF“GiOpponentComponentj‚ÍA©•ª‚Å€–SƒAƒjƒ‚ğÄ¶‚µ‚Ä‚©‚çÁ‚¦‚éB‚»‚êˆÈŠO‚ÍA‚»‚Ìê‚ÅÁ‚·
+                    //    j F G iOpponentComponent j ÍA     Å  S A j    Ä    Ä‚        B    ÈŠO ÍA   Ì Å   
                     if (hpc->hp <= 0.0f && !hitE->GetComponent<OpponentComponent>())
                         ctx.world.DestroyEntity(hitE->id);
                 }
             }
         }
 
-        // ---- ƒAƒjƒ[ƒVƒ‡ƒ“‚ÖF‚¢‚Ü‚Ìó‘Ô‚ğ“n‚·iƒOƒ‰ƒt‚É“¯‚¶–¼‘O‚Ìƒpƒ‰ƒ[ƒ^‚ª‚ ‚é‚Æ‚«‚¾‚¯‘‚­j----
+        // ----  A j   [ V     ÖF   Ü‚Ì Ô‚ n   i O   t É“      O Ìƒp     [ ^      Æ‚          j----
         if (AnimatorComponent* an = self.GetComponent<AnimatorComponent>()) {
-            // ÀÛ‚É“®‚¢‚½—Êi•Ç‚É~‚ß‚ç‚ê‚½‚Ô‚ñ‚ÍŠÜ‚Ü‚È‚¢j‚©‚çA‘¬‚³‚ÆŒü‚«‚ğ‹‚ß‚é
+            //    Û‚É“      Êi Ç‚É~ ß‚ ê‚½ Ô‚ ÍŠÜ‚Ü‚È‚  j    A     ÆŒ       ß‚ 
             const float mx = t->position.x - beforeX, mz = t->position.z - beforeZ;
             const float inv = (dt > 1e-6f) ? 1.0f / dt : 0.0f;
             const float moved = sqrtf(mx * mx + mz * mz) * inv;                     // m/s
-            // ‘Ì‚ÌŒü‚«‚©‚çŒ©‚½•ûŒüi‰E‚ª +XA‘O‚ª +YjB‘S‘¬‚Å 1 ‚É‚È‚é‚æ‚¤‚É moveSpeed ‚ÅŠ„‚é
+            //  Ì‚ÌŒ      çŒ©       i E   +X A O   +Y j B S     1  É‚È‚ æ‚¤   moveSpeed  ÅŠ   
             const float norm = (moveSpeed > 1e-4f) ? inv / moveSpeed : 0.0f;
             float localX = (mx * cy - mz * sy) * norm;
             float localY = (mx * sy + mz * cy) * norm;
@@ -196,11 +196,12 @@ namespace uel {
             an->params.SetIfExists(kAnimMoveY, localY);
             an->params.SetIfExists(kAnimGrounded, (t->position.y <= ground + 0.001f) ? 1.0f : 0.0f);
             an->params.SetIfExists(kAnimDead, isDead ? 1.0f : 0.0f);
-            if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // TriggerF’µ‚ñ‚¾
-            if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // TriggerFŒ‚‚Á‚½
+            an->params.SetIfExists(kAnimAimPitch, XMConvertToDegrees(pitch));        //    _ Ìã‰º i x j
+            if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger F    
+            if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger F      
         }
 
-        // ƒJƒƒ‰
+        //  J    
         XMVECTOR look = XMVectorSet(cp * sy, sp, cp * cy, 0);
         XMVECTOR up = XMVectorSet(0, 1, 0, 0);
         XMVECTOR eye = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 0);

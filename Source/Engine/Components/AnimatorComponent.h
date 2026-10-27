@@ -4,6 +4,7 @@
 #include "Engine/Animation/AnimParams.h"
 #include "Engine/Animation/AnimNode.h"
 #include "Engine/Animation/AnimMontage.h"
+#include "Engine/Animation/AnimAimOffset.h"
 
 namespace uel {
 
@@ -31,6 +32,7 @@ namespace uel {
         AnimNodePtr graph;          // 根のノード。入っていれば、こちらが姿勢を決める
         std::string graphPath;      // グラフのアセットのパス（Data/Anim/<名前>.animgraph.json）。空なら未保存
         std::vector<AnimMontage> montages;  // モンタージュの定義（グラフのアセットに一緒に保存する）
+        AnimAimOffset aim;                  // エイムオフセット（視点の上下に合わせて背骨を曲げる。グラフのアセットに一緒に保存する）
 
 
         // ---- 通知（実行時だけ。保存しない）----

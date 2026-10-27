@@ -387,7 +387,7 @@ namespace uel {
                         if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_ANIMGRAPH")) {
                             if (pl->Data) {
                                 const std::string path = static_cast<const char*>(pl->Data);
-                                const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages);
+                                const bool ok = LoadAnimGraph(path, an->params, an->graph, an->montages, an->aim);
                                 if (ok) an->graphPath = path;
                                 graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                                 graphMsgTimer = 3.0f;
@@ -397,7 +397,7 @@ namespace uel {
                     }
                     if (ImGui::SmallButton(u8"グラフを保存")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
-                        const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages);
+                        const bool ok = an->graph && !path.empty() && SaveAnimGraph(path, an->params, an->graph.get(), an->montages, an->aim);
                         if (ok) { an->graphPath = path; RequestAssetRescan(); }
                         graphMsg = ok ? u8"保存しました" : (an->graph ? u8"保存できませんでした（名前？）" : u8"保存するグラフがありません");
                         graphMsgTimer = 3.0f;
@@ -405,7 +405,7 @@ namespace uel {
                     ImGui::SameLine();
                     if (ImGui::SmallButton(u8"グラフを読み込む")) {
                         const std::string path = AnimGraphPathFromName(an->graphPath);
-                        const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages);
+                        const bool ok = !path.empty() && LoadAnimGraph(path, an->params, an->graph, an->montages, an->aim);
                         if (ok) an->graphPath = path;
                         graphMsg = ok ? u8"読み込みました" : u8"読み込めませんでした（ファイル？）";
                         graphMsgTimer = 3.0f;

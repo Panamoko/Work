@@ -277,7 +277,7 @@ namespace uel {
                 auto* an = e.AddComponent<AnimatorComponent>();
                 an->clipIndex = ed.anClip; an->speed = ed.anSpeed; an->loop = ed.anLoop; an->blendTime = ed.anBlendTime;
                 an->graphPath = ed.anGraph;
-                if (!an->graphPath.empty()) LoadAnimGraph(an->graphPath, an->params, an->graph, an->montages);    // ファイルが無ければ、クリップ1つの再生になる
+                if (!an->graphPath.empty()) LoadAnimGraph(an->graphPath, an->params, an->graph, an->montages, an->aim);    // ファイルが無ければ、クリップ1つの再生になる
             }
         }
 

@@ -156,7 +156,8 @@ namespace uel {
             else                 EvaluateSingleClip(*sk, cpu, dt, pose);
             if (an) {
                 ApplyMontage(*an, cpu, dt, pose, scratch);  // モンタージュを上に重ねる（再生していなければ何もしない）
-                an->finalPose = pose;                       // 次にモンタージュへ割り込んだとき、ここから混ぜる
+                ApplyAimOffset(cpu.skeleton, an->aim, an->params, pose);   // 視点の上下に合わせて背骨を曲げる（有効なときだけ）
+                an->finalPose = pose;                      // 次にモンタージュへ割り込んだとき、ここから混ぜる
             }
             // 一人称のとき：指定した骨（頭など）を潰して、カメラの前に自分の頭が映らないようにする。
 // スケールをほぼ 0 にすると、その骨と子の骨（髪や顔）に付いた頂点が1点に集まり、描かれなくなる

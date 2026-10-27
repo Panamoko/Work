@@ -28,6 +28,7 @@ namespace uel {
         static constexpr const char* kAnimJump = "Jump";            // Trigger：跳んだ
         static constexpr const char* kAnimAttack = "Attack";        // Trigger：撃った
         static constexpr const char* kAnimDead = "Dead";            // Bool   ：HP が 0
+        static constexpr const char* kAnimAimPitch = "AimPitch";    // Float  ：視点の上下の角度（度。上が +）。エイムオフセットが使う
     private:
         float pitch = 0.0f;
         float velY = 0.0f;

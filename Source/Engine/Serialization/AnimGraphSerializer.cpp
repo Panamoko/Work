@@ -22,7 +22,8 @@ namespace uel {
         //   4 … モンタージュの定義（montages）
         //   5 … モンタージュの重ねる範囲（maskBone / maskBlendDepth）
         //   6 … LayeredBlend ノード（骨ごとに2つの姿勢を混ぜる）
-        constexpr int kAnimGraphVersion = 6;
+        //   7 … エイムオフセット（aim）
+        constexpr int kAnimGraphVersion = 7;
         int g_loadVersion = kAnimGraphVersion;     // 読み込み中のファイルの版（保存するときは最新）
 
         struct ParamDTO {
@@ -40,6 +41,14 @@ namespace uel {
         struct NotifyDTO {
             float time = 0.0f; std::string name;
             template<class A> void serialize(A& ar) { ar(CEREAL_NVP(time), CEREAL_NVP(name)); }
+        };
+        struct AimDTO {
+            bool enabled = false; std::string startBone, endBone, pitchParam = "AimPitch", yawParam;
+            float maxPitch = 60.0f, maxYaw = 60.0f; bool invertPitch = false, invertYaw = false;
+            template<class A> void serialize(A& ar) {
+                ar(CEREAL_NVP(enabled), CEREAL_NVP(startBone), CEREAL_NVP(endBone), CEREAL_NVP(pitchParam), CEREAL_NVP(yawParam),
+                    CEREAL_NVP(maxPitch), CEREAL_NVP(maxYaw), CEREAL_NVP(invertPitch), CEREAL_NVP(invertYaw));
+            }
         };
         struct MontageDTO {
             std::string name, clip;
@@ -204,7 +213,7 @@ namespace uel {
         return std::string(kAssetRoot) + "/Anim/" + nameOrPath + ".animgraph.json";
     }
 
-    bool SaveAnimGraph(const std::string& path, const AnimParams& params, const AnimNode* root, const std::vector<AnimMontage>& montages)
+    bool SaveAnimGraph(const std::string& path, const AnimParams& params, const AnimNode* root, const std::vector<AnimMontage>& montages, const AnimAimOffset& aim)
     {
         if (path.empty() || !root) return false;
 
@@ -225,6 +234,10 @@ namespace uel {
             for (const auto& nt : m.notifies) d.notifies.push_back({ nt.time, nt.name });
             md.push_back(std::move(d));
         }
+        AimDTO ad;
+        ad.enabled = aim.enabled; ad.startBone = aim.startBone; ad.endBone = aim.endBone;
+        ad.pitchParam = aim.pitchParam; ad.yawParam = aim.yawParam; ad.maxPitch = aim.maxPitch; ad.maxYaw = aim.maxYaw;
+        ad.invertPitch = aim.invertPitch; ad.invertYaw = aim.invertYaw;
 
         std::ofstream ofs(path);
         if (!ofs) return false;
@@ -234,11 +247,12 @@ namespace uel {
         ar(cereal::make_nvp("version", version),
             cereal::make_nvp("params", pd),
             cereal::make_nvp("root", rd),
-            cereal::make_nvp("montages", md));
+            cereal::make_nvp("montages", md),
+            cereal::make_nvp("aim", ad));
         return true;    // ar が破棄されるときに書き出される
     }
 
-    bool LoadAnimGraph(const std::string& path, AnimParams& params, AnimNodePtr& root, std::vector<AnimMontage>& montages)
+    bool LoadAnimGraph(const std::string& path, AnimParams& params, AnimNodePtr& root, std::vector<AnimMontage>& montages, AnimAimOffset& aim)
     {
         std::ifstream ifs(path);
         if (!ifs) return false;
@@ -247,6 +261,7 @@ namespace uel {
         std::vector<ParamDTO> pd;
         std::vector<NodeDTO> rd;
         std::vector<MontageDTO> md;
+        AimDTO ad;
         try {
             cereal::JSONInputArchive ar(ifs);
             ar(cereal::make_nvp("version", version));
@@ -254,6 +269,7 @@ namespace uel {
             ar(cereal::make_nvp("params", pd),
                 cereal::make_nvp("root", rd));
             if (version >= 4) ar(cereal::make_nvp("montages", md));
+            if (version >= 7) ar(cereal::make_nvp("aim", ad));
         }
         catch (...) {
             g_loadVersion = kAnimGraphVersion;
@@ -279,6 +295,10 @@ namespace uel {
             for (const auto& nd : d.notifies) m.notifies.push_back({ nd.time, nd.name });
             montages.push_back(std::move(m));
         }
+        aim = AnimAimOffset{};                  // 版 6 以前のファイルには無い：使わない（enabled = false）
+        aim.enabled = ad.enabled; aim.startBone = ad.startBone; aim.endBone = ad.endBone;
+        aim.pitchParam = ad.pitchParam; aim.yawParam = ad.yawParam; aim.maxPitch = ad.maxPitch; aim.maxYaw = ad.maxYaw;
+        aim.invertPitch = ad.invertPitch; aim.invertYaw = ad.invertYaw;
         return true;
     }
 
