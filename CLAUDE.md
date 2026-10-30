@@ -79,7 +79,7 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 | ファイルを分けたら `min` が見つからない | 元のファイルでは `d3d11.h` 経由の Windows の `min` マクロに頼っていた | `(std::min)(a, b)` と書き、`<algorithm>` を include する |
 | ドッキングの配置が崩れた | ウィンドウ名を日本語にした | ウィンドウ名は英語のまま |
 | 起動時にアサートで止まる | `AddFontFromFileTTF` に存在しないフォントを渡した | 先に `std::filesystem::exists` で確かめる |
-| `Illegal character in shader file`・`unexpected #endif`・「型 〇〇 を解決できません」 | VS で `.hlsl` を新規作成して中身を貼り付けたら、UTF-8 BOM 付き（や Shift-JIS）で保存された | `.hlsl` / `.hlsli` は作業用フォルダで UTF-8（BOM なし）で作り、`cp` コマンドでコピーしてもらう（9章） |
+| `Illegal character in shader file`・`unexpected #endif`・「型 〇〇 を解決できません」 | VS で `.hlsl` を新規作成して中身を貼り付けたら、UTF-8 BOM 付き（や Shift-JIS）で保存された | コードは本文に全部載せる（ユーザーは VS で追加してコピペする）。HLSL は「貼った後、エンコード付きで保存 → UTF-8 シグネチャなし」まで手順に書き、確かめ方も添える（9章） |
 
 ---
 
@@ -354,13 +354,13 @@ Source/Engine/
 - **HLSL は `Shader/` の `.hlsl` / `.hlsli`**（一覧は4章）。**ビルド時に** VS の FxCompile が `Data/Shader/<ファイル名>.cso` にコンパイルし、**実行時に** `ShaderLoader`（`CreateVertexShaderFromCso` / `CreatePixelShaderFromCso`）が読んでシェーダを作る。エンジンのコードに `D3DCompile` は残っていない（`d3dcompiler` を使うのは `imgui_impl_dx11.cpp` だけ）。
   - プロジェクト全体の既定（`Game.vcxproj` の `ItemDefinitionGroup`）：Shader Model 5.0、出力 `Data\Shader\%(Filename).cso`、エントリ関数は既定の `main`。**1ファイル＝1シェーダ**で、どの `.hlsl` も関数名は `main`。
   - **「シェーダーの種類」（頂点／ピクセル）はファイルごとのプロパティ**で、ユーザーが VS で設定する（Debug・Release の両方）。`.hlsli` は「ビルドに含めない」（`None`）。
-  - 新しい `.hlsl` を足す手順：作業用フォルダで UTF-8（BOM なし）で作る → ユーザーが `cp` でコピー → ソリューションエクスプローラーで追加 → プロパティで種類を設定。
+  - 新しい `.hlsl` を足す手順：ユーザーが VS で追加して中身を貼る → 「エンコード付きで保存」で UTF-8（シグネチャなし）にする → プロパティで種類を設定。
   - `.cso` が見つからないと、VS の「出力」に `[Shader] not found: Data/Shader/X.cso (...)` と出て、その部分が描かれない（空なら背景はクリア色のまま）。HLSL の文法エラーは**ビルドエラー**として出る（実行時ではない）。
   - `Data/Shader/*.cso` は Git 管理下（ビルドで上書きされる）。
 - **`.hlsl` / `.hlsli` の文字コードは UTF-8（BOM なし）**。fxc で確かめた結果：
   - **BOM 付き** → `error X3000: Illegal character in shader file`。`.hlsli` に BOM があると、それを include した側で `unexpected #endif` や「型を解決できません」になる。
   - **Shift-JIS** → 日本語コメントの最後の文字の2バイト目が `\`（`表` `ソ` `能` など）だと、**次の行まで黙ってコメントになる**（エラーが出ないぶん危ない）。
-  - **VS で新規作成して貼り付けると BOM 付きか Shift-JIS になる。** だから貼り付けではなく、作業用フォルダのファイルを `cp` でコピーしてもらう。直すときは VS の「保存オプションの詳細設定」／「エンコード付きで保存」で「Unicode (UTF-8 シグネチャなし) - コードページ 65001」。
+  - **VS で新規作成して貼り付けると BOM 付きか Shift-JIS になる。** 貼った後に「ファイル → 名前を付けて保存 →『上書き保存』の▼ → エンコード付きで保存」で「Unicode (UTF-8 シグネチャなし) - コードページ 65001」を選んで保存してもらう（コードは本文に載せ、ユーザーがコピペする流れ）。
   - まとめて変換するコマンド（UTF-8 として読めないファイルだけを Shift-JIS から変換する）：
     ```
     cd /c/Users/2240192/Desktop/Work/Shader && for f in *.hlsl *.hlsli; do if ! iconv -f UTF-8 -t UTF-8 "$f" >/dev/null 2>&1; then iconv -f CP932 -t UTF-8 "$f" > "$f.tmp" && mv "$f.tmp" "$f" && echo "converted: $f"; fi; done

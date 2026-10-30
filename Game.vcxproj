@@ -170,8 +170,10 @@
     <ClInclude Include="Source\Engine\Editor\ViewportPanel.h" />
     <ClInclude Include="Source\Engine\Game\GameContext.h" />
     <ClInclude Include="Source\Engine\Game\GameFlow.h" />
+    <ClInclude Include="Source\Engine\Graphics\DdsTexture.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineShadowMap.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h" />
+    <ClInclude Include="Source\Engine\Graphics\EnvironmentMap.h" />
     <ClInclude Include="Source\Engine\Graphics\GraphicsDevice.h" />
     <ClInclude Include="Source\Engine\Graphics\Mesh.h" />
     <ClInclude Include="Source\Engine\Graphics\MeshShader.h" />
@@ -234,8 +236,10 @@
     <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp" />
     <ClCompile Include="Source\Engine\Editor\InspectorPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\ViewportPanel.cpp" />
+    <ClCompile Include="Source\Engine\Graphics\DdsTexture.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineShadowMap.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp" />
+    <ClCompile Include="Source\Engine\Graphics\EnvironmentMap.cpp" />
     <ClCompile Include="Source\Engine\Graphics\GraphicsDevice.cpp" />
     <ClCompile Include="Source\Engine\Graphics\Mesh.cpp" />
     <ClCompile Include="Source\Engine\Graphics\MeshShader.cpp" />

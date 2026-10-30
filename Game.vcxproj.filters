@@ -317,6 +317,12 @@
     <ClInclude Include="Source\Engine\Graphics\ShaderLoader.h">
       <Filter>Source\Engine\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\DdsTexture.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\EnvironmentMap.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -485,6 +491,12 @@
       <Filter>Source\Engine\Animation</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Graphics\ShaderLoader.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\DdsTexture.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\EnvironmentMap.cpp">
       <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
   </ItemGroup>

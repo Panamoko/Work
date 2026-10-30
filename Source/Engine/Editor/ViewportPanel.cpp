@@ -40,6 +40,7 @@ namespace uel {
         DirectX::XMStoreFloat4x4(&proj, DirectX::XMMatrixIdentity());
         cubeMesh = Mesh::CreateCube(device);
         skybox.Initialize(device);
+        envMap.Initialize(device);   // Data/Sprite/IBL/skybox.dds
         shadowMap.Initialize(device, 2048);
         skinnedShader.Initialize(device);
 
@@ -422,7 +423,7 @@ namespace uel {
         XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
         XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
-        skybox.Render(context, viewProj, camPos);
+        skybox.Render(context, viewProj, camPos, envMap.Sky());
         // 空は色だけを描く。ここから先（メッシュ）は、色に加えて法線も書き出す
         rt.BindSceneTargets(context);
         shader.SetLight(lighting);

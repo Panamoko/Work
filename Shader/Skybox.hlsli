@@ -7,8 +7,11 @@
 cbuffer SkyCB : register(b0)
 {
     float4x4 invViewProj; // （ビュー × 射影）の逆行列。画面上の点 → ワールドの点
-    float4 camPos; // xyz = カメラのワールド位置
+    float4 camPos; // xyz = カメラのワールド位置、w = 1 なら空の画像（skyTex）を使う / 0 ならグラデーション
 };
+
+TextureCube skyTex : register(t0); // 空の画像（キューブマップ。HDR：明るさに上限が無い）
+SamplerState skySamp : register(s0); // 線形補間・端で止める
 
 struct SkyVSOut
 {

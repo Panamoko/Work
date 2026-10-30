@@ -6,6 +6,8 @@
 #include "Engine/Editor/TransformEdit.h"
 #include "Engine/Editor/EditorCamera.h"
 #include "Engine/Scene/EntityId.h"
+#include "Engine/Graphics/EnvironmentMap.h"
+
 #include <DirectXMath.h>
 #include <memory>
 #include "Engine/Graphics/EngineSkybox.h" 
@@ -40,6 +42,7 @@ namespace uel {
 
         EngineSkybox        skybox;
         EngineShadowMap shadowMap;
+        EnvironmentMap  envMap;      // ü‚è‚ÌŒiFi‹ó‚Ì‰æ‘œj
         SkinnedMeshShader skinnedShader;
         EngineNavGrid nav;
         GameFlow flow;

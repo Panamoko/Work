@@ -24,10 +24,19 @@ namespace uel {
 
         D3D11_RASTERIZER_DESC rd = {}; rd.FillMode = D3D11_FILL_SOLID; rd.CullMode = D3D11_CULL_NONE; rd.DepthClipEnable = TRUE;
         if (FAILED(device->CreateRasterizerState(&rd, raster.GetAddressOf()))) return false;
+
+        // 空の画像用：線形補間（ミップの間も）、端で止める
+        D3D11_SAMPLER_DESC sd = {};
+        sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        sd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        if (FAILED(device->CreateSamplerState(&sd, sampler.GetAddressOf()))) return false;
         return true;
     }
 
-    void EngineSkybox::Render(ID3D11DeviceContext* ctx, const XMFLOAT4X4& viewProj, const XMFLOAT3& camPos)
+    void EngineSkybox::Render(ID3D11DeviceContext* ctx, const XMFLOAT4X4& viewProj, const XMFLOAT3& camPos,
+        ID3D11ShaderResourceView* skyCube)
     {
         if (!vs || !ps) return;   // シェーダが読めなかったときは描かない（背景はクリアした色のまま）
 
@@ -35,7 +44,7 @@ namespace uel {
         XMMATRIX vp = XMLoadFloat4x4(&viewProj);
         XMMATRIX inv = XMMatrixInverse(nullptr, vp);
         XMStoreFloat4x4(&data.invViewProj, XMMatrixTranspose(inv));
-        data.camPos = XMFLOAT4(camPos.x, camPos.y, camPos.z, 1.0f);
+        data.camPos = XMFLOAT4(camPos.x, camPos.y, camPos.z, skyCube ? 1.0f : 0.0f);   // w：空の画像を使うか
         ctx->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
 
         ctx->OMSetDepthStencilState(noDepth.Get(), 0);
@@ -46,6 +55,10 @@ namespace uel {
         ctx->PSSetShader(ps.Get(), nullptr, 0);
         ctx->VSSetConstantBuffers(0, 1, cb.GetAddressOf());
         ctx->PSSetConstantBuffers(0, 1, cb.GetAddressOf());
+        if (skyCube) {
+            ctx->PSSetShaderResources(0, 1, &skyCube);
+            ctx->PSSetSamplers(0, 1, sampler.GetAddressOf());
+        }
         ctx->Draw(3, 0);
 
         ctx->OMSetDepthStencilState(nullptr, 0); // 既定（深度有効）へ戻す
