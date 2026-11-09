@@ -31,6 +31,7 @@ namespace uel {
         DirectX::XMFLOAT4   toon;            // x=threshold, y=softness, z=texSteps, w=texSmooth
         DirectX::XMFLOAT4   toonShade;       // rgb=陰の面に掛ける色
         DirectX::XMFLOAT4   outline;         // rgb=アウトラインの色, a=太さ（ワールドの長さ）
+        DirectX::XMFLOAT4   sky;             // x=空の明るさ, y=cos(空の回転), z=sin(空の回転)（SkyShaderParams で作る）
     };
 
     // ShadingParams（描き方のデータ）を定数バッファに詰める。

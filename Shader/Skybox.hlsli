@@ -8,6 +8,7 @@ cbuffer SkyCB : register(b0)
 {
     float4x4 invViewProj; // （ビュー × 射影）の逆行列。画面上の点 → ワールドの点
     float4 camPos; // xyz = カメラのワールド位置、w = 1 なら空の画像（skyTex）を使う / 0 ならグラデーション
+    float4 skyParams; // x = 空の明るさ、y = cos(空の回転)、z = sin(空の回転)
 };
 
 TextureCube skyTex : register(t0); // 空の画像（キューブマップ。HDR：明るさに上限が無い）

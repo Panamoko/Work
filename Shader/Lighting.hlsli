@@ -73,14 +73,88 @@ float3 SimplifyTexture(float2 uv, float3 texColor)
 }
 
 // ---- 材質：metallic / roughness ----
+// ハイライトは GGX（今のゲームエンジンで標準の式）で計算する。
+//   ハイライト = D（向きのそろい方） × G（凹凸の影） × F（フレネル） / (4 × N・V × N・L)
+// 「光の総量は roughness によらず同じ」になるので、なめらかな面は小さく強く、粗い面は大きく弱く光る。
+
+static const float kPI = 3.14159265;
+
+// 非金属の「正面から見たときの反射率」。プラスチック・木・布・肌など、ほとんどの物が 4% 前後
+static const float3 kDielectricF0 = float3(0.04, 0.04, 0.04);
+
 // 映り込みを粗い面でぼかすときの、空の平均の色
 static const float3 kSkyAverage = (kSkyHorizon * 2.0 + kSkyZenith + kSkyGround) * 0.25;
 
-// roughness から Blinn-Phong の指数を作る（0.5 でおよそ 30）。なめらかなほど小さく鋭いハイライトになる。
-float SpecularPower(float rough)
+// roughness → 式で使う α²。roughness が小さすぎるとハイライトが1点に縮んで見えなくなるので、下限を付ける
+float RoughnessAlpha2(float rough)
 {
-    float a = max(rough * rough, 0.03);
-    return clamp(2.0 / (a * a) - 2.0, 1.0, 2048.0);
+    float a = max(rough, 0.05);
+    a *= a;
+    return a * a;
+}
+
+// D：表面の細かい凹凸のうち、ちょうど光を目に返す向きの面がどれだけあるか（GGX / Trowbridge-Reitz）
+float DistributionGGX(float ndh, float a2)
+{
+    float q = ndh * ndh * (a2 - 1.0) + 1.0;
+    return a2 / (kPI * q * q);
+}
+
+// G：凹凸が光や視線をさえぎる分（Smith / Schlick-GGX）。光や視線が浅いほど弱くなる
+float GeometrySmith(float ndv, float ndl, float rough)
+{
+    float k = (rough + 1.0) * (rough + 1.0) / 8.0;
+    return (ndv / (ndv * (1.0 - k) + k)) * (ndl / (ndl * (1.0 - k) + k));
+}
+
+// F：フレネル（Schlick の近似）。正面では f0、斜めから見るほど白（反射 100%）に近づく
+float3 FresnelSchlick(float3 f0, float cosTheta)
+{
+    return f0 + (1.0 - f0) * pow(1.0 - saturate(cosTheta), 5.0);
+}
+
+// ---- 映り込み（IBL：周りの景色を映す） ----
+// 景色があるとき（params.w = 1）は、事前に計算した2つを使う（UE などと同じ「スプリットサム」の方法）：
+//   envSpecular … 空を粗さごとにぼかしたキューブマップ。粗いほど小さいミップ（ぼけた景色）を読む
+//   brdfLut     … 映り込みの強さ = f0 × A ＋ B の A と B の表。視線が浅いほど B が増えて白く光る（フレネル）
+// 景色が無いときは、前と同じグラデーションの空と f0 で計算する。
+bool HasEnvironment()
+{
+    return params.w > 0.5;
+}
+
+// 向き r に映って見える景色の色（画面の色。粗いほどぼける）
+float3 EnvironmentColor(float3 r, float rough)
+{
+    if (HasEnvironment())
+    {
+        uint w, h, mips;
+        envSpecular.GetDimensions(0, w, h, mips);
+        float lod = rough * (float) (mips - 1);
+        return HdrToScreen(envSpecular.SampleLevel(envSamp, RotateSkyDir(r, sky.yz), lod).rgb, sky.x);
+    }
+    return lerp(SkyColor(r), kSkyAverage, rough);
+}
+
+// 映り込みの強さ（色ごと。0〜1）
+float3 EnvironmentBrdf(float3 f0, float ndv, float rough)
+{
+    if (HasEnvironment())
+    {
+        float2 ab = brdfLut.SampleLevel(envSamp, float2(ndv, rough), 0).rg;
+        return f0 * ab.x + ab.y;
+    }
+    return f0;
+}
+
+// 明るさを steps 段に丸める（色合いは保つ）。Toon の映り込み用
+float3 PosterizeBrightness(float3 c, float steps)
+{
+    float v = max(c.r, max(c.g, c.b));
+    if (v < 1e-4)
+        return c;
+    float q = max(floor(v * steps + 0.5), 1.0) / steps;
+    return c * (q / v);
 }
 
 // ---- 1ピクセルの色 ----
@@ -100,19 +174,22 @@ float3 ShadeSurface(PSIn i)
     float3 n = normalize(i.nrm);
     float3 l = normalize(-lightDir.xyz); // 面 → 光
     float3 v = normalize(cameraPos.xyz - i.wpos); // 面 → カメラ
-    float3 h = normalize(l + v);
+    float3 h = normalize(l + v); // 光と視線のちょうど間の向き
     float3 r = reflect(-v, n); // 鏡に映って見える向き
 
     // 材質。金属は自分の下地の色（拡散）を持たず、見えるのはハイライトと映り込み（どちらも下地の色が付く）
     float metallic = saturate(shading.z);
     float rough = saturate(specRim.y);
     float3 diffuseCol = base * (1.0 - metallic);
-    float3 specCol = lerp(float3(1.0, 1.0, 1.0), base, metallic);
 
-    // Lit と Toon で共通に使う値（ndl 以外は 0〜1 のなめらかな値）
+    // ハイライトの強さ。非金属は「ハイライトの強さ」（1 で現実の強さ）、金属は必ず 1（金属はハイライトそのものが見た目なので）
+    float specScale = lerp(specRim.x, 1.0, metallic);
+
+    // Lit と Toon で共通に使う値
     float ndl = dot(n, l);
+    float ndh = saturate(dot(n, h));
+    float a2 = RoughnessAlpha2(rough);
     float sh = (params.z > 0.5 && shading.y > 0.5) ? ShadowFactor(i.wpos) : 1.0;
-    float specRaw = pow(saturate(dot(n, h)), SpecularPower(rough)); // Blinn-Phong
     float rimRaw = pow(1.0 - saturate(dot(n, v)), max(specRim.w, 0.01)); // 輪郭に近いほど明るい
 
     float3 c;
@@ -127,13 +204,18 @@ float3 ShadeSurface(PSIn i)
         float3 lightCol = lightColor.rgb * saturate(params.x + params.y);
         c = diffuseCol * lightCol * lerp(toonShade.rgb, float3(1.0, 1.0, 1.0), lit);
 
-        // スペキュラとリムは、くっきりした形にする。大きさは roughness / リムの鋭さで決まる
-        c += lightColor.rgb * specCol * (ToonStep(specRaw, 0.5, w) * specRim.x * lit);
+        // スペキュラ：GGX の形（真ん中を 1 とした割合）が半分より明るい所を、くっきり塗る。
+        //   大きさは roughness で決まる。粗い面は広がるぶん暗くする（roughness 0.5 以下は最大の明るさ）
+        float q = ndh * ndh * (a2 - 1.0) + 1.0;
+        float shape = saturate(a2 * a2 / (q * q));
+        float spread = saturate(0.0625 / a2); // 0.0625 = roughness 0.5 のときの α²
+        float3 specCol = lerp(float3(1.0, 1.0, 1.0), base, metallic);
+        c += lightColor.rgb * specCol * (ToonStep(shape, 0.5, w) * specScale * spread * lit);
+
         c += rimColor.rgb * (ToonStep(rimRaw, 0.5, w) * specRim.z);
 
-        // 金属の映り込み（Toon 風）：上は空・下は地面の2色で、地平線の境目をくっきり出す。粗い面ほどぼける
-        float up = ToonStep(r.y, 0.0, max(w, rough * 0.5));
-        float3 env = lerp(kSkyGround, lerp(kSkyHorizon, kSkyZenith, 0.5), up);
+        // 金属の映り込み（Toon 風）：景色を大きくぼかしてから、明るさを3段に丸める（塗り分けたような見た目）
+        float3 env = PosterizeBrightness(EnvironmentColor(r, max(rough, 0.5)), 3.0);
         c += base * env * metallic;
     }
     else
@@ -142,15 +224,20 @@ float3 ShadeSurface(PSIn i)
         float d = saturate(ndl);
         c = diffuseCol * (params.x + d * params.y * sh) * lightColor.rgb;
 
-        // スペキュラは上に足す。影の中と、光が当たらない面には出さない
-        c += lightColor.rgb * specCol * (specRaw * specRim.x * smoothstep(0.0, 0.1, d) * sh * params.y);
+        // スペキュラ（GGX）。反射率 f0 は、非金属は 4%、金属は下地の色そのもの
+        float ndv = max(dot(n, v), 1e-4);
+        float3 f0 = lerp(kDielectricF0, base, metallic);
+        float3 F = FresnelSchlick(f0, saturate(dot(v, h)));
+        float3 spec = DistributionGGX(ndh, a2) * GeometrySmith(ndv, d, rough) * F / (4.0 * ndv * max(d, 1e-4));
+        // このエンジンの拡散光は π で割っていない（下地の色 × cosθ）ので、ハイライトも π 倍して釣り合わせる
+        c += lightColor.rgb * spec * (kPI * d * sh * params.y * specScale);
 
         // リムは視線だけで決まるので、影の中にも出る
         c += rimColor.rgb * (rimRaw * specRim.z);
 
-        // 金属の映り込み：鏡の向きに見える空の色。粗い面ほど空の平均の色に近づく
-        float3 env = lerp(SkyColor(r), kSkyAverage, rough);
-        c += base * env * metallic;
+        // 映り込み：鏡の向き r に見える景色 × 映り込みの強さ。
+        //   金属は下地の色が付いてはっきり映る。非金属も、斜めから見るとうっすら映る（フレネル）
+        c += EnvironmentColor(r, rough) * EnvironmentBrdf(f0, ndv, rough) * specScale;
     }
     return c;
 }

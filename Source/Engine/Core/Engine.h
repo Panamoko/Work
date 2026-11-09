@@ -14,6 +14,7 @@
 #include "Engine/Graphics/SceneLighting.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/PostProcessSettings.h"
+#include "Engine/Graphics/ShaderHotReload.h"
 
 namespace uel {
 
@@ -52,6 +53,7 @@ namespace uel {
         EditorMode           mode = EditorMode::Edit;
         SceneLighting        lighting;
         PostProcessSettings  postSettings;
+        ShaderHotReload      shaderReload;       // Shader/ の .hlsl が保存されたら、コンパイルし直す（開発用）
 
         std::wstring         baseTitle;          // 元のウィンドウタイトル
         float                titleTimer = 0.0f;  // タイトル更新用タイマー

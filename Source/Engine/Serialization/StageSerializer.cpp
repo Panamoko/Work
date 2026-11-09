@@ -459,7 +459,7 @@ namespace uel {
     // ---- Environment（ライトとポストプロセスの設定）----
     namespace {
         // 設定ファイルの版。項目を足したら +1 して、serialize に「if (g_envSchema >= N) ar(...);」を足す（Scene と同じ方式）。
-        constexpr int kEnvSchemaLatest = 1;
+        constexpr int kEnvSchemaLatest = 2;
         int g_envSchema = kEnvSchemaLatest;
 
         struct EnvironmentDTO {
@@ -467,6 +467,8 @@ namespace uel {
             Vec3DTO lightDir{ -0.4f, -1.0f, 0.35f };
             Vec3DTO lightColor{ 1.0f, 0.98f, 0.92f };
             float   ambient = 0.25f, intensity = 1.0f, shadowRange = 30.0f;
+            // 空（版 2 から）
+            float   skyExposure = 1.0f, skyRotation = 0.0f;
             // ポストプロセス（確認用の表示モード debugView は保存しない。起動時はいつも Final）
             float   saturation = 1.0f;
             bool    edgeEnabled = false;
@@ -478,6 +480,7 @@ namespace uel {
                     CEREAL_NVP(saturation),
                     CEREAL_NVP(edgeEnabled), CEREAL_NVP(edgeColor), CEREAL_NVP(edgeThickness),
                     CEREAL_NVP(edgeDepthThreshold), CEREAL_NVP(edgeNormalThreshold), CEREAL_NVP(edgeFadeDistance));   // v1
+                    if (g_envSchema >= 2) ar(CEREAL_NVP(skyExposure), CEREAL_NVP(skyRotation));   // v2    
             }
         };
     }
@@ -488,6 +491,7 @@ namespace uel {
         d.lightDir = { light.direction.x, light.direction.y, light.direction.z };
         d.lightColor = { light.color.x, light.color.y, light.color.z };
         d.ambient = light.ambient; d.intensity = light.intensity; d.shadowRange = light.shadowRange;
+        d.skyExposure = light.skyExposure; d.skyRotation = light.skyRotation;
         d.saturation = post.saturation;
         d.edgeEnabled = post.edgeEnabled;
         d.edgeColor = { post.edgeColor[0], post.edgeColor[1], post.edgeColor[2] };
@@ -527,6 +531,7 @@ namespace uel {
         light.direction = { d.lightDir.x, d.lightDir.y, d.lightDir.z };
         light.color = { d.lightColor.x, d.lightColor.y, d.lightColor.z };
         light.ambient = d.ambient; light.intensity = d.intensity; light.shadowRange = d.shadowRange;
+        light.skyExposure = d.skyExposure; light.skyRotation = d.skyRotation;
         post.saturation = d.saturation;
         post.edgeEnabled = d.edgeEnabled;
         post.edgeColor[0] = d.edgeColor.x; post.edgeColor[1] = d.edgeColor.y; post.edgeColor[2] = d.edgeColor.z;

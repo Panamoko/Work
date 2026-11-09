@@ -32,7 +32,8 @@ namespace uel {
         void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
             ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings);
         GameFlow& GetFlow() { return flow; }
-
+        // シェーダを作り直す（ホットリロードの後に呼ぶ）。作り直せなかったものは前のまま使う。全部できたら true
+        bool ReloadShaders(ID3D11Device* device);
     private:
         RenderTexture rt;          // シーンを描く先
         RenderTexture finalRT;     // ポストプロセス後の画像（Viewport に表示するのはこちら）

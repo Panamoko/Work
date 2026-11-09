@@ -2,6 +2,7 @@
 #include "Engine/Config/EngineConfig.h"
 #include <fstream>
 #include <string>
+#include <unordered_map>
 
 using Microsoft::WRL::ComPtr;
 
@@ -17,10 +18,20 @@ namespace uel {
         {
             OutputDebugStringA(("[Shader] " + message + "\n").c_str());
         }
+
+        // ホットリロードでコンパイルし直したバイトコード（名前 → 中身）。あれば .cso より優先する
+        std::unordered_map<std::string, std::vector<char>>& Overrides()
+        {
+            static std::unordered_map<std::string, std::vector<char>> map;
+            return map;
+        }
     }
 
     bool LoadShaderBytecode(const char* name, std::vector<char>& out)
     {
+        const auto found = Overrides().find(name);
+        if (found != Overrides().end()) { out = found->second; return true; }
+
         const std::string path = CsoPath(name);
         std::ifstream ifs(path, std::ios::binary | std::ios::ate);   // ate：最後に移動して大きさを知る
         if (!ifs) {
@@ -34,6 +45,11 @@ namespace uel {
         ifs.seekg(0, std::ios::beg);
         if (!ifs.read(out.data(), size)) { Report("read failed: " + path); return false; }
         return true;
+    }
+
+    void SetShaderBytecodeOverride(const char* name, std::vector<char> code)
+    {
+        Overrides()[name] = std::move(code);
     }
 
     bool CreateVertexShaderFromCso(ID3D11Device* device, const char* name,

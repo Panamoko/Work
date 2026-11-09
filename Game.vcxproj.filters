@@ -323,6 +323,9 @@
     <ClInclude Include="Source\Engine\Graphics\EnvironmentMap.h">
       <Filter>Source\Engine\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Graphics\ShaderHotReload.h">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -497,6 +500,9 @@
       <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Graphics\EnvironmentMap.cpp">
+      <Filter>Source\Engine\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Graphics\ShaderHotReload.cpp">
       <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
   </ItemGroup>

@@ -183,7 +183,11 @@ namespace uel {
         ImGui::DragFloat(u8"光の強さ", &light.intensity, 0.01f, 0.0f, 5.0f);
         ImGui::DragFloat(u8"影の範囲", &light.shadowRange, 0.5f, 10.0f, 120.0f, "%.0f m");
 
+
         ImGui::Separator();
+        ImGui::TextUnformatted(u8"空");
+        ImGui::DragFloat(u8"空の明るさ", &light.skyExposure, 0.01f, 0.0f, 4.0f);
+        ImGui::DragFloat(u8"空の回転", &light.skyRotation, 0.5f, -180.0f, 180.0f, u8"%.0f 度");
         ImGui::TextUnformatted(u8"ポストプロセス");
         ImGui::DragFloat(u8"彩度", &post.saturation, 0.01f, 0.0f, 2.0f);
         const char* viewNames[] = { u8"完成", u8"法線", u8"深度", u8"エッジ" };   // same order as PostDebugView

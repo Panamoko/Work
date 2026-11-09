@@ -64,6 +64,14 @@ namespace uel {
         ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
         if (FAILED(device->CreateSamplerState(&ssd, shadowSampler.GetAddressOf()))) return false;
 
+        // 映り込み用のサンプラ（s2）。静的メッシュ側と同じ設定。
+        D3D11_SAMPLER_DESC esd = {};
+        esd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        esd.AddressU = esd.AddressV = esd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        esd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        esd.MaxLOD = D3D11_FLOAT32_MAX;
+        if (FAILED(device->CreateSamplerState(&esd, envSampler.GetAddressOf()))) return false;
+
         // 1x1 の白テクスチャ（テクスチャを持たないサブメッシュ用）
         uint32_t white = 0xFFFFFFFF;
         D3D11_TEXTURE2D_DESC wd = {}; wd.Width = wd.Height = 1; wd.MipLevels = 1; wd.ArraySize = 1;
@@ -89,8 +97,9 @@ namespace uel {
         o.color = color;
         o.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
         o.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
-        o.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
+        o.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, envEnabled ? 1.0f : 0.0f);
         FillShading(o, shading);
+        o.sky = skyParams;
         o.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
         ctx->UpdateSubresource(objCB.Get(), 0, nullptr, &o, 0, 0);
 
@@ -110,6 +119,9 @@ namespace uel {
         ctx->PSSetSamplers(0, 1, sampler.GetAddressOf());
         ctx->PSSetShaderResources(1, 1, &shadowSRV);
         ctx->PSSetSamplers(1, 1, shadowSampler.GetAddressOf());
+        ID3D11ShaderResourceView* envSRVs[2] = { envSpecularSRV, brdfLutSRV };   // t2, t3
+        ctx->PSSetShaderResources(2, 2, envSRVs);
+        ctx->PSSetSamplers(2, 1, envSampler.GetAddressOf());
 
         model.Bind(ctx);
         const auto& subs = model.Submeshes();
@@ -141,6 +153,7 @@ namespace uel {
     {
         lightDir = light.direction; lightColor = light.color;
         lightAmbient = light.ambient; lightIntensity = light.intensity;
+        skyParams = SkyShaderParams(light);
     }
 
     void SkinnedMeshShader::SetShadow(ID3D11ShaderResourceView* srv, const XMFLOAT4X4& lvp)
@@ -148,6 +161,13 @@ namespace uel {
         shadowSRV = srv;
         lightViewProj = lvp;
         shadowEnabled = (srv != nullptr);
+    }
+
+    void SkinnedMeshShader::SetEnvironment(ID3D11ShaderResourceView* specularCube, ID3D11ShaderResourceView* brdfLut)
+    {
+        envSpecularSRV = specularCube;
+        brdfLutSRV = brdfLut;
+        envEnabled = (specularCube != nullptr && brdfLut != nullptr);
     }
 
 } // namespace uel

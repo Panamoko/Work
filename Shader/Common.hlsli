@@ -1,14 +1,14 @@
 #ifndef COMMON_HLSLI
 #define COMMON_HLSLI
 
-// ƒƒbƒVƒ…‚Ì•`‰æiÃ“IEƒXƒLƒ“ƒhj‚Å‹¤’Ê‚Ég‚¤éŒ¾B
-//   Eb0 ‚Ì’è”ƒoƒbƒtƒ@ ObjectCB
-//   EƒeƒNƒXƒ`ƒƒ‚ÆƒTƒ“ƒvƒ‰
-//   E’¸“_ƒVƒF[ƒ_‚Ìo—ÍiPSInj‚ÆA‚»‚ê‚ğì‚éŠÖ”i’Êí—p / ƒAƒEƒgƒ‰ƒCƒ“—pj
-//   EƒsƒNƒZƒ‹ƒVƒF[ƒ_‚Ìo—ÍiPSOutBF‚Æ–@ü‚Ì2–‡j
+// ãƒ¡ãƒƒã‚·ãƒ¥ã®æç”»ï¼ˆé™çš„ãƒ»ã‚¹ã‚­ãƒ³ãƒ‰ï¼‰ã§å…±é€šã«ä½¿ã†å®£è¨€ã€‚
+//   ãƒ»b0 ã®å®šæ•°ãƒãƒƒãƒ•ã‚¡ ObjectCB
+//   ãƒ»ãƒ†ã‚¯ã‚¹ãƒãƒ£ã¨ã‚µãƒ³ãƒ—ãƒ©
+//   ãƒ»é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ã®å‡ºåŠ›ï¼ˆPSInï¼‰ã¨ã€ãã‚Œã‚’ä½œã‚‹é–¢æ•°ï¼ˆé€šå¸¸ç”¨ / ã‚¢ã‚¦ãƒˆãƒ©ã‚¤ãƒ³ç”¨ï¼‰
+//   ãƒ»ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ã®å‡ºåŠ›ï¼ˆPSOutã€‚è‰²ã¨æ³•ç·šã®2æšï¼‰
 
-// b0FƒIƒuƒWƒFƒNƒg{ƒ‰ƒCƒg{•`‚«•ûB
-// C++ ‘¤iShaderCommon.h ‚Ì ObjectCBj‚ÆA•À‚ÑEŒ^‚ğ•K‚¸ˆê’v‚³‚¹‚é‚±‚ÆB
+// b0ï¼šã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆï¼‹ãƒ©ã‚¤ãƒˆï¼‹æãæ–¹ã€‚
+// C++ å´ï¼ˆShaderCommon.h ã® ObjectCBï¼‰ã¨ã€ä¸¦ã³ãƒ»å‹ã‚’å¿…ãšä¸€è‡´ã•ã›ã‚‹ã“ã¨ã€‚
 cbuffer ObjectCB : register(b0)
 {
     float4x4 world;
@@ -17,33 +17,36 @@ cbuffer ObjectCB : register(b0)
     float4 color;
     float4 lightDir;
     float4 lightColor;
-    float4 params; // x = ŠÂ‹«ŒõAy = Œõ‚Ì‹­‚³Az = ‰e‚ ‚è
-    float4 cameraPos; // xyz = ƒJƒƒ‰‚Ìƒ[ƒ‹ƒhˆÊ’u
-    float4 shading; // x = •`‚«•ûi0 = Lit, 1 = Unlit, 2 = ToonjAy = ‰e‚ğó‚¯‚éAz = metallic
-    float4 specRim; // x = ƒXƒyƒLƒ…ƒ‰‚Ì‹­‚³Ay = roughnessAz = ƒŠƒ€‚Ì‹­‚³Aw = ƒŠƒ€‚Ì‰s‚³
-    float4 rimColor; // rgb = ƒŠƒ€ƒ‰ƒCƒg‚ÌF
-    float4 toon; // x = –¾ˆÃ‚Ì‹«–ÚAy = ‚Ú‚©‚µ•Az = ƒeƒNƒXƒ`ƒƒ‚Ì’i”Aw = ƒeƒNƒXƒ`ƒƒ‚ğ‚È‚ç‚·”¼ŒaiUVj
-    float4 toonShade; // rgb = ‰A‚Ì–Ê‚ÉŠ|‚¯‚éF
-    float4 outline; // rgb = ƒAƒEƒgƒ‰ƒCƒ“‚ÌFAa = ‘¾‚³iƒ[ƒ‹ƒh‚Ì’·‚³j
+    float4 params; // x = ç’°å¢ƒå…‰ã€y = å…‰ã®å¼·ã•ã€z = å½±ã‚ã‚Šã€w = æ˜ ã‚Šè¾¼ã¿ã®æ™¯è‰²ã‚ã‚Šï¼ˆenvSpecular ã¨ brdfLutï¼‰
+    float4 cameraPos; // xyz = ã‚«ãƒ¡ãƒ©ã®ãƒ¯ãƒ¼ãƒ«ãƒ‰ä½ç½®
+    float4 shading; // x = æãæ–¹ï¼ˆ0 = Lit, 1 = Unlit, 2 = Toonï¼‰ã€y = å½±ã‚’å—ã‘ã‚‹ã€z = metallic
+    float4 specRim; // x = ã‚¹ãƒšã‚­ãƒ¥ãƒ©ã®å¼·ã•ã€y = roughnessã€z = ãƒªãƒ ã®å¼·ã•ã€w = ãƒªãƒ ã®é‹­ã•
+    float4 rimColor; // rgb = ãƒªãƒ ãƒ©ã‚¤ãƒˆã®è‰²
+    float4 toon; // x = æ˜æš—ã®å¢ƒç›®ã€y = ã¼ã‹ã—å¹…ã€z = ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®æ®µæ•°ã€w = ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ãªã‚‰ã™åŠå¾„ï¼ˆUVï¼‰
+    float4 toonShade; // rgb = é™°ã®é¢ã«æ›ã‘ã‚‹è‰²
+    float4 outline; // rgb = ã‚¢ã‚¦ãƒˆãƒ©ã‚¤ãƒ³ã®è‰²ã€a = å¤ªã•ï¼ˆãƒ¯ãƒ¼ãƒ«ãƒ‰ã®é•·ã•ï¼‰
+    float4 sky; // x = ç©ºã®æ˜ã‚‹ã•ã€y = cos(ç©ºã®å›è»¢)ã€z = sin(ç©ºã®å›è»¢)
 };
 
-Texture2D tex : register(t0); // ƒƒbƒVƒ…‚ÌƒeƒNƒXƒ`ƒƒi–³‚¯‚ê‚Î 1x1 ‚Ì”’j
-Texture2D shadowMap : register(t1); // ƒVƒƒƒhƒEƒ}ƒbƒviƒ‰ƒCƒg‚©‚çŒ©‚½[“xj
-SamplerState samp : register(s0); // ’ÊíiüŒ`EŒJ‚è•Ô‚µj
-SamplerComparisonState shadowSamp : register(s1); // ‰e—pi[“x‚ğ”ä‚×‚½Œ‹‰Ê‚ğ•Ô‚·j
-
-// ’¸“_ƒVƒF[ƒ_ ¨ ƒsƒNƒZƒ‹ƒVƒF[ƒ_
+Texture2D tex : register(t0); // ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒ†ã‚¯ã‚¹ãƒãƒ£ï¼ˆç„¡ã‘ã‚Œã° 1x1 ã®ç™½ï¼‰
+Texture2D shadowMap : register(t1); // ã‚·ãƒ£ãƒ‰ã‚¦ãƒãƒƒãƒ—ï¼ˆãƒ©ã‚¤ãƒˆã‹ã‚‰è¦‹ãŸæ·±åº¦ï¼‰
+SamplerState samp : register(s0); // é€šå¸¸ï¼ˆç·šå½¢ãƒ»ç¹°ã‚Šè¿”ã—ï¼‰
+SamplerComparisonState shadowSamp : register(s1); // å½±ç”¨ï¼ˆæ·±åº¦ã‚’æ¯”ã¹ãŸçµæœã‚’è¿”ã™ï¼‰
+TextureCube envSpecular : register(t2); // æ˜ ã‚Šè¾¼ã¿ç”¨ï¼šç²—ã•ã”ã¨ã«ã¼ã‹ã—ãŸç©ºï¼ˆãƒŸãƒƒãƒ— 0 = é¡ ã€œ æœ€å¾Œ = ã„ã¡ã°ã‚“ç²—ã„ï¼‰ã€‚HDR
+Texture2D brdfLut : register(t3); // æ˜ ã‚Šè¾¼ã¿ã®å¼·ã•ã®è¡¨ï¼ˆæ¨ª = è¦–ç·šã®è§’åº¦ Nãƒ»Vã€ç¸¦ = ç²—ã•ã€‚r = Aã€g = Bï¼‰
+SamplerState envSamp : register(s2); // æ˜ ã‚Šè¾¼ã¿ç”¨ï¼ˆç·šå½¢ãƒ»ç«¯ã§æ­¢ã‚ã‚‹ï¼‰
+// é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ â†’ ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€
 struct PSIn
 {
     float4 pos : SV_POSITION;
-    float3 nrm : NORMAL; // ƒ[ƒ‹ƒh–@üi’·‚³‚Í 1 ‚Æ‚ÍŒÀ‚ç‚È‚¢j
-    float4 col : COLOR; // ’¸“_ƒJƒ‰[
+    float3 nrm : NORMAL; // ãƒ¯ãƒ¼ãƒ«ãƒ‰æ³•ç·šï¼ˆé•·ã•ã¯ 1 ã¨ã¯é™ã‚‰ãªã„ï¼‰
+    float4 col : COLOR; // é ‚ç‚¹ã‚«ãƒ©ãƒ¼
     float2 uv : TEXCOORD;
-    float3 wpos : WPOS; // ƒ[ƒ‹ƒhˆÊ’u
+    float3 wpos : WPOS; // ãƒ¯ãƒ¼ãƒ«ãƒ‰ä½ç½®
 };
 
-// ---- ’¸“_ƒVƒF[ƒ_—p ----
-// ƒ[ƒ‹ƒhˆÊ’u‚Æƒ[ƒ‹ƒh–@ü‚©‚çAƒsƒNƒZƒ‹ƒVƒF[ƒ_‚Ö“n‚·’l‚ğì‚éB
+// ---- é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ç”¨ ----
+// ãƒ¯ãƒ¼ãƒ«ãƒ‰ä½ç½®ã¨ãƒ¯ãƒ¼ãƒ«ãƒ‰æ³•ç·šã‹ã‚‰ã€ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ã¸æ¸¡ã™å€¤ã‚’ä½œã‚‹ã€‚
 PSIn MakePSIn(float3 wpos, float3 wnrm, float4 col, float2 uv)
 {
     PSIn o;
@@ -55,8 +58,8 @@ PSIn MakePSIn(float3 wpos, float3 wnrm, float4 col, float2 uv)
     return o;
 }
 
-// ƒAƒEƒgƒ‰ƒCƒ“i”w–Ê–@jF’¸“_‚ğ–@ü‚ÌŒü‚«‚É‰Ÿ‚µo‚·B
-// ‚±‚ÌƒpƒX‚Í— –Ê‚¾‚¯‚ğ•`‚­‚Ì‚ÅA‚Ó‚­‚ç‚ñ‚¾Œ`‚ªŒ³‚ÌŒ`‚ÌŠO‚É‚Í‚İo‚½•”•ª‚¾‚¯‚ªŒ©‚¦A—ÖŠsü‚É‚È‚éB
+// ã‚¢ã‚¦ãƒˆãƒ©ã‚¤ãƒ³ï¼ˆèƒŒé¢æ³•ï¼‰ï¼šé ‚ç‚¹ã‚’æ³•ç·šã®å‘ãã«æŠ¼ã—å‡ºã™ã€‚
+// ã“ã®ãƒ‘ã‚¹ã¯è£é¢ã ã‘ã‚’æãã®ã§ã€ãµãã‚‰ã‚“ã å½¢ãŒå…ƒã®å½¢ã®å¤–ã«ã¯ã¿å‡ºãŸéƒ¨åˆ†ã ã‘ãŒè¦‹ãˆã€è¼ªéƒ­ç·šã«ãªã‚‹ã€‚
 PSIn MakeOutlinePSIn(float3 wpos, float3 wnrm, float4 col, float2 uv)
 {
     float len = length(wnrm);
@@ -64,10 +67,10 @@ PSIn MakeOutlinePSIn(float3 wpos, float3 wnrm, float4 col, float2 uv)
     return MakePSIn(wpos + n * outline.a, n, col, uv);
 }
 
-// ---- ƒsƒNƒZƒ‹ƒVƒF[ƒ_‚Ìo—Í ----
-// ƒV[ƒ“‚Í2–‡‚Ì•`‰ææ‚É“¯‚É‘‚­F
-//   0 –‡–Ú = FA1 –‡–Ú = ƒ[ƒ‹ƒh–@üi‚ ‚Æ‚Åƒ|ƒXƒgƒvƒƒZƒX‚ª—ÖŠsü‚ğ’T‚·‚Ì‚É“Ç‚Şj
-// F‚Ì1–‡‚µ‚©‚Â‚È‚¢‚Å‚¢‚È‚¢‚Æ‚«i‹ó‚ğ•`‚­ŠÔ‚È‚Çj‚ÍA2–‡–Ú‚Ìo—Í‚ÍÌ‚Ä‚ç‚ê‚é‚¾‚¯B
+// ---- ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ã®å‡ºåŠ› ----
+// ã‚·ãƒ¼ãƒ³ã¯2æšã®æç”»å…ˆã«åŒæ™‚ã«æ›¸ãï¼š
+//   0 æšç›® = è‰²ã€1 æšç›® = ãƒ¯ãƒ¼ãƒ«ãƒ‰æ³•ç·šï¼ˆã‚ã¨ã§ãƒã‚¹ãƒˆãƒ—ãƒ­ã‚»ã‚¹ãŒè¼ªéƒ­ç·šã‚’æ¢ã™ã®ã«èª­ã‚€ï¼‰
+// è‰²ã®1æšã—ã‹ã¤ãªã„ã§ã„ãªã„ã¨ãï¼ˆç©ºã‚’æãé–“ãªã©ï¼‰ã¯ã€2æšç›®ã®å‡ºåŠ›ã¯æ¨ã¦ã‚‰ã‚Œã‚‹ã ã‘ã€‚
 struct PSOut
 {
     float4 color : SV_TARGET0;
@@ -78,7 +81,7 @@ PSOut MakePSOut(float3 c, float3 worldNormal)
 {
     PSOut o;
     o.color = float4(c, 1.0);
-    o.normal = float4(normalize(worldNormal) * 0.5 + 0.5, 1.0); // a = 1 ‚Íu‚±‚±‚É•¨‚ª‚ ‚év‚Ìˆó
+    o.normal = float4(normalize(worldNormal) * 0.5 + 0.5, 1.0); // a = 1 ã¯ã€Œã“ã“ã«ç‰©ãŒã‚ã‚‹ã€ã®å°
     return o;
 }
 

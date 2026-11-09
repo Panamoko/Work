@@ -7,7 +7,7 @@ using Microsoft::WRL::ComPtr;
 namespace uel {
     namespace {
         // Shader/Skybox.hlsli の cbuffer SkyCB と、並び・型を必ず一致させること。
-        struct SkyCB { XMFLOAT4X4 invViewProj; XMFLOAT4 camPos; };
+        struct SkyCB { XMFLOAT4X4 invViewProj; XMFLOAT4 camPos; XMFLOAT4 skyParams; };
     }
 
     bool EngineSkybox::Initialize(ID3D11Device* device)
@@ -36,7 +36,7 @@ namespace uel {
     }
 
     void EngineSkybox::Render(ID3D11DeviceContext* ctx, const XMFLOAT4X4& viewProj, const XMFLOAT3& camPos,
-        ID3D11ShaderResourceView* skyCube)
+        ID3D11ShaderResourceView* skyCube, const SceneLighting& lighting)
     {
         if (!vs || !ps) return;   // シェーダが読めなかったときは描かない（背景はクリアした色のまま）
 
@@ -45,6 +45,7 @@ namespace uel {
         XMMATRIX inv = XMMatrixInverse(nullptr, vp);
         XMStoreFloat4x4(&data.invViewProj, XMMatrixTranspose(inv));
         data.camPos = XMFLOAT4(camPos.x, camPos.y, camPos.z, skyCube ? 1.0f : 0.0f);   // w：空の画像を使うか
+        data.skyParams = SkyShaderParams(lighting);   // x：明るさ、y / z：回転の cos / sin
         ctx->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
 
         ctx->OMSetDepthStencilState(noDepth.Get(), 0);

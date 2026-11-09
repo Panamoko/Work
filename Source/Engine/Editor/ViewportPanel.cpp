@@ -46,6 +46,20 @@ namespace uel {
 
     }
 
+
+    bool ViewportPanel::ReloadShaders(ID3D11Device* device)
+    {
+        // 新しく作ってみて、できたものだけ入れ替える（作れなかったら前のシェーダのまま）。
+        // ライト・影・景色・ポストプロセスの設定は、毎フレーム RenderScene で渡し直すので、作り直しても消えない。
+        bool allOk = true;
+        { EngineSkybox      s; if (s.Initialize(device)) skybox = std::move(s);        else allOk = false; }
+        { PostProcess       s; if (s.Initialize(device)) postProcess = std::move(s);   else allOk = false; }
+        { MeshShader        s; if (s.Initialize(device)) shader = std::move(s);        else allOk = false; }
+        { SkinnedMeshShader s; if (s.Initialize(device)) skinnedShader = std::move(s); else allOk = false; }
+        { EngineShadowMap   s; if (s.Initialize(device, shadowMap.GetSize())) shadowMap = std::move(s); else allOk = false; }
+        return allOk;
+    }
+
     void ViewportPanel::DrawUI(ID3D11Device* device, World& world, EntityId& selected, CommandHistory& history,
         bool playMode, MeshCache& cache)
     {
@@ -423,15 +437,17 @@ namespace uel {
         XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
         XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
-        skybox.Render(context, viewProj, camPos, envMap.Sky());
+        skybox.Render(context, viewProj, camPos, envMap.Sky(), lighting);
         // 空は色だけを描く。ここから先（メッシュ）は、色に加えて法線も書き出す
         rt.BindSceneTargets(context);
         shader.SetLight(lighting);
         shader.SetShadow(shadowMap.GetSRV(), lightVP);
+        shader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
         shader.SetCameraPosition(camPos);
         RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
         skinnedShader.SetLight(lighting);
         skinnedShader.SetShadow(shadowMap.GetSRV(), lightVP);
+        skinnedShader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
         skinnedShader.SetCameraPosition(camPos);
         RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
         // シャドウSRVを外す（次フレームのシャドウ書き込みと競合させない）

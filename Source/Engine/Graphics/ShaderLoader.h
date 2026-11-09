@@ -9,10 +9,14 @@ namespace uel {
     //   name はファイル名だけ（例："SkyboxVS"）。Data/Shader/SkyboxVS.cso を読む。
     //   .cso の出力先は Game.vcxproj の HLSL コンパイラ設定（Data\Shader\%(Filename).cso）と合わせてある。
     //   Shader/*.hlsl を直したら、ビルドすれば .cso も作り直される。
+    //   実行中に直した場合は、ホットリロード（ShaderHotReload）がコンパイルし直したものが .cso より優先される。
     // 見つからない・作れないときは、Visual Studio の「出力」に [Shader] から始まるメッセージを出して false を返す。
 
-    // .cso の中身（シェーダのバイトコード）を読む
+    // シェーダのバイトコードを読む（ホットリロードの結果があればそれ、無ければ .cso の中身）
     bool LoadShaderBytecode(const char* name, std::vector<char>& out);
+
+    // ホットリロード用：name のバイトコードを差し替える。以後 LoadShaderBytecode は .cso よりこちらを返す
+    void SetShaderBytecodeOverride(const char* name, std::vector<char> code);
 
     // 頂点シェーダを作る。bytecode を渡すと、読んだバイトコードを返す（入力レイアウトを作るのに使う）
     bool CreateVertexShaderFromCso(ID3D11Device* device, const char* name,

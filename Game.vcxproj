@@ -182,6 +182,7 @@
     <ClInclude Include="Source\Engine\Graphics\RenderTexture.h" />
     <ClInclude Include="Source\Engine\Graphics\SceneLighting.h" />
     <ClInclude Include="Source\Engine\Graphics\ShaderCommon.h" />
+    <ClInclude Include="Source\Engine\Graphics\ShaderHotReload.h" />
     <ClInclude Include="Source\Engine\Graphics\ShaderLoader.h" />
     <ClInclude Include="Source\Engine\Graphics\ShadingParams.h" />
     <ClInclude Include="Source\Engine\Graphics\SkinnedMeshShader.h" />
@@ -245,6 +246,7 @@
     <ClCompile Include="Source\Engine\Graphics\MeshShader.cpp" />
     <ClCompile Include="Source\Engine\Graphics\PostProcess.cpp" />
     <ClCompile Include="Source\Engine\Graphics\RenderTexture.cpp" />
+    <ClCompile Include="Source\Engine\Graphics\ShaderHotReload.cpp" />
     <ClCompile Include="Source\Engine\Graphics\ShaderLoader.cpp" />
     <ClCompile Include="Source\Engine\Graphics\SkinnedMeshShader.cpp" />
     <ClCompile Include="Source\Engine\Graphics\SkinnedRenderModel.cpp" />

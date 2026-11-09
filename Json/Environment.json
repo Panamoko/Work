@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "environment": {
         "lightDir": {
             "x": -0.4000000059604645,
@@ -24,6 +24,8 @@
         "edgeThickness": 0.5,
         "edgeDepthThreshold": 0.5339999794960022,
         "edgeNormalThreshold": 0.3149999976158142,
-        "edgeFadeDistance": 100.0
+        "edgeFadeDistance": 100.0,
+        "skyExposure": 0.5,
+        "skyRotation": 22.0
     }
 }

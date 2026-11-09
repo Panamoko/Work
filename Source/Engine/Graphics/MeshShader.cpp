@@ -57,6 +57,14 @@ namespace uel {
         ssd.ComparisonFunc = D3D11_COMPARISON_LESS_EQUAL;
         if (FAILED(device->CreateSamplerState(&ssd, shadowSampler.GetAddressOf()))) return false;
 
+        // 映り込み用のサンプラ（s2）：線形補間（ミップの間も）、端で止める
+        D3D11_SAMPLER_DESC esd = {};
+        esd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        esd.AddressU = esd.AddressV = esd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        esd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+        esd.MaxLOD = D3D11_FLOAT32_MAX;
+        if (FAILED(device->CreateSamplerState(&esd, envSampler.GetAddressOf()))) return false;
+
         // 1x1 の白テクスチャ（テクスチャを持たないメッシュ用）
         uint32_t white = 0xFFFFFFFF;
         D3D11_TEXTURE2D_DESC wd = {};
@@ -87,8 +95,9 @@ namespace uel {
         data.color = color;
         data.lightDir = XMFLOAT4(lightDir.x, lightDir.y, lightDir.z, 0.0f);
         data.lightColor = XMFLOAT4(lightColor.x, lightColor.y, lightColor.z, 0.0f);
-        data.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, 0.0f);
+        data.params = XMFLOAT4(lightAmbient, lightIntensity, shadowEnabled ? 1.0f : 0.0f, envEnabled ? 1.0f : 0.0f);
         FillShading(data, shading);
+        data.sky = skyParams;
         data.cameraPos = XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 1.0f);
         context->UpdateSubresource(cb.Get(), 0, nullptr, &data, 0, 0);
 
@@ -101,6 +110,9 @@ namespace uel {
         context->PSSetSamplers(0, 1, sampler.GetAddressOf());
         context->PSSetShaderResources(1, 1, &shadowSRV);
         context->PSSetSamplers(1, 1, shadowSampler.GetAddressOf());
+        ID3D11ShaderResourceView* envSRVs[2] = { envSpecularSRV, brdfLutSRV };   // t2, t3
+        context->PSSetShaderResources(2, 2, envSRVs);
+        context->PSSetSamplers(2, 1, envSampler.GetAddressOf());
 
         mesh.Bind(context);
         const auto& subs = mesh.GetSubmeshes();
@@ -145,6 +157,7 @@ namespace uel {
         lightColor = light.color;
         lightAmbient = light.ambient;
         lightIntensity = light.intensity;
+        skyParams = SkyShaderParams(light);
     }
 
     void MeshShader::SetShadow(ID3D11ShaderResourceView* srv, const XMFLOAT4X4& lvp)
@@ -152,6 +165,13 @@ namespace uel {
         shadowSRV = srv;
         lightViewProj = lvp;
         shadowEnabled = (srv != nullptr);
+    }
+
+    void MeshShader::SetEnvironment(ID3D11ShaderResourceView* specularCube, ID3D11ShaderResourceView* brdfLut)
+    {
+        envSpecularSRV = specularCube;
+        brdfLutSRV = brdfLut;
+        envEnabled = (specularCube != nullptr && brdfLut != nullptr);
     }
 
 } // namespace uel

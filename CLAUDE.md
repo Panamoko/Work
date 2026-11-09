@@ -1,7 +1,54 @@
 # UE-Like Engine（就職作品）作業ガイド
 
-Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）で作るプロジェクト。
+**協力型 PvE FPS**（Left 4 Dead 2 の協力プレイ ＋ Overwatch のロール制）を、自作の UE ライクなエンジン（C++17 / DirectX11）で作るプロジェクト。2026-11-09 に「Overwatch 風 FPS」から方針を変えた（0章）。
 このファイルは、別セッションでも同じ前提で作業するための「ルール」と「現状」のまとめ。
+
+---
+
+## 0. 作っているゲーム（協力型 PvE）
+
+**基準の資料**：`C:\Users\2240192\Desktop\Claude用_協力型PvE_FPS_プロジェクト共有資料.docx`（2026-11-09）。ゲームの仕様・ロードマップ・未決定事項はこの資料に従う。資料の「既存エンジンの現状」は AI 共有用の資料から写したものなので、**実装の前に必ず実際のコードで確かめる**。
+
+### 決まっていること
+- **プレイヤー1人＋AI 仲間2人**（オンラインではない）。プレイヤーが **Tank / DPS / Support** から1つ選び、残り2ロールを AI が担当。ステージ中は変えない。
+- FPS 視点（TPS は必須にしない）。1ステージは通常約10分、苦戦時15分程度。
+- **ウェーブ制**：ウェーブの敵を全滅させると次へ、最後にボス戦。
+- **武器**：ロールごとの専用武器。弾は実質無限だが、マガジン単位でリロードする。今のヒットスキャンの射撃を使い回し、武器ごとのダメージ・連射間隔・拡散・装弾数・リロードを足す。
+- **アビリティ**：通常アビリティ1つ（クールダウン制）。ULT は通常より少し強い程度で、ダメージ・回復でゲージがたまる案。**先に通常攻撃と通常アビリティでロールの差を作り、ULT は後回しでよい**。
+- **ダウン・蘇生**：HP 0 で Downed（移動・攻撃不可）。プレイヤー・AI・AI 同士で蘇生できる。制限時間を過ぎると Dead。3人とも戦えない、またはプレイヤーがダウンしたまま時間切れでゲームオーバー。**蘇生と通常の回復は別の仕組みにする**。
+- **回復**は Support のアビリティが基本（マップの回復アイテムは主にしない）。AI の Support は味方の HP や危険度で回復する相手を選ぶ。
+- **ボス**：通常・突進・特殊攻撃が目標（最初は少数のパターンでよい）。行動を「予備動作 → 攻撃 → 硬直」に分け、Tank が引き受け・DPS が攻撃・Support が回復、という分担を感じられるようにする。
+- **AI 仲間は段階的に**：Phase 1 追従・攻撃・Support の回復 → 2 蘇生・危険回避 → 3 ロール別の連携 → 4 状況判断 → 5 プレイヤーの「集合」指示（将来）。
+- **見せ場**は AI 仲間の行動・連携と、ゲームとしての完成度・遊びやすさ。自作エンジンは技術的な強みとして補足する。採用担当向けに 3〜5 分の短いデモ（ロール選択、AI の追従・攻撃・回復・蘇生、ボス戦の連携）を用意する。
+- キャラの見た目は未定（人型・ロボット・スタイライズを固定しない）。
+
+### ロードマップ（資料の 9章）
+| 段階 | 内容 | 終わりの目安 | 状況 |
+|---|---|---|---|
+| 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
+| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 次。1-1 AI 仲間1体の追従 → 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順で提案済み（AI 仲間の Component 名はユーザーが決める） |
+| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | |
+| 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
+| 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
+| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | |
+| 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
+| 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
+| 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
+| 9 AI の高度化 | 蘇生の判断、危険回避、連携、集合 | AI を仲間と感じられる | |
+
+### コードを調べて分かったこと（新しいゲームで効いてくる所）
+- **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
+- **敵はプレイヤーしか狙わない**（追跡も攻撃も）。AI 仲間も狙わせるには陣営（味方／敵）の考え方が要る。
+- **プレイヤーの射撃は「Hitbox を持つ物すべて」に当たる**（味方撃ちが起きる）。また、**敵以外で HP が 0 になった物はその場で `DestroyEntity` される**（`PlayerComponent.cpp` の射撃の処理）。AI 仲間に HP・Hitbox を付ける前に、ここを直す（ダウンの仕組みとぶつかる）。
+- **プレイヤーの HP が 0 で即ゲームオーバー**（`GameRuleComponent`）。ダウンを入れるときに変える。
+- **射撃の処理は `PlayerComponent::Update` に直接書いてある**。AI も同じ撃ち方をするなら、先に共通の処理として外に出す。
+- **`SpawnerComponent` は「全滅で次のウェーブ」までできている**（資料の「追加が必要」は誤り）。足りないのは、ウェーブごとに違う敵を出すこと（今は1つの Spawner に Prefab 1種類）と、最後のボス。
+- `HPComponent` は `hp` と `maxHp` だけで、敵も使う。ダウン・死亡・蘇生の状態は別の部品に分けるのが安全。
+- 選んだロールは `GameFlow`（Scene をまたいで残る）に持たせて、ロール選択の画面から Stage へ渡せる。
+- 経路探索のグリッドは Play 中に毎フレーム作り直している（原点中心の 60m 四方で固定）。AI の追従には使えるが、ステージを広くするなら直す。
+
+### 決まっていないこと（資料の 12章）
+キャラの見た目、各ロールの武器・能力の中身、通常の敵の種類と数、蘇生時間・ダウンの制限時間・復帰時の HP、蘇生中に攻撃されたときの扱い、Dead からの復帰（ステージ終了まで戻らない案）、装弾数・リロード時間、ULT のゲージの量と増え方、ウェーブ数・敵の数・休憩時間、ボスの攻撃の中身、集合の指示（将来）、TPS（必要になったら）。**決まっていないことは勝手に決めず、案を出してユーザーに選んでもらう。**
 
 ---
 
@@ -35,6 +82,31 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 - **行を足す指示の見本には、足す行だけを載せる。** 前後の行も見せるときは「追加後はこうなる」と明記し、すでにある行（`ImGui::End();` など）が二重に貼られないようにする。
 - **1ファイルは 900 行以内を目安にする。** 超えそうなら、役割ごとに別ファイルへ分ける案を出す（今いちばん長いのは `InspectorPanel.cpp` の約 630 行）。
 - 説明は日本語。コード中のコメントも日本語でよい（`.hlsl` / `.hlsli` も、**UTF-8（BOM なし）で保存するなら**日本語コメントでよい。理由は9章）。
+
+### 設計・提案の方針
+- **企業（ゲーム会社）で実際に使われている技術・設計を使う。** 自己流の仕組みより、業界で通じる手法（UE や Unity にある考え方、よく知られた設計パターンなど）を選び、「実際の現場ではこう呼ばれている／こう作られている」も添える。
+- **動作に支障が出ない範囲で、最初から軽量化を含んだコードを出す。** 毎フレーム無駄な処理をしない（毎フレームの検索・文字列の生成・メモリ確保を避ける、結果を使い回す、間隔をあけて処理する、など）。ただし読みやすさや正しさを崩してまで細かく最適化しない。軽量化した所と理由は説明に書く。
+- **設計の理由・良い点・悪い点・制限を説明する。** ユーザー本人が面接で設計の意図を説明できることを重視する。
+- **実装済み・再利用する物・新しく作る物・決まっていない物を区別して書く。**
+- **大きい機能は、最初に全体の計画と小さな実装の順番を示し、ユーザーが合意してからコードを出す。** 一度に大量のコードを出さない。
+- 最初から高度な AI や複雑なボスを作らない。3人チームで戦闘が成り立つ最小の形を完成させてから広げる。
+
+### 複数のセッションで作業するときの決まり
+ユーザーは分野ごとにセッションを分けて、**同じフォルダ（同じ作業ツリー）**を触っている（2026-11-09 時点：ゲームの「リポジトリ確認」、「Shader コーディング」、「Animation コーディング」）。セッションは、ほかのセッションでの変更を自動では知らない。CLAUDE.md を読むのもセッションの開始時だけ。
+
+- **担当のフォルダ**
+  | セッション | 主に触る所 |
+  |---|---|
+  | ゲーム | `Components/`、`Game/`、ゲーム用の Prefab・Scene |
+  | Shader | `Shader/`、`Graphics/` |
+  | Animation | `Animation/`、`Systems/AnimationSystem`、アニメの編集画面（`AnimEditorPanels` と `AnimGraph*`）、`Serialization/AnimGraphSerializer` |
+- **共通のファイル**（`InspectorPanel.cpp`、`StageSerializer.cpp`、`ViewportPanel.cpp`、`Engine.cpp`、`EngineConfig.h`、`CLAUDE.md`）を触る作業は、**同時に2つ進めない**。
+- **作業を始める前に、今のファイルを読み直す**（`git status` と `git log` も見る）。セッションの途中でも、ユーザーがほかのセッションの変更を貼っていることがある。覚えている中身を前提に指示を書かない。
+- **1つの変更を貼ってもらったら、すぐコミットしてもらう**（コミットはユーザーが行う）。ほかのセッションの作業に移る前にコミットされていると、どの変更がどこから来たか分かり、戻すこともできる。
+- **保存の版**（Scene の `kSchemaLatest`、Environment の `kEnvSchemaLatest`、グラフの `kAnimGraphVersion`）**を上げるのは、一度に1つのセッションだけ。** 上げる前に今の値をファイルで確かめ、上げたらコミットしてもらってから次の作業へ。2つのセッションが同じ番号を使うと、違う項目が同じ版になり、古いファイルの読み込みが壊れる。
+- **CLAUDE.md は、直す直前に読み直す。** 各セッションは自分の章だけを直す（ゲームは0章・5章・7章、Animation は6章、Shader は9章。共通の章（1〜4、8、10、11）は、必要な行だけを足す）。ほかのセッションが書いた内容を消さない。
+- **ほかのセッションでできた物に気づいたら**（CLAUDE.md に無いファイルや機能、未コミットの変更など）、前提をユーザーに確かめ、CLAUDE.md の該当の章に足す（2026-11-09 に、LayeredBlend・エイムオフセットが CLAUDE.md に書かれていなかったことがある）。
+- ユーザーがほかのセッションに戻るときは、最初に「CLAUDE.md の〇章を読み直して。前回から〇〇が変わった」と伝えてもらうとよい。
 
 ### 画面に出す文字（ImGui）
 - **エディタの説明・ボタン・メッセージは日本語にする。** 文字列は必ず **`u8"..."`** で書く（Shift-JIS のファイルでも UTF-8 BOM のファイルでも正しく出る）。
@@ -80,6 +152,8 @@ Overwatch風FPSを、自作のUEライクなエンジン（C++17 / DirectX11）�
 | ドッキングの配置が崩れた | ウィンドウ名を日本語にした | ウィンドウ名は英語のまま |
 | 起動時にアサートで止まる | `AddFontFromFileTTF` に存在しないフォントを渡した | 先に `std::filesystem::exists` で確かめる |
 | `Illegal character in shader file`・`unexpected #endif`・「型 〇〇 を解決できません」 | VS で `.hlsl` を新規作成して中身を貼り付けたら、UTF-8 BOM 付き（や Shift-JIS）で保存された | コードは本文に全部載せる（ユーザーは VS で追加してコピペする）。HLSL は「貼った後、エンコード付きで保存 → UTF-8 シグネチャなし」まで手順に書き、確かめ方も添える（9章） |
+| `'lod' が宣言されていません`・`no matching 1 parameter function`（M-4） | 「`return ...` の1行を差し替え」と指示したが、すぐ下に似た `return` 行があり、違うほうを差し替えた | 似た行が近くにあるときは1行の差し替えにせず、**関数ごと**差し替える |
+| 「上半身のレイヤーは無い」と思い込んだ | ほかのセッション（Animation）で作った機能が、CLAUDE.md に書かれていなかった | 作業の前に実際のファイルを読む。新しい物に気づいたら CLAUDE.md に足す（2章「複数のセッションで作業するときの決まり」） |
 
 ---
 
@@ -124,7 +198,7 @@ git show 2df15d7:Source/AI/BehaviorTree.cpp
 Shader/
   Common.hlsli         b0（ObjectCB）・t0/t1・s0/s1・PSIn・MakePSIn・MakeOutlinePSIn・PSOut（色＋法線の MRT）
   Lighting.hlsli       影（ShadowFactor）・Toon の段階・テクスチャの単純化・ShadeSurface（見た目の式はここ）
-  SkyColor.hlsli       空の3色と SkyColor(dir)（空の描画と金属の映り込みで共用）
+  SkyColor.hlsli       空のグラデーション SkyColor(dir)（画像が無いときの代わり）、空の回転 RotateSkyDir(dir, cs)、HDR → 画面の色 HdrToScreen(hdr, exposure)
   MeshVertex.hlsli     静的メッシュの VSIn と ToWorld
   SkinnedVertex.hlsli  スキンドの VSIn と ToWorld（Skin を呼ぶ）
   Skinning.hlsli       b1（Bones[128]）と Skin()（本描画と影で共用）
@@ -147,13 +221,16 @@ Source/Engine/
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
-                 AnimStateMachineNode, AnimMontage
+                 AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
+                 AnimMontage, AnimAimOffset（視点の角度で背骨を曲げる）
   Systems/       RenderSystem（描画）, AnimationSystem（毎フレームの姿勢の計算）
   Graphics/      GraphicsDevice, RenderTexture（シーン用／色だけ の2種類）, Mesh,
                  MeshShader, SkinnedMeshShader, SkinnedRenderModel,
                  ShaderCommon（b0 の C++ 側の形 ObjectCB と FillShading）, ShaderLoader（.cso の読み込み）,
                  ShadingParams（描き方のデータ）,
-                 EngineSkybox, EngineShadowMap, SceneLighting, PostProcess, PostProcessSettings
+                 EngineSkybox, EngineShadowMap, SceneLighting, PostProcess, PostProcessSettings,
+                 DdsTexture（DDS の読み込み。自作）, EnvironmentMap（空・映り込み用のキューブマップと LUT。Data/Sprite/IBL_PureSky）,
+                 ShaderHotReload（実行中に .hlsl を保存するとコンパイルし直す。2026-11-09 時点で作業中・未コミット）
   Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache,
                  TinyGltfImpl（tinygltf / stb_image の実装の埋め込み。プロジェクトで1か所だけ）
   AI/            EngineNavGrid（A*）
@@ -211,8 +288,8 @@ Source/Engine/
 | Animator | アニメの制御（UE の AnimInstance）。グラフが空ならクリップ1つをクロスフェード再生、グラフがあればグラフが姿勢を決める（6章） | `clipIndex, speed, loop, playing, blendTime, params, graph, graphPath, montages`。`Play()`, `PlayMontage("名前")`, `StopMontage()`, `WasFired("通知名")` |
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
-| Player | 操作キャラ。**これを持つEntityがプレイヤー** | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead` を渡す |
-| Opponent | 敵。NavGrid の経路でプレイヤーを追い、近づいたら攻撃。HP 0 で倒れてから消える | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
+| Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
+| Opponent | 敵。NavGrid の経路でプレイヤーを追い、近づいたら攻撃。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
 | Spawner | Prefab から敵をウェーブで湧かせる | `prefabPath, waveCount, baseCount, countIncrease, spawnInterval, firstDelay, waveDelay, spawnRadius` |
@@ -220,7 +297,8 @@ Source/Engine/
 | ScreenUI | Title / Result 画面 | `title, subtitle, buttonText, nextScene, showResult` |
 | PrefabInstance | どの Prefab から作ったか | `path` |
 
-### 今のゲームの仕様
+### 今のゲームの仕様（実装済みの部分。新しい方針は0章）
+今の実装は「1人のプレイヤーが、1種類の敵のウェーブを倒す」形。0章の協力型 PvE へ、ロードマップに沿って作り変えていく。
 - 操作：右ドラッグで視点、WASD 移動、Space ジャンプ、左クリックで射撃
 - 射撃：基本ダメージ 34。ヒットボックスの頭は倍率（既定2倍）。壁の向こうには当たらない。ヒットボックスが無くHPを持つ物はメッシュで判定。倒れている最中の敵には当たらない。
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
@@ -240,9 +318,10 @@ Source/Engine/
 - `AnimationSystem::Update` の中の順番（Entity ごと）：
   1. ローカル姿勢を決める：Animator（グラフあり）→ Animator（クリップ1つ・クロスフェード）→ SkinnedMesh（クリップ1つ）の順に、あるものを使う
   2. モンタージュを上に重ねる（再生中だけ）
-  3. 一人称なら `fpHideBone` を潰す
-  4. 通知の記録（`events`、表示用の `lastEvent`）
-  5. 行列にして `boneGlobal` / `palette` へ
+  3. エイムオフセットで背骨を曲げる（`an->aim.enabled` のときだけ）
+  4. 一人称なら `fpHideBone` を潰す
+  5. 通知の記録（`events`、表示用の `lastEvent`）
+  6. 行列にして `boneGlobal` / `palette` へ
 - Trigger パラメータは、グラフの計算が終わったら毎フレーム 0 に戻す（1フレームだけ有効）。
 
 ### グラフ（ノードの木）
@@ -251,7 +330,9 @@ Source/Engine/
   - **Clip**（`AnimClipNode`）：クリップを**名前で**指定して再生。`loop`、`speed`、`speedParam`（Float パラメータを速度に掛ける）、`notifies`（時刻と名前）
   - **BlendSpace1D**（`AnimBlendSpace1DNode`）：Float パラメータ1つを軸に、近い2つのクリップを混ぜる。2つは**同じ割合の位置（位相）**で再生する（歩きと走りの足がずれない）。`smoothTime` で入力をなめらかに追う
   - **StateMachine**（`AnimStateMachineNode`）：状態（中身は Clip か BlendSpace1D）と遷移。遷移は**上から順に調べて最初に成り立ったもの**を使う。条件はすべて成り立ったとき（Float は `> / <`、Bool は true / false、Trigger は立っていれば）。`from = -1` は「Any（どの状態からでも）」。`waitForEnd` は「移る前の状態のクリップが終わってから」（ループしないクリップのときだけ効く）
-- 根に置けるのは3種類どれでも。状態の中身にステートマシンは入れられない（入れ子なし）。
+  - **LayeredBlend**（`AnimLayeredBlendNode`。UE の Layered blend per bone）：`basePose`（全身。移動のステートマシンなど）の上に、`blendPose`（構え・攻撃など）を `maskBone`（例：`"spine"`）から先の骨にだけ重ねる。`maskBone` が空なら全身。`weight` と `weightParam`（Float パラメータを掛ける）、境目を何段の骨でなじませるかの `maskBlendDepth`。重みが 0 のときも両方の時間を進める
+- 状態の中身にステートマシンは入れられない（入れ子なし）。
+- **エイムオフセット**（`AnimAimOffset`。`AnimatorComponent::aim`。UE の Aim Offset）：視点の上下・左右の角度のパラメータ（`pitchParam` 既定 `"AimPitch"`、`yawParam`。度）に合わせて、`startBone` から `endBone` までの背骨を少しずつ曲げる。上下を向いたクリップは要らない（骨を回して作る手続き型）。`maxPitch` / `maxYaw` で制限、`invertPitch` / `invertYaw` で向きを反転。グラフとモンタージュの後にかける。プレイヤーは `AimPitch` を渡している。
 - `CondOp` と `AnimParamType` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
 
 ### パラメータ・通知・モンタージュ
@@ -259,11 +340,11 @@ Source/Engine/
   - 書くときは `params.SetIfExists("Speed", v)`（グラフにその名前が無ければ何もしない。勝手に増やさないため）。
   - 名前は Component の定数で持つ（`PlayerComponent::kAnimSpeed` など）。Player と Opponent で `Speed / Attack / Dead` は同じ名前。
 - **通知（Notify）**：Clip ノード（とモンタージュ）の時刻に名前を置くと、再生位置がそこを通ったフレームに `events` に入る。ゲーム側は**次のフレームに** `an->WasFired("Hit")` で受け取る。
-- **モンタージュ**：グラフの上に1回だけ重ねて再生するクリップ（UE の Anim Montage）。定義（名前・クリップ・`blendIn`・`blendOut`・`rate`・通知）はグラフのアセットに保存する。ゲーム側は `PlayMontage("HitReact")` と名前で呼ぶ。下のグラフは止めずに進むので、抜けると「今の」動きに戻る。再生中に別のモンタージュを呼ぶと、今の姿勢から混ぜて切り替える。
+- **モンタージュ**：グラフの上に1回だけ重ねて再生するクリップ（UE の Anim Montage）。定義（名前・クリップ・`blendIn`・`blendOut`・`rate`・通知、重ねる範囲の `maskBone` / `maskBlendDepth`）はグラフのアセットに保存する。`maskBone` が空なら全身、骨の名前なら上半身などだけに重ねる。ゲーム側は `PlayMontage("HitReact")` と名前で呼ぶ。下のグラフは止めずに進むので、抜けると「今の」動きに戻る。再生中に別のモンタージュを呼ぶと、今の姿勢から混ぜて切り替える。同時に再生できるのは1つ。
 
 ### グラフのアセット（`AnimGraphSerializer`）
-- `Data/Anim/<名前>.animgraph.json`。中身：パラメータの一覧（今の値が初期値。Trigger は 0 で保存）、ノードの木、モンタージュの定義。
-- 版は `kAnimGraphVersion = 4`（1 最初 / 2 エディタ上の位置 / 3 通知 / 4 モンタージュ）。Scene と同じく「その版以降だけ読む」。
+- `Data/Anim/<名前>.animgraph.json`。中身：パラメータの一覧（今の値が初期値。Trigger は 0 で保存）、ノードの木、モンタージュの定義、エイムオフセットの設定。
+- 版は `kAnimGraphVersion = 7`（1 最初 / 2 エディタ上の位置 / 3 通知 / 4 モンタージュ / 5 モンタージュの重ねる範囲 / 6 LayeredBlend / 7 エイムオフセット）。Scene と同じく「その版以降だけ読む」。
 - Scene に保存するのは `graphPath` だけ（`anGraph`）。読み込み時にグラフのファイルを読む。**グラフの変更は「保存」ボタンを押すまでファイルに残らない。**
 - 名前だけ（`Enemy`）を入れると `AnimGraphPathFromName` が `Data/Anim/Enemy.animgraph.json` にする。
 - 今あるグラフ：`Character` / `Enemy` / `Large` / `Player1`。
@@ -303,7 +384,7 @@ Source/Engine/
 ## 8. 保存形式
 
 - Scene：`Json/<Scene名>.json`。一覧は `Json/Scenes.json`。起動時は `Scenes.json` の一覧で読み込み、無いときだけデモの2Sceneを作る。`Json/` フォルダが無ければ起動時に作る。
-- Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 1`。確認用の表示モード（`debugView`）だけは保存しない。
+- Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
 - **Scene の schemaVersion は現在 19。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
@@ -360,6 +441,7 @@ Source/Engine/
 - **`.hlsl` / `.hlsli` の文字コードは UTF-8（BOM なし）**。fxc で確かめた結果：
   - **BOM 付き** → `error X3000: Illegal character in shader file`。`.hlsli` に BOM があると、それを include した側で `unexpected #endif` や「型を解決できません」になる。
   - **Shift-JIS** → 日本語コメントの最後の文字の2バイト目が `\`（`表` `ソ` `能` など）だと、**次の行まで黙ってコメントになる**（エラーが出ないぶん危ない）。
+  - **一覧には「UTF-8 シグネチャ付き」（＝BOM 付き。ダメ）と「UTF-8 シグネチャなし」（OK）が並んでいて、間違えやすい**（M-3 で `Common.hlsli` が BOM 付きになり `Illegal character` が出た）。手順には必ず「シグネチャ**なし**」を強調して書く。
   - **VS で新規作成して貼り付けると BOM 付きか Shift-JIS になる。** 貼った後に「ファイル → 名前を付けて保存 →『上書き保存』の▼ → エンコード付きで保存」で「Unicode (UTF-8 シグネチャなし) - コードページ 65001」を選んで保存してもらう（コードは本文に載せ、ユーザーがコピペする流れ）。
   - まとめて変換するコマンド（UTF-8 として読めないファイルだけを Shift-JIS から変換する）：
     ```
@@ -374,24 +456,38 @@ Source/Engine/
   - `ShaderCommon.h` の `ObjectCB` ⇔ `Common.hlsli` の `cbuffer ObjectCB`
   - `SkinnedMeshShader.cpp` / `EngineShadowMap.cpp` の `BoneCB` ⇔ `Skinning.hlsli` の `cbuffer Bones`（128 個）
   - `EngineShadowMap.cpp` の `SCB` ⇔ `Shadow.hlsli` の `cbuffer ShadowCB`
-  - `EngineSkybox.cpp` の `SkyCB` ⇔ `Skybox.hlsli`、`PostProcess.cpp` の `PostCB` ⇔ `PostProcess.hlsli`
+  - `EngineSkybox.cpp` の `SkyCB` ⇔ `Skybox.hlsli`（最後が `skyParams`）、`PostProcess.cpp` の `PostCB` ⇔ `PostProcess.hlsli`
+  - `ObjectCB` の最後は `sky`（空の明るさ・回転の cos / sin）。項目を足すときは `sky` の後ろに、C++ と HLSL の両方へ
   - 入力レイアウト（`MeshShader.cpp` / `SkinnedMeshShader.cpp` / `EngineShadowMap.cpp`）⇔ 各 `VSIn` のセマンティクス。レイアウトは読み込んだ `.cso` のバイトコードで作る。
-- スロット：`b0`＝`ObjectCB`（オブジェクト＋ライト＋カメラ位置＋描き方）、`b1`＝ボーン、`t0`＝テクスチャ、`t1`＝シャドウマップ、`s0`＝通常（線形・繰り返し）、`s1`＝影用の比較サンプラ。ポストプロセスは別で、`b0`＝`PostCB`、`t0`＝色、`t1`＝法線、`t2`＝深度、`s0`＝ポイント・端で止める。
+- スロット：`b0`＝`ObjectCB`（オブジェクト＋ライト＋カメラ位置＋描き方）、`b1`＝ボーン、`t0`＝テクスチャ、`t1`＝シャドウマップ、`t2`＝映り込み用のぼかした空（`specular_pmrem`）、`t3`＝映り込みの強さの表（`lut_ggx`）、`s0`＝通常（線形・繰り返し）、`s1`＝影用の比較サンプラ、`s2`＝映り込み用（線形・端で止める）。`t2`/`t3` があるかは `params.w`（`SetEnvironment` で両方そろったら 1）。ポストプロセスは別で、`b0`＝`PostCB`、`t0`＝色、`t1`＝法線、`t2`＝深度、`s0`＝ポイント・端で止める。
 - **描き方のデータの流れ**：`ShaderComponent`（Scene）が `ShadingParams`（Graphics）を1つ持つ → `RenderSystem` が取り出して `Draw` に渡す → `FillShading` が `ObjectCB` に詰める。Graphics 側は Component を知らない。
 - **描き方の項目を足すときに直す場所**：`ShadingParams.h` → `ShaderCommon.h`（`ObjectCB`・`FillShading`）→ `Shader/Common.hlsli`（`cbuffer ObjectCB`）→ `Shader/Lighting.hlsli`（式）→ `InspectorPanel.cpp`（Inspector）→ `StageSerializer.cpp`（版を +1）。`MeshShader` / `SkinnedMeshShader` / `RenderSystem` は触らなくてよい。
 
 ### ライティングと材質（`ShadeSurface`）
-- **Lit**：`下地 ×（アンビエント＋平行光×影）` ＋ スペキュラ（Blinn-Phong）＋ リムライト ＋ 金属の映り込み。
+- **Lit**：`下地 ×（アンビエント＋平行光×影）` ＋ スペキュラ（GGX）＋ リムライト ＋ 映り込み（IBL）。
 - **Unlit**：テクスチャ × 色そのまま。
 - **Toon**：ハーフランバートを `toonThreshold` で2色に分ける（陰には `toonShadeColor` を掛ける）。シャドウマップの影も同じ「陰の色」になる。スペキュラ・リムは 0.5 を境に2値化。任意でテクスチャの単純化（周り8点との平均 → 明るさを段階に丸める。色相は保つ）。
-- **metallic / roughness**（簡易版。PBR ではない）：metallic で下地の色（拡散）が消え、ハイライトと映り込みに下地の色が付く。roughness はハイライトの大きさ（`power = 2 / roughness^4 − 2`）と映り込みのぼけ。
-- **映り込みは空の色を式で計算している**（キューブマップは使っていない）。空の3色と式は `SkyColor.hlsli` の1か所だけ（空の描画 `SkyboxPS` と `Lighting.hlsli` の両方が include する）。
+- **metallic / roughness**（M-2・M-3 で直した。PBR の式を LDR・ガンマ空間のまま使っている）：
+  - **ハイライトは GGX**（D：GGX、G：Smith / Schlick-GGX、F：Schlick のフレネル）。光の総量が roughness によらず同じなので、なめらか＝小さく強い、粗い＝大きく弱い。前の Blinn-Phong は粗いほど全体が白っぽく光っていた。拡散光が π で割っていないので、ハイライトも π 倍して釣り合わせている。roughness の下限は 0.05。
+  - 反射率 `f0` は非金属 0.04、金属は下地の色。metallic で拡散（下地の色）が消える。
+  - **強さ `specScale = lerp(specularStrength, 1, metallic)`**：非金属は「ハイライトの強さ」（1 が現実の強さ、0 なら出ない）、金属は必ず 1。映り込みにも同じ倍率が掛かる。
+  - **映り込み（IBL、スプリットサム）**：`EnvironmentColor(r, rough)`＝`specular_pmrem` を `lod = rough × (ミップ数 − 1)` で読んで `HdrToScreen`、`EnvironmentBrdf`＝`f0 × A + B`（`lut_ggx` を `(N・V, rough)` で読む。r = A、g = B。上の行が rough 0 であることを中身で確認済み）。景色が無いとき（`params.w` = 0）は前のグラデーションの空と `f0`。
+  - **Toon**：ハイライトの形は GGX の「真ん中に対する割合」を 0.5 で2値化（大きさは roughness）、粗い面は `0.0625 / α²` で暗くする（roughness 0.5 以下は最大）。金属の映り込みは景色を roughness 0.5 以上でぼかして明るさを3段に丸める（`PosterizeBrightness`）。非金属には映り込みを足さない。
+- グラデーションの空（3色と式）は `SkyColor.hlsli` の1か所だけ（空の描画 `SkyboxPS` と `Lighting.hlsli` の両方が include する）。今は空の画像が読めなかったときの代わり。
+
+### 空（`EngineSkybox` と `EnvironmentMap`）
+- **空は HDR のキューブマップ**（`Data/Sprite/IBL_PureSky/skybox.dds`。1024²・RGBA16F・ミップ 11・6面）。どのフォルダを使うかは `EnvironmentMap.cpp` の `kIblFolder`（`"IBL"` にすると野原の写真）。`ViewportPanel` が `EnvironmentMap envMap` を持ち、`skybox.Render(..., envMap.Sky())` に渡す。映り込み用の `envMap.Specular()`（`specular_pmrem.dds`）と `envMap.BrdfLut()`（`lut_ggx.dds`、2D）は `shader.SetEnvironment(...)` / `skinnedShader.SetEnvironment(...)` で渡す。
+- 読めなかったら `Sky()` が nullptr になり、空は前のグラデーションで描かれる（`SkyCB.camPos.w` が 0）。VS の「出力」に `[DDS] ...` と理由が出る。
+- `SkyboxPS` は `HdrToScreen`（露出 → ACES の近似のトーンマップ → 1/2.2 のガンマ）で画面の色にする。HDR の値は上限が無い（曇り空は最大 5 くらい、`IBL` の太陽は約 57000）。
+- **空の明るさと回転**（M-4）：`SceneLighting::skyExposure`（露出の倍率、既定 1）と `skyRotation`（Y 軸まわり、度、既定 0）。Environment パネルの「空」の欄で編集し、`Environment.json` に保存する。`SkyShaderParams(lighting)` が `(明るさ, cos, sin, 0)` を作り、空（`SkyCB.skyParams`）と映り込み（`ObjectCB.sky`。`MeshShader` / `SkinnedMeshShader` が `SetLight` で受け取る）の両方に同じ値を渡すので、空と映り込みは必ず一緒に回り、一緒に暗くなる。回転は `RotateSkyDir`（空を +θ 回す＝見る向きを −θ 回して読む）。
+- **DDS は自作の `DdsTexture` で読む。** DirectXTex は使わない：`DirectXTex.lib` は /MDd（DLL 版の実行時ライブラリ）、Game は /MTd（静的版）なので、リンクすると LNK2038 になる。`DdsTexture` が読めるのは圧縮していない形式（RGBA16F / RGBA32F / RG16F / RG32F / R32F / RGBA8 / BGRA8）、2D とキューブ、ミップ付き、旧形式と DX10 のヘッダ。
+- キューブの面の向きは D3D の標準（+X, −X, +Y, −Y, +Z, −Z）のまま、ワールドの向きで読む（上下は確認済み。左右が写真と鏡になっているかは未確認だが、空なので目立たない）。
 - **アウトライン（背面法）**：`outlineWidth > 0` の Entity は、本描画の直後に同じ `Draw` の中でもう1回描く。法線方向に押し出した形を `CULL_FRONT`（裏面だけ）で単色描画。定数バッファもボーンも本描画のものを使う。太さはワールドの長さ。
 
 ### 描画の流れ（`ViewportPanel::RenderScene`）
 1. **シャドウパス**：カメラに追従するライト行列を作り、ライトから見た深度をシャドウマップに書く（静的 → スキンド）。
 2. **`rt.Begin`**：シーン用の描画先（色・法線・深度）をクリアし、**色だけ**を描画先にする。
-3. **空**：色だけを描く（空のシェーダは法線を書かないため）。
+3. **空**：色だけを描く（空のシェーダは法線を書かないため）。空のキューブマップは `t0`／サンプラは `s0`（空専用。線形・端で止める）。
 4. **`rt.BindSceneTargets`**：色＋法線の2枚を描画先にする（MRT）。
 5. **静的メッシュ → スキンドメッシュ**：`SurfacePS` / `OutlinePS` が色（`SV_TARGET0`）とワールド法線（`SV_TARGET1`。`×0.5+0.5`、a=1 が「物がある」印）を同時に書く。
 6. **ポストプロセス**：`postProcess.Apply(context, rt, finalRT, postSettings, proj)`。`rt` の色・法線・深度を読んで `finalRT` に書く。**Viewport に表示するのは `finalRT`。**
@@ -427,17 +523,20 @@ Source/Engine/
   - 影の形は光の角度で決まる。今の光の向き（-0.4, -1.0, 0.35）は高さ約 62° なので、影は足元に短くまとまり、手足の動きが分かりにくい。動きを見せたいなら Environment の「光の向き」で光を低くする（例：(-1.0, -0.45, 0.2) で約 24°、影は身長の約 2.3 倍）。
   - 一人称のプレイヤーの影は、`fpHideBone` を潰した後の姿勢を使うので、頭が無い。
   - `ViewportPanel::Initialize` は各シェーダの `Initialize` の戻り値を見ていない（`.cso` が無くても起動は続き、その部分が描かれないだけ）。
-  - シェーダのホットリロードは無い（`.hlsl` を変えたらビルドして起動し直す）。
-- `Data/Sprite/IBL/` に IBL 用の DDS が7つある（約 285MB、Git 管理下）が、**使っていない**。中身は屋外の実写 HDRI から作った正しい一式（キューブ 1024²・RGBA16F・ミップ付き、`specular_pmrem` は事前計算済み）。本格的な PBR をやるなら使えるが、Toon 路線とは絵が合わない。布用の3つ（`sheen_pmrem` / `lut_charlie` / `lut_sheen_e`）は使い道がない。
+  - シェーダのホットリロード（`ShaderHotReload`）は作業中・未コミット（2026-11-09 時点）。それまでは `.hlsl` を変えたらビルドして起動し直す。
+- IBL 用の DDS は2組（どちらも Git 管理下。1組 約 270MB）：`Data/Sprite/IBL/`（野原の写真）と `Data/Sprite/IBL_PureSky/`（曇り空。元の `overcast_soil_puresky_2k.hdr` も入っている）。中身はどちらもキューブ 1024²・RGBA16F・ミップ付き、`specular_pmrem` は事前計算済み、`lut_ggx` は 1024² の RGBA8。**今使っているのは `IBL_PureSky/` の `skybox.dds`（空の描画）・`specular_pmrem.dds` と `lut_ggx.dds`（映り込み）**。`diffuse_iem`（空から来る拡散光）はまだ使っていない（環境光は一様な色のまま）。布用の `sheen_pmrem` / `lut_charlie` / `lut_sheen_e` は使い道がない。
+- 空を回しても、光の向き（`lightDir`）は一緒に回らない（太陽と影の向きを合わせるなら手で直す）。空の回転は Y 軸まわりだけ。「空の明るさ」は空と映り込みにだけ効き、メッシュの環境光・光の強さとは別。
+- 曇り空なので太陽ははっきりしない。`IBL`（野原）の太陽の向きは (0.533, 0.753, 0.386)（高さ約 49°）、`IBL_PureSky` のいちばん明るい所は (0.805, 0.569, −0.167)（約 35°）。光の向き（`SceneLighting::lightDir`）は空とは別に設定する（自動では合わせない）。
 - **アニメーション**
-  - Blend Space は1軸だけ（2D は無い）。上半身だけ別の動き（ボーンごとのレイヤー）、ルートモーションは無い。
-  - 状態の中にステートマシンは入れられない。モンタージュは同時に1つ、全身に掛かる。
+  - Blend Space は1軸だけ（2D は無い）。ルートモーション、IK は無い。
+  - 状態の中にステートマシンは入れられない。モンタージュは同時に1つ。
   - 通知をゲーム側が受け取るのは1フレーム後。
   - Animation パネルのタイムラインは、グラフを使っていない Entity のときだけ。
   - Anim Graph パネルは選んだ Entity のグラフを直接編集する。同じグラフのファイルを使うほかの Entity には、保存して読み込み直すまで反映されない。
 - ヒットボックスは体の中心線に固定。ボーン（頭など）に追従しない。
-- NavGrid の範囲が固定（原点中心、60×60）。
-- プレイヤーの移動・攻撃は `PlayerComponent` 1つに全部入っている（キャラごとの差は未対応）。
+- NavGrid の範囲が固定（原点中心、60×60）。Play 中は毎フレーム作り直している。
+- プレイヤーの移動・攻撃・カメラ・射撃は `PlayerComponent` 1つに全部入っている（ロールごとの差は未対応）。
+- 新しいゲームで足りない土台（0章も参照）：陣営（味方／敵）、味方撃ちの防止、ダウン・蘇生の状態、武器・リロード・アビリティ・クールダウン、親子付け（Attach。`Entity` に `parent` / `children` の欄はあるが未使用。武器を手に持たせるのに要る）、物理（剛体・衝突・トリガ）、ゲーム用の UI（今の HUD は ImGui）、音、エフェクト。
 - Play中にコンポーネントを足した／消した結果は、編集用Worldにしか入らない。
 - Prefab の Apply / Revert、Component の追加／削除は Undo できない。
 - **エディタ**
@@ -449,13 +548,17 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。次は段階 1「3人チーム」の 1-1（AI 仲間1体がプレイヤーについて歩く）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+
+以下はエンジン側の残り（ゲーム作りで必要になったときに取り組む）：
+
 - ~~本格的なシェーダ~~ → **一区切り済み**。残っている候補：
   - 部位ごとの材質（`ShaderComponent` をサブメッシュ単位に）
-  - ~~HLSL をファイルに出す~~ → **済み**（`Shader/*.hlsl` → ビルドで `.cso`。コミット `f5ac873`）。残り：ホットリロード（実行中に `.hlsl` を `D3DCompile` し直す）
-  - metallic / roughness の見え方を直す（金属感とラフネスが期待と違う、とユーザーから指摘あり。次にやる）
-- ~~アニメーション（ブレンド、ステートマシンなど）~~ → **一区切り済み**（Animator、クロスフェード、ノードの木、Blend Space 1D、ステートマシン、ノードエディタ、通知、モンタージュ、グラフのアセット）。残っている候補：Blend Space 2D、上半身レイヤー、ルートモーション
+  - ~~HLSL をファイルに出す~~ → **済み**（`Shader/*.hlsl` → ビルドで `.cso`。コミット `f5ac873`）。ホットリロードは作業中
+  - ~~metallic / roughness の見え方を直す~~ → **M-1〜M-3 で済み**（空のキューブマップ、GGX のハイライト、IBL の映り込み）。M-4（Environment に「空の明るさ」「空の回転」）も済み。残りの候補：`diffuse_iem` で環境光を空から取る、Toon の金属の段の調整
+- ~~アニメーション（ブレンド、ステートマシンなど）~~ → **一区切り済み**（Animator、クロスフェード、ノードの木、Blend Space 1D、ステートマシン、LayeredBlend、エイムオフセット、ノードエディタ、通知、モンタージュ、グラフのアセット）。残っている候補：Blend Space 2D、ルートモーション
 - ~~ファイルの分割・フォルダ整理・エディタの日本語化・FPS 固定~~ → **済み**
 - 当たり判定（ボーン追従のヒットボックスなど）
-- プレイヤーのキャラごとの攻撃方法・移動方法
+- ~~プレイヤーのキャラごとの攻撃方法・移動方法~~ → 0章のロードマップ（段階 3 武器・段階 6 アビリティ）に入った
 - （必要になったら）ゲームの更新を固定ステップにする（物理を作るとき、60FPS を下回るほど重くなったとき）。入力の「押した1フレーム」を取りこぼさない工夫が要る
 - （必要になったら）Inspector の Component を折りたためるようにする（`CollapsingHeader`）

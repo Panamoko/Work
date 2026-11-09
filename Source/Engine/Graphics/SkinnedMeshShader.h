@@ -25,7 +25,9 @@ namespace uel {
         void SetLight(const SceneLighting& light);
         void SetShadow(ID3D11ShaderResourceView* srv, const DirectX::XMFLOAT4X4& lightViewProj);
         void SetCameraPosition(const DirectX::XMFLOAT3& pos) { cameraPos = pos; }
-
+        // 映り込みの景色。specularCube：粗さごとにぼかした空（キューブマップ）、brdfLut：映り込みの強さの表。
+        // どちらかが nullptr なら、映り込みは前のグラデーションの空で計算する。
+        void SetEnvironment(ID3D11ShaderResourceView* specularCube, ID3D11ShaderResourceView* brdfLut);
     private:
         Microsoft::WRL::ComPtr<ID3D11VertexShader>       vs;
         Microsoft::WRL::ComPtr<ID3D11PixelShader>        ps;
@@ -46,6 +48,12 @@ namespace uel {
         bool shadowEnabled = false;
         DirectX::XMFLOAT3 cameraPos{ 0.0f, 0.0f, 0.0f };
 
+        // 映り込み用（t2 = 景色、t3 = 強さの表、s2 = サンプラ）
+        Microsoft::WRL::ComPtr<ID3D11SamplerState> envSampler;   // 線形・端で止める
+        ID3D11ShaderResourceView* envSpecularSRV = nullptr;      // 非所有
+        ID3D11ShaderResourceView* brdfLutSRV = nullptr;          // 非所有
+        bool envEnabled = false;
+        DirectX::XMFLOAT4 skyParams{ 1.0f, 1.0f, 0.0f, 0.0f };   // 空の明るさと回転（SetLight で SkyShaderParams から作る）
         // アウトライン用（ふくらませた形の裏面だけを描く）
         Microsoft::WRL::ComPtr<ID3D11VertexShader>    vsOutline;
         Microsoft::WRL::ComPtr<ID3D11PixelShader>     psOutline;

@@ -16,14 +16,15 @@ namespace uel {
             return std::string(kAssetRoot) + "/Sprite/" + kIblFolder + "/" + name;
         }
 
-        // キューブマップを読む。2D の画像だったら使わない
-        bool LoadCube(ID3D11Device* device, const char* name, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv)
+        // DDS を読む。wantCube と形（キューブマップか 2D か）が違ったら使わない
+        bool LoadTexture(ID3D11Device* device, const char* name, bool wantCube,
+            Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& srv)
         {
             const std::string path = IblPath(name);
             DdsTextureInfo info;
             if (!LoadDdsTexture(device, path.c_str(), srv, &info)) return false;
-            if (!info.isCube) {
-                OutputDebugStringA(("[DDS] not a cube map: " + path + "\n").c_str());
+            if (info.isCube != wantCube) {
+                OutputDebugStringA(("[DDS] " + std::string(wantCube ? "not a cube map: " : "not a 2D texture: ") + path + "\n").c_str());
                 srv.Reset();
                 return false;
             }
@@ -33,6 +34,10 @@ namespace uel {
 
     bool EnvironmentMap::Initialize(ID3D11Device* device)
     {
-        return LoadCube(device, "skybox.dds", sky);
+        // 1つ失敗しても、残りは読む（読めたものだけ使う）
+        const bool okSky = LoadTexture(device, "skybox.dds", true, sky);
+        const bool okSpecular = LoadTexture(device, "specular_pmrem.dds", true, specular);
+        const bool okLut = LoadTexture(device, "lut_ggx.dds", false, brdfLut);
+        return okSky && okSpecular && okLut;
     }
 }
