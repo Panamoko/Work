@@ -26,7 +26,7 @@
 | 段階 | 内容 | 終わりの目安 | 状況 |
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
-| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 次。1-1 AI 仲間1体の追従 → 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順 |
+| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 作業中。1-1 AI 仲間1体の追従（**済み**）→ 1-1b AllyComponent の保存（**済み**。Scene の版 20）→ 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順 |
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
@@ -162,6 +162,7 @@
 | `Illegal character in shader file`・`unexpected #endif`・「型 〇〇 を解決できません」 | VS で `.hlsl` を新規作成して中身を貼り付けたら、UTF-8 BOM 付き（や Shift-JIS）で保存された | コードは本文に全部載せる（ユーザーは VS で追加してコピペする）。HLSL は「貼った後、エンコード付きで保存 → UTF-8 シグネチャなし」まで手順に書き、確かめ方も添える（9章） |
 | `'lod' が宣言されていません`・`no matching 1 parameter function`（M-4） | 「`return ...` の1行を差し替え」と指示したが、すぐ下に似た `return` 行があり、違うほうを差し替えた | 似た行が近くにあるときは1行の差し替えにせず、**関数ごと**差し替える |
 | 「上半身のレイヤーは無い」と思い込んだ | ほかのセッション（Animation）で作った機能が、CLAUDE.md に書かれていなかった | 作業の前に実際のファイルを読む。新しい物に気づいたら CLAUDE.md に足す（2章「複数のセッションで作業するときの決まり」） |
+| 保存して起動し直したら、AI 仲間の AllyComponent が消え、PlayerComponent と HitboxComponent が戻った（1-1b） | Player を複製した Entity が Prefab のインスタンスのままだった。インスタンスは読み込みのたびに Prefab の内容で作り直される（8章） | Prefab のインスタンスの Component を変える手順では、**保存の前に「リンクを解除」**（または「Prefab に反映」）を書く。確かめ方：Inspector に青い字の `Prefab：...` が出ていないこと |
 
 ---
 
@@ -223,7 +224,7 @@ Source/Engine/
   Platform/      Window
   Config/        EngineConfig（kAssetRoot, kSceneDir, SceneFilePath, kTargetFps, kMaxDeltaTime, ClampDeltaTime）
   Components/    Component（基底）と、すべての Component（フォルダの中は分けない）
-                 Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Opponent /
+                 Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Ally / Opponent /
                  Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance
   Scene/         EntityId, Entity, World
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）
@@ -297,6 +298,7 @@ Source/Engine/
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
 | Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
+| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。今は追従だけ：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まってプレイヤーを向く。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。アニメへ `Speed` を渡す |
 | Opponent | 敵。NavGrid の経路でプレイヤーを追い、近づいたら攻撃。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
@@ -409,7 +411,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 19。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 20。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -430,6 +432,7 @@ Source/Engine/
 | 17 | Animator（clip, speed, loop, blendTime） |
 | 18 | Animator のグラフのパス（`anGraph`） |
 | 19 | SkinnedMesh の `fpHideBone`（`skFpHide`） |
+| 20 | Ally（`hasAlly, alMoveSpeed, alFollowDist, alResumeDist, alRepath`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -526,6 +529,7 @@ Source/Engine/
 ## 10. 既知の制限・気づいている問題
 
 - `Game.vcxproj` に、存在しないファイル `External\SphereCast\Include\SphereCast.h` の登録が残っている（ビルドには影響しない）。
+- **日本語のコメントが壊れているファイルが2つある**（2026-11-09 に発見）：`Components/PlayerComponent.cpp`（コミット `53f5734` から）と `Systems/RenderSystem.cpp`（`cce8561` から）。Shift-JIS のファイルを UTF-8（BOM 付き）として保存し直したときに、日本語の部分が空白と記号に置き換わった（コードは無事で、ビルドも通る）。元のコメントは、その直前のコミットから読める（例：`git show b7bf732:Source/Engine/Components/PlayerComponent.cpp`）。PlayerComponent は 1-2 で手を入れるときに直す。
 - 外部ライブラリの Tracy / DirectXTex、`imgui_demo.cpp` は、今のエンジンからは使われていない。
 - `GraphicsDevice.cpp` の `Present(0, 0)` は VSync オフだが、横のコメントは「VSync ON」のまま。
 - **時間・FPS**
@@ -570,7 +574,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。次は段階 1「3人チーム」の 1-1（AI 仲間1体がプレイヤーについて歩く）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。今は段階 1「3人チーム」の途中（1-1 追従と 1-1b 保存は済み。次は 1-2 陣営）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 以下はエンジン側の残り（ゲーム作りで必要になったときに取り組む）：
 
