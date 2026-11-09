@@ -26,7 +26,7 @@
 | 段階 | 内容 | 終わりの目安 | 状況 |
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
-| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 次。1-1 AI 仲間1体の追従 → 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順で提案済み（AI 仲間の Component 名はユーザーが決める） |
+| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 次。1-1 AI 仲間1体の追従 → 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順 |
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
@@ -35,6 +35,14 @@
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
 | 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
 | 9 AI の高度化 | 蘇生の判断、危険回避、連携、集合 | AI を仲間と感じられる | |
+
+### 決めた設計
+- **「誰が操作するか」と「何ができるか（ロール）」を別の Component に分ける**（2026-11-09 決定）。
+  - 操作する側：`PlayerComponent`（プレイヤーの入力）、`AllyComponent`（AI 仲間の判断。全ロール共通。追従・狙う敵の選択・蘇生など）
+  - ロール：`TankComponent` / `DPSComponent` / `SupportComponent`（そのロールで「できること」＝武器の値・アビリティの動作だけ。「いつ使うか」は操作する側が決める）。作るのは段階 3（武器）と 6（アビリティ）
+  - 組み合わせ：プレイヤーの DPS ＝ `PlayerComponent` ＋ `DPSComponent`、AI の Support ＝ `AllyComponent` ＋ `SupportComponent`。3ロール × 2操作を 3＋2 個の部品で作れる。
+  - 現場での対応：UE の PlayerController / AIController（同じ Pawn をどちらも操作できる）と、Gameplay Ability System の Ability。
+  - AI のロールごとの判断の違い（Tank は前に出る、Support は HP の低い味方を優先、など）は、`AllyComponent` が付いているロールの Component を見て変える（AI の Phase 3「役割連携」。ロードマップでは段階 9）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
 - **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
@@ -230,7 +238,7 @@ Source/Engine/
                  ShadingParams（描き方のデータ）,
                  EngineSkybox, EngineShadowMap, SceneLighting, PostProcess, PostProcessSettings,
                  DdsTexture（DDS の読み込み。自作）, EnvironmentMap（空・映り込み用のキューブマップと LUT。Data/Sprite/IBL_PureSky）,
-                 ShaderHotReload（実行中に .hlsl を保存するとコンパイルし直す。2026-11-09 時点で作業中・未コミット）
+                 ShaderHotReload（実行中に .hlsl を保存するとコンパイルし直す。作業中：コミット済みだが、2026-11-09 時点では Engine からまだ呼ばれていない）
   Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache,
                  TinyGltfImpl（tinygltf / stb_image の実装の埋め込み。プロジェクトで1か所だけ）
   AI/            EngineNavGrid（A*）
@@ -331,8 +339,15 @@ Source/Engine/
   - **BlendSpace1D**（`AnimBlendSpace1DNode`）：Float パラメータ1つを軸に、近い2つのクリップを混ぜる。2つは**同じ割合の位置（位相）**で再生する（歩きと走りの足がずれない）。`smoothTime` で入力をなめらかに追う
   - **StateMachine**（`AnimStateMachineNode`）：状態（中身は Clip か BlendSpace1D）と遷移。遷移は**上から順に調べて最初に成り立ったもの**を使う。条件はすべて成り立ったとき（Float は `> / <`、Bool は true / false、Trigger は立っていれば）。`from = -1` は「Any（どの状態からでも）」。`waitForEnd` は「移る前の状態のクリップが終わってから」（ループしないクリップのときだけ効く）
   - **LayeredBlend**（`AnimLayeredBlendNode`。UE の Layered blend per bone）：`basePose`（全身。移動のステートマシンなど）の上に、`blendPose`（構え・攻撃など）を `maskBone`（例：`"spine"`）から先の骨にだけ重ねる。`maskBone` が空なら全身。`weight` と `weightParam`（Float パラメータを掛ける）、境目を何段の骨でなじませるかの `maskBlendDepth`。重みが 0 のときも両方の時間を進める
+    - **置けるのは根だけ**（エディタの制限）。2つの入力に置けるのは Clip / BlendSpace1D / StateMachine。
+    - 通知は両方の入力から出る。`HasNotify` は子まで探す（だから `OpponentComponent` の「グラフに `Hit` があるか」は入力の中まで見る）。
+    - 「再生が終わったか」（`IsFinished`）は下地（`basePose`）で判断する。
+    - マスクは骨の名前・段数・骨格が変わったときだけ作り直す（毎フレームは作らない）。
 - 状態の中身にステートマシンは入れられない（入れ子なし）。
-- **エイムオフセット**（`AnimAimOffset`。`AnimatorComponent::aim`。UE の Aim Offset）：視点の上下・左右の角度のパラメータ（`pitchParam` 既定 `"AimPitch"`、`yawParam`。度）に合わせて、`startBone` から `endBone` までの背骨を少しずつ曲げる。上下を向いたクリップは要らない（骨を回して作る手続き型）。`maxPitch` / `maxYaw` で制限、`invertPitch` / `invertYaw` で向きを反転。グラフとモンタージュの後にかける。プレイヤーは `AimPitch` を渡している。
+- **エイムオフセット**（`AnimAimOffset`。`AnimatorComponent::aim`。UE の Aim Offset）：**ノードではなく、グラフのアセットに一緒に保存する設定**（UE ではノードだが、根に箱を置くとエディタで中のステートマシンを開けなくなるため、こうした）。視点の上下・左右の角度のパラメータ（`pitchParam` 既定 `"AimPitch"`、`yawParam`。度）に合わせて、`startBone` から `endBone` までの背骨を少しずつ曲げる。上下を向いたクリップは要らない（骨を回して作る手続き型）。`maxPitch` / `maxYaw`（既定 60 度）で制限、`invertPitch` / `invertYaw` で向きを反転。グラフとモンタージュの後にかける。プレイヤーは `AimPitch` を渡している（グラフにそのパラメータとエイムの設定が無ければ何も起きない）。
+  - `enabled` の既定は false（使うときに Anim Graph の「エイム」の欄でオンにする）。
+  - 回す軸は**モデルの空間**（上下は X 軸、左右は Y 軸）。骨ごとのローカルの軸の向きがばらばらなモデルでも同じ向きに曲がる。左手系なので、上を + にするため X 軸まわりは符号を逆にしている。
+  - 角度は曲げる骨の本数で等分して、根元の骨から順に足していく（腰から急に折れず、背中全体で反る）。
 - `CondOp` と `AnimParamType` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
 
 ### パラメータ・通知・モンタージュ
@@ -347,12 +362,19 @@ Source/Engine/
 - 版は `kAnimGraphVersion = 7`（1 最初 / 2 エディタ上の位置 / 3 通知 / 4 モンタージュ / 5 モンタージュの重ねる範囲 / 6 LayeredBlend / 7 エイムオフセット）。Scene と同じく「その版以降だけ読む」。
 - Scene に保存するのは `graphPath` だけ（`anGraph`）。読み込み時にグラフのファイルを読む。**グラフの変更は「保存」ボタンを押すまでファイルに残らない。**
 - 名前だけ（`Enemy`）を入れると `AnimGraphPathFromName` が `Data/Anim/Enemy.animgraph.json` にする。
-- 今あるグラフ：`Character` / `Enemy` / `Large` / `Player1`。
+- 今あるグラフ（2026-11-09 時点）：
+  - `Enemy`：版 7。根が LayeredBlend（下地＝Idle / Run / Death のステートマシン、重ねる側＝Guard / Attack / Death のステートマシン、`spine` から先）。エイムを使っている。モンタージュ `HitReact`
+  - `Players`：版 6。根が LayeredBlend（入力は2つともステートマシン）。エイムは無し
+  - `Character` / `Large` / `Player1`：版 2。根がステートマシンだけ
 
 ### エディタ
-- **Inspector の Animator 欄**：クリップ1つの再生、グラフのファイルの保存／読み込み、グラフの根が Clip / BlendSpace1D ならその詳細、パラメータの編集。
-- **Anim Graph パネル**：上にファイルの行、左にパラメータとモンタージュ、中央にキャンバス、右に選んだものの詳細。
+- **Inspector の Animator 欄**：クリップ1つの再生、グラフのファイルの保存／読み込み、グラフの根が Clip / BlendSpace1D / LayeredBlend ならその詳細（LayeredBlend は入力の中身も入れ子で出る）、パラメータの編集。
+- **Anim Graph パネル**：上にファイルの行、左にパラメータ・モンタージュ・エイム、中央にキャンバス、右に選んだものの詳細。
   - ポーズグラフ（根のノード → 出力ポーズ）。右クリックでノードの追加・置き換え・削除。StateMachine はダブルクリックで中へ。
+  - 右クリックの「Layered Blend（上半身に重ねる）」で根を置き換えると、**今までの根のノードが自動で下地に入る**（重ねる範囲は、名前に `spine` を含む最初の骨が初期値）。
+  - 根が LayeredBlend のときは、左に入力の箱が2つ（下地・重ねる側）出る。箱をクリックで右に中身、右クリックで入力の置き換え・削除、StateMachine ならダブルクリックで開く（上の行は `AnimGraph > 下地の State Machine` のように出る。開いているのがどれかは `g.smSlot`：0 = 根、1 = 下地、2 = 重ねる側）。
+  - 「全体を表示（F）」は、箱全体が入る大きさ（最大 100%）に合わせる。別のグラフを開いたときも自動で合わせる。
+  - 左の欄の「エイム」：使う／使わない、曲げ始め・曲げ終わりの骨、上下・左右のパラメータ（無ければ「作る」ボタン）、最大の角度、反転。曲げる骨の本数と今の角度も出る。
   - ステートマシンの画面：右クリックで状態の追加・遷移の追加、ドラッグで移動、ホイールで拡大縮小、F で全体表示。
 - **Animation パネル**：クリップの一覧とタイムライン（グラフを使っていない Entity のとき）。
 - Asset Browser のグラフ（`[グラフ]`）は、Inspector や Anim Graph のファイル欄へドラッグ＆ドロップで読み込める（種類 `ASSET_ANIMGRAPH`）。
@@ -523,7 +545,7 @@ Source/Engine/
   - 影の形は光の角度で決まる。今の光の向き（-0.4, -1.0, 0.35）は高さ約 62° なので、影は足元に短くまとまり、手足の動きが分かりにくい。動きを見せたいなら Environment の「光の向き」で光を低くする（例：(-1.0, -0.45, 0.2) で約 24°、影は身長の約 2.3 倍）。
   - 一人称のプレイヤーの影は、`fpHideBone` を潰した後の姿勢を使うので、頭が無い。
   - `ViewportPanel::Initialize` は各シェーダの `Initialize` の戻り値を見ていない（`.cso` が無くても起動は続き、その部分が描かれないだけ）。
-  - シェーダのホットリロード（`ShaderHotReload`）は作業中・未コミット（2026-11-09 時点）。それまでは `.hlsl` を変えたらビルドして起動し直す。
+  - シェーダのホットリロード（`ShaderHotReload`、`ViewportPanel::ReloadShaders`）は作業中。コミットはされているが、2026-11-09 時点では `Engine` が `ShaderHotReload` を持っているだけで、`Initialize` / `Update` も `ReloadShaders` も呼ばれていない（まだ動かない）。それまでは `.hlsl` を変えたらビルドして起動し直す。
 - IBL 用の DDS は2組（どちらも Git 管理下。1組 約 270MB）：`Data/Sprite/IBL/`（野原の写真）と `Data/Sprite/IBL_PureSky/`（曇り空。元の `overcast_soil_puresky_2k.hdr` も入っている）。中身はどちらもキューブ 1024²・RGBA16F・ミップ付き、`specular_pmrem` は事前計算済み、`lut_ggx` は 1024² の RGBA8。**今使っているのは `IBL_PureSky/` の `skybox.dds`（空の描画）・`specular_pmrem.dds` と `lut_ggx.dds`（映り込み）**。`diffuse_iem`（空から来る拡散光）はまだ使っていない（環境光は一様な色のまま）。布用の `sheen_pmrem` / `lut_charlie` / `lut_sheen_e` は使い道がない。
 - 空を回しても、光の向き（`lightDir`）は一緒に回らない（太陽と影の向きを合わせるなら手で直す）。空の回転は Y 軸まわりだけ。「空の明るさ」は空と映り込みにだけ効き、メッシュの環境光・光の強さとは別。
 - 曇り空なので太陽ははっきりしない。`IBL`（野原）の太陽の向きは (0.533, 0.753, 0.386)（高さ約 49°）、`IBL_PureSky` のいちばん明るい所は (0.805, 0.569, −0.167)（約 35°）。光の向き（`SceneLighting::lightDir`）は空とは別に設定する（自動では合わせない）。

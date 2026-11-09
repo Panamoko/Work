@@ -11,6 +11,7 @@
 #include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/OpponentComponent.h"
+#include "Engine/Components/AllyComponent.h"
 #include "Engine/Components/ScreenUIComponent.h"
 #include "Engine/Components/GameRuleComponent.h"
 #include "Engine/Components/HitboxComponent.h"
@@ -519,6 +520,21 @@ namespace uel {
             ImGui::PopID();
         }
 
+        // AllyComponent（AI 仲間）
+        if (auto* al = e->GetComponent<AllyComponent>()) {
+            ImGui::PushID("cmp_ally");
+            ImGui::BulletText(u8"AllyComponent（AI 仲間）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<AllyComponent>();
+            else {
+                ImGui::DragFloat(u8"移動速度", &al->moveSpeed, 0.1f, 0.0f, 50.0f);
+                ImGui::DragFloat(u8"止まる距離", &al->followDistance, 0.1f, 0.5f, 30.0f);
+                ImGui::DragFloat(u8"動き出す距離", &al->resumeDistance, 0.1f, 0.5f, 30.0f);
+                ImGui::DragFloat(u8"経路の計算間隔", &al->repathInterval, 0.05f, 0.1f, 5.0f, u8"%.2f 秒");
+                if (al->resumeDistance < al->followDistance) al->resumeDistance = al->followDistance;    // 動き出す距離は、止まる距離より短くしない
+            }
+            ImGui::PopID();
+        }
+
         // HPComponent（表示＋削除）
         if (auto* hpc = e->GetComponent<HPComponent>()) {
             ImGui::PushID("cmp_hp");
@@ -619,6 +635,7 @@ namespace uel {
             ImGui::Separator();
             if (!e->GetComponent<PlayerComponent>() && ImGui::MenuItem(u8"PlayerComponent（操作キャラ）")) e->AddComponent<PlayerComponent>();
             if (!e->GetComponent<OpponentComponent>() && ImGui::MenuItem(u8"OpponentComponent（敵）"))  e->AddComponent<OpponentComponent>();
+            if (!e->GetComponent<AllyComponent>() && ImGui::MenuItem(u8"AllyComponent（AI 仲間）")) e->AddComponent<AllyComponent>();
             if (!e->GetComponent<HPComponent>() && ImGui::MenuItem(u8"HPComponent（体力）"))      e->AddComponent<HPComponent>();
             if (!e->GetComponent<HitboxComponent>() && ImGui::MenuItem(u8"HitboxComponent（当たり判定）")) e->AddComponent<HitboxComponent>();
             if (!e->GetComponent<NavObstacleComponent>() && ImGui::MenuItem(u8"NavObstacleComponent（経路探索の障害物）")) e->AddComponent<NavObstacleComponent>();

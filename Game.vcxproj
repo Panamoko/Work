@@ -142,6 +142,7 @@
     <ClInclude Include="Source\Engine\Assets\GltfSkinnedLoader.h" />
     <ClInclude Include="Source\Engine\Assets\MeshCache.h" />
     <ClInclude Include="Source\Engine\Assets\SkinnedModelCache.h" />
+    <ClInclude Include="Source\Engine\Components\AllyComponent.h" />
     <ClInclude Include="Source\Engine\Components\AnimatorComponent.h" />
     <ClInclude Include="Source\Engine\Components\Component.h" />
     <ClInclude Include="Source\Engine\Components\GameRuleComponent.h" />
@@ -220,6 +221,7 @@
     <ClCompile Include="Source\Engine\Assets\MeshCache.cpp" />
     <ClCompile Include="Source\Engine\Assets\SkinnedModelCache.cpp" />
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp" />
+    <ClCompile Include="Source\Engine\Components\AllyComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\GameRuleComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\OpponentComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\PlayerComponent.cpp" />
