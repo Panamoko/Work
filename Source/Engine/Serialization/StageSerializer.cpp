@@ -4,6 +4,7 @@
 #include "Engine/Components/MeshRendererComponent.h"
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/OpponentComponent.h"
+#include "Engine/Components/AllyComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Components/NavObstacleComponent.h"
@@ -55,7 +56,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 19;
+        constexpr int kSchemaLatest = 20;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -99,6 +100,7 @@ namespace uel {
             bool  hasAnimator = false; int anClip = 0; float anSpeed = 1.0f; bool anLoop = true; float anBlendTime = 0.2f;
             std::string anGraph;
             std::string skFpHide;
+            bool  hasAlly = false; float alMoveSpeed = 4.5f, alFollowDist = 3.0f, alResumeDist = 4.5f, alRepath = 0.5f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -134,6 +136,9 @@ namespace uel {
                     ar(CEREAL_NVP(hasAnimator), CEREAL_NVP(anClip), CEREAL_NVP(anSpeed), CEREAL_NVP(anLoop), CEREAL_NVP(anBlendTime)); // v17// v16
                 if (g_loadSchema >= 18) ar(CEREAL_NVP(anGraph));
                 if (g_loadSchema >= 19) ar(CEREAL_NVP(skFpHide));                                               // v19// v18
+                if (g_loadSchema >= 20)
+                    ar(CEREAL_NVP(hasAlly), CEREAL_NVP(alMoveSpeed), CEREAL_NVP(alFollowDist),
+                        CEREAL_NVP(alResumeDist), CEREAL_NVP(alRepath));                                        // v20
             }
         };
 
@@ -156,6 +161,10 @@ namespace uel {
             }
             if (auto* hpc = e.GetComponent<HPComponent>()) { ed.hasHP = true; ed.hp = hpc->hp; ed.maxHp = hpc->maxHp; }
             if (auto* op = e.GetComponent<OpponentComponent>()) { ed.hasOpponent = true; ed.oppMoveSpeed = op->moveSpeed; ed.oppStopRange = op->stopRange; }
+            if (auto* al = e.GetComponent<AllyComponent>()) {
+                ed.hasAlly = true; ed.alMoveSpeed = al->moveSpeed; ed.alFollowDist = al->followDistance;
+                ed.alResumeDist = al->resumeDistance; ed.alRepath = al->repathInterval;
+            }
             if (e.GetComponent<PlayerComponent>()) ed.hasPlayer = true;
             if (auto* sk = e.GetComponent<SkinnedMeshComponent>()) {
                 ed.hasSkinned = true;
@@ -226,6 +235,11 @@ namespace uel {
             }
             if (ed.hasHP) { auto* hpc = e.AddComponent<HPComponent>(); hpc->hp = ed.hp; hpc->maxHp = ed.maxHp; }
             if (ed.hasOpponent) { auto* op = e.AddComponent<OpponentComponent>(); op->moveSpeed = ed.oppMoveSpeed; op->stopRange = ed.oppStopRange; }
+            if (ed.hasAlly) {
+                auto* al = e.AddComponent<AllyComponent>();
+                al->moveSpeed = ed.alMoveSpeed; al->followDistance = ed.alFollowDist;
+                al->resumeDistance = ed.alResumeDist; al->repathInterval = ed.alRepath;
+            }
             if (ed.hasPlayer)   e.AddComponent<PlayerComponent>();
             if (ed.hasSkinned) {
                 auto* sk = e.AddComponent<SkinnedMeshComponent>();
@@ -480,7 +494,7 @@ namespace uel {
                     CEREAL_NVP(saturation),
                     CEREAL_NVP(edgeEnabled), CEREAL_NVP(edgeColor), CEREAL_NVP(edgeThickness),
                     CEREAL_NVP(edgeDepthThreshold), CEREAL_NVP(edgeNormalThreshold), CEREAL_NVP(edgeFadeDistance));   // v1
-                    if (g_envSchema >= 2) ar(CEREAL_NVP(skyExposure), CEREAL_NVP(skyRotation));   // v2    
+                if (g_envSchema >= 2) ar(CEREAL_NVP(skyExposure), CEREAL_NVP(skyRotation));   // v2    
             }
         };
     }
