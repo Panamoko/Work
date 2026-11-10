@@ -13,6 +13,7 @@
 #include "Engine/Physics/HitShapes.h"
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
+#include "Engine/Game/Team.h"
 
 #include <cmath>
 #include <memory>
@@ -31,9 +32,9 @@ namespace uel {
         if (hitMarker > 0.0f) hitMarker -= dt;
         auto* myHp = self.GetComponent<HPComponent>();
         const bool isDead = (myHp && myHp->hp <= 0.0f);
-        const bool canAct = in.enabled && !isDead;   //    S   ͑   s  
+        const bool canAct = in.enabled && !isDead;   // 死亡中は操作不可
 
-        //  Ώۃ  b V   擾 iassetId  ͎葱       ́j
+        // 対象メッシュ取得（assetId空は手続き立方体）
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
             auto* gm = ge->GetComponent<MeshRendererComponent>();
             if (!gm) return nullptr;
@@ -41,7 +42,7 @@ namespace uel {
                 : ctx.meshCache.GetOrLoad(ctx.device, gm->assetId);
             };
 
-        //     
+        // 見回し
         if (canAct && in.lookActive) {
             t->rotationEuler.y += in.mouseDX * 0.15f;
             pitch -= in.mouseDY * 0.004f;
@@ -53,7 +54,7 @@ namespace uel {
         float yaw = XMConvertToRadians(t->rotationEuler.y);
         float sy = sinf(yaw), cy = cosf(yaw);
 
-        //  ړ   
+        // 移動量
         float dx = 0.0f, dz = 0.0f;
         float speed = moveSpeed * dt;
         if (canAct) {
@@ -63,7 +64,7 @@ namespace uel {
             if (in.keyA) { dx -= cy * speed; dz += sy * speed; }
         }
 
-        //  ǁi       C Aself   O A X   C h j
+        // 壁（水平レイ、self除外、スライド）
         const float bodyH = 0.5f;
         auto wallBlocked = [&](float ox, float oz) -> bool {
             float len = sqrtf(ox * ox + oz * oz);
@@ -88,7 +89,7 @@ namespace uel {
         if (!wallBlocked(dx, dz)) { t->position.x += dx; t->position.z += dz; }
         else { if (!wallBlocked(dx, 0)) t->position.x += dx; if (!wallBlocked(0, dz)) t->position.z += dz; }
 
-        //  n ʍ   
+        // 地面高さ
         float ground = groundY;
         for (const auto& slot : ctx.world.Slots()) {
             if (!slot) continue; Entity* ge = slot.get();
@@ -104,7 +105,7 @@ namespace uel {
                 if (gy <= t->position.y + eyeHeight && gy > ground) ground = gy;
         }
 
-        //  d ́E ڒn E W     v
+        // 重力・接地・ジャンプ
         bool grounded = (t->position.y <= ground + 0.001f);
         const bool jumped = grounded && canAct && in.jumpPressed;
         if (jumped) velY = 6.0f;
@@ -112,7 +113,7 @@ namespace uel {
         t->position.y += velY * dt;
         if (t->position.y < ground) { t->position.y = ground; velY = 0.0f; }
 
-        //  ˌ  i O     C A        Entity  Ԃ  j
+        // 射撃（前方レイ、当たったEntityを赤く）
         float cp = cosf(pitch), sp = sinf(pitch);
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
         const bool shot = canAct && in.shootClicked;
@@ -120,7 +121,7 @@ namespace uel {
             XMFLOAT3 rd = { cp * sy, sp, cp * cy };
             const float baseDamage = 34.0f;
 
-            // (1)  q b g { b N X i   ̃J v Z   {   ̋  j
+            // (1) ヒットボックス（胴体カプセル＋頭の球）
             Entity* hbE = nullptr; float hbT = 1000.0f; bool head = false;
             for (const auto& slot : ctx.world.Slots()) {
                 if (!slot) continue; Entity* ge = slot.get();
@@ -128,20 +129,20 @@ namespace uel {
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* hb = ge->GetComponent<HitboxComponent>();
                 if (!gt || !hb) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   //  |  Ă   Œ  ̓G ɂ͓     Ȃ 
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
                 auto ws = hb->GetWorldShapes(*gt);
                 float tt;
                 if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
                 if (RayCapsule(eyePos, rd, ws.bodyA, ws.bodyB, ws.bodyR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = false; }
             }
 
-            // (2)    b V   i ǁE   Ȃǂ̎Օ    B q b g { b N X     ̂̓q b g { b N X Ŕ   ς݂Ȃ̂ŏ  O j
+            // (2) メッシュ（壁・床などの遮蔽物。ヒットボックスを持つものはヒットボックスで判定済みなので除外）
             Entity* meshE = nullptr; float meshT = 1000.0f;
             for (const auto& slot : ctx.world.Slots()) {
                 if (!slot) continue; Entity* ge = slot.get();
                 if (ge == &self) continue;
                 if (ge->GetComponent<HitboxComponent>()) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   //  |  Ă   Œ  ̓G ɂ͓     Ȃ 
+                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
                 bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
@@ -154,7 +155,7 @@ namespace uel {
                 if (RaycastMesh(*mp, gw, eyePos, rd, meshT, tt)) { meshT = tt; meshE = ge; }
             }
 
-            // (3)  ߂  ق  ɓ     i ǂ̌      ̃q b g { b N X ɂ͓     Ȃ  j
+            // (3) 近いほうに当たる（壁の向こうのヒットボックスには当たらない）
             Entity* hitE = nullptr; float mul = 1.0f; bool headHit = false;
             if (hbE && hbT <= meshT) {
                 hitE = hbE; headHit = head;
@@ -162,29 +163,33 @@ namespace uel {
             }
             else if (meshE) hitE = meshE;
 
+            // 味方（同じ陣営）に当たった弾は、そこで止まる（奥の敵には届かない）。ダメージ・ヒットマーカー・赤くする表示は無し
+            if (hitE && IsFriendly(self, *hitE)) hitE = nullptr;
+
             if (hitE) {
                 if (auto* hpc = hitE->GetComponent<HPComponent>()) {
                     hitMarker = 0.15f;
                     lastHeadshot = headHit;
-                    hpc->hp -= baseDamage * mul;                        //  _   [ W i   ͔{   j
+                    hpc->hp -= baseDamage * mul;                        // ダメージ（頭は倍率）
                     if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
-                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        //   e \   i Ԃ݁j
+                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
                     if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
                         sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };
-                    //    j F G iOpponentComponent j ́A     Ŏ  S A j    Đ    Ă        B    ȊO ́A   ̏ ŏ   
-                    if (hpc->hp <= 0.0f && !hitE->GetComponent<OpponentComponent>())
+                    // 撃破：陣営の無い物（的・箱など）だけ、その場で消す。
+                    // 敵（Enemies）は自分で死亡アニメを再生してから消える。味方（Players）は消さない（戦闘不能・ダウンは自分で扱う）
+                    if (hpc->hp <= 0.0f && GetTeam(*hitE) == Team::None)
                         ctx.world.DestroyEntity(hitE->id);
                 }
             }
         }
 
-        // ----  A j   [ V     ցF   ܂̏ Ԃ n   i O   t ɓ      O ̃p     [ ^      Ƃ          j----
+        // ---- アニメーションへ：いまの状態を渡す（グラフに同じ名前のパラメータがあるときだけ書く）----
         if (AnimatorComponent* an = self.GetComponent<AnimatorComponent>()) {
-            //    ۂɓ      ʁi ǂɎ~ ߂ ꂽ Ԃ ͊܂܂Ȃ  j    A     ƌ       ߂ 
+            // 実際に動いた量（壁に止められたぶんは含まない）から、速さと向きを求める
             const float mx = t->position.x - beforeX, mz = t->position.z - beforeZ;
             const float inv = (dt > 1e-6f) ? 1.0f / dt : 0.0f;
             const float moved = sqrtf(mx * mx + mz * mz) * inv;                     // m/s
-            //  ̂̌      猩       i E   +X A O   +Y j B S     1  ɂȂ 悤   moveSpeed  Ŋ   
+            // 体の向きから見た方向（右が +X、前が +Y）。全速で 1 になるように moveSpeed で割る
             const float norm = (moveSpeed > 1e-4f) ? inv / moveSpeed : 0.0f;
             float localX = (mx * cy - mz * sy) * norm;
             float localY = (mx * sy + mz * cy) * norm;
@@ -196,12 +201,12 @@ namespace uel {
             an->params.SetIfExists(kAnimMoveY, localY);
             an->params.SetIfExists(kAnimGrounded, (t->position.y <= ground + 0.001f) ? 1.0f : 0.0f);
             an->params.SetIfExists(kAnimDead, isDead ? 1.0f : 0.0f);
-            an->params.SetIfExists(kAnimAimPitch, XMConvertToDegrees(pitch));        //    _ ̏㉺ i x j
-            if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger F    
-            if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger F      
+            an->params.SetIfExists(kAnimAimPitch, XMConvertToDegrees(pitch));        // 視点の上下（度）
+            if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger：跳んだ
+            if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger：撃った
         }
 
-        //  J    
+        // カメラ
         XMVECTOR look = XMVectorSet(cp * sy, sp, cp * cy, 0);
         XMVECTOR up = XMVectorSet(0, 1, 0, 0);
         XMVECTOR eye = XMVectorSet(eyePos.x, eyePos.y, eyePos.z, 0);

@@ -171,6 +171,7 @@
     <ClInclude Include="Source\Engine\Editor\ViewportPanel.h" />
     <ClInclude Include="Source\Engine\Game\GameContext.h" />
     <ClInclude Include="Source\Engine\Game\GameFlow.h" />
+    <ClInclude Include="Source\Engine\Game\Team.h" />
     <ClInclude Include="Source\Engine\Graphics\DdsTexture.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineShadowMap.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h" />
