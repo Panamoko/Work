@@ -24,6 +24,7 @@
 #include "Engine/Serialization/StageSerializer.h"
 #include "Engine/Serialization/AnimGraphSerializer.h"
 #include "Engine/Config/EngineConfig.h"
+#include "Engine/Components/PartySetupComponent.h"
 
 #include <imgui.h>
 #include <cctype>
@@ -623,6 +624,23 @@ namespace uel {
             }
             ImGui::PopID();
         }
+        // PartySetupComponent（Stage の開始時に3人のチームをそろえる）
+        if (auto* ps = e->GetComponent<PartySetupComponent>()) {
+            ImGui::PushID("cmp_party");
+            ImGui::BulletText(u8"PartySetup（3人のチーム）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PartySetupComponent>();
+            else {
+                editStr(u8"AI 仲間の Prefab", ps->allyPrefab);
+                if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
+                    if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
+                        if (pl->Data) ps->allyPrefab = static_cast<const char*>(pl->Data);
+                    ImGui::EndDragDropTarget();
+                }
+                ImGui::DragFloat(u8"後ろへの距離", &ps->spawnBack, 0.05f, 0.0f, 20.0f);
+                ImGui::DragFloat(u8"左右の間隔", &ps->spawnSide, 0.05f, 0.0f, 20.0f);
+            }
+            ImGui::PopID();
+        }
 
         // + コンポーネントを追加（UEのドロップダウン）
         // ※ Inspector の一番下に置く。新しい Component の編集欄は、これより上（ScreenUI の後ろ）に足す
@@ -643,7 +661,7 @@ namespace uel {
             if (!e->GetComponent<SpawnerComponent>() && ImGui::MenuItem(u8"SpawnerComponent（敵の出現・ウェーブ）")) e->AddComponent<SpawnerComponent>();
             if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem(u8"GameRuleComponent（勝敗判定）")) e->AddComponent<GameRuleComponent>();
             if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem(u8"ScreenUIComponent（タイトル・リザルト画面）")) e->AddComponent<ScreenUIComponent>();
-
+            if (!e->GetComponent<PartySetupComponent>() && ImGui::MenuItem(u8"PartySetupComponent（3人のチーム）")) e->AddComponent<PartySetupComponent>();
             ImGui::EndPopup();
         }
         ImGui::End();

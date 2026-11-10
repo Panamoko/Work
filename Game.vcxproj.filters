@@ -335,6 +335,21 @@
     <ClInclude Include="Source\Engine\Game\Role.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Components\DPSComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\PartySetupComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\RoleComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\SupportComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Components\TankComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -515,6 +530,9 @@
       <Filter>Source\Engine\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Components\AllyComponent.cpp">
+      <Filter>Source\Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Components\PartySetupComponent.cpp">
       <Filter>Source\Engine\Components</Filter>
     </ClCompile>
   </ItemGroup>

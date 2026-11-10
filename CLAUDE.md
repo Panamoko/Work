@@ -26,7 +26,7 @@
 | 段階 | 内容 | 終わりの目安 | 状況 |
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
-| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 作業中。1-1 AI 仲間1体の追従（**済み**）→ 1-1b AllyComponent の保存（**済み**。Scene の版 20）→ 1-2 陣営 → 1-3 ロール選択画面 → 1-4 Stage 開始時に3人を配置、の順 |
+| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 作業中。1-1 AI 仲間1体の追従（**済み**）→ 1-1b AllyComponent の保存（**済み**。版 20）→ 1-2 陣営（**済み**。a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（**済み**。版 21）→ 1-4 Stage 開始時に3人を配置（次） |
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
@@ -43,6 +43,14 @@
   - 組み合わせ：プレイヤーの DPS ＝ `PlayerComponent` ＋ `DPSComponent`、AI の Support ＝ `AllyComponent` ＋ `SupportComponent`。3ロール × 2操作を 3＋2 個の部品で作れる。
   - 現場での対応：UE の PlayerController / AIController（同じ Pawn をどちらも操作できる）と、Gameplay Ability System の Ability。
   - AI のロールごとの判断の違い（Tank は前に出る、Support は HP の低い味方を優先、など）は、`AllyComponent` が付いているロールの Component を見て変える（AI の Phase 3「役割連携」。ロードマップでは段階 9）。
+- **陣営は「操作する側」から決める**（1-2。`Game/Team.h`。ヘッダだけ）。`GetTeam(e)`：Player・Ally を持てば `Players`、Opponent を持てば `Enemies`、どれも無ければ `None`。`GetAttitude(a, b)`：Friendly / Neutral / Hostile。UE の `FGenericTeamId`・`ETeamAttitude`（陣営は Controller が持つ）に合わせた。Entity ごとに変えたくなったら `TeamComponent` を足し、`GetTeam` がそれを先に見る（呼ぶ側は変わらない）。
+  - **味方に当たった弾は、そこで止まる**（ダメージ・ヒットマーカーなし。奥の敵に届かない）。ユーザーが選んだ（2026-11-10）。戦闘不能の味方は弾を止めない。
+  - HP 0 でその場で消えるのは陣営 `None` の物（的・箱）だけ。敵は自分で倒れてから消え、味方は消えない。
+  - **敵の狙い**：HP が残っている敵対陣営の中で、いちばん近い相手。0.5 秒ごとに選び直し（`retargetInterval`）、今の相手より 1m 以上近いときだけ乗り換える（`retargetMargin`）。HPComponent の無い物は狙わない。
+  - **AI 仲間の HP 0 は、その場で戦闘不能**（ダウン・蘇生ができるまでの仮。ユーザーが選んだ）。止まって `Dead` をアニメに渡し、敵に狙われない。HP が戻れば動き出す。ゲームオーバーの判定はまだプレイヤーの HP 0 だけ（段階 4 で直す）。
+- **ロール**（1-3。`Game/Role.h`）：`enum class Role { Tank, DPS, Support }`（並び順を変えない）、`RoleName` / `RoleDescription`。選んだロールは `GameFlow::playerRole`（UE の GameInstance に当たる）。Play を始めるたびに既定の **DPS** に戻す（`Engine::StartPlay`）。
+  - ロール選択の画面は `ScreenUIComponent` の `roleSelect`（オンでボタン1つの代わりに3つのロール。1 / 2 / 3 キー、Enter は今のロール）。
+  - 流れ：Title →(START)→ **RoleSelect** →(ロールを選ぶ)→ Stage →… → Result →(RETRY)→ **RoleSelect**（RETRY でロール選択へ戻る。ユーザーが選んだ）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
 - **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
@@ -163,6 +171,8 @@
 | `'lod' が宣言されていません`・`no matching 1 parameter function`（M-4） | 「`return ...` の1行を差し替え」と指示したが、すぐ下に似た `return` 行があり、違うほうを差し替えた | 似た行が近くにあるときは1行の差し替えにせず、**関数ごと**差し替える |
 | 「上半身のレイヤーは無い」と思い込んだ | ほかのセッション（Animation）で作った機能が、CLAUDE.md に書かれていなかった | 作業の前に実際のファイルを読む。新しい物に気づいたら CLAUDE.md に足す（2章「複数のセッションで作業するときの決まり」） |
 | 保存して起動し直したら、AI 仲間の AllyComponent が消え、PlayerComponent と HitboxComponent が戻った（1-1b） | Player を複製した Entity が Prefab のインスタンスのままだった。インスタンスは読み込みのたびに Prefab の内容で作り直される（8章） | Prefab のインスタンスの Component を変える手順では、**保存の前に「リンクを解除」**（または「Prefab に反映」）を書く。確かめ方：Inspector に青い字の `Prefab：...` が出ていないこと |
+| 「ROLE: …」が撃った直後しか出ない（1-3a） | 「`if (pc && ...) {` の行の**直前**に足す」と書いたが、`{` の**後ろ**（ブロックの中）に貼られた | `{` で終わる行の前後に足す指示では、**足した後の形（前後の行ごと）**を見せる。ファイルの変更が2か所以上なら全体で渡す |
+| 渡したファイルの日本語（コメントと画面の文字）が全部壊れた（1-3b の `ViewportPanel.cpp`） | Shift-JIS のファイルを**メモ帳で開いて**中身をコピーした。今のメモ帳は BOM の無いファイルを UTF-8 として開くので、化けたまま貼られた | **手を入れたファイルは UTF-8（BOM 付き）で渡す**（3章）。メモ帳でも VS でも正しく開ける |
 
 ---
 
@@ -170,7 +180,9 @@
 
 - C++17 / DirectX 11 / Visual Studio 2022 (v143) / x64 / `Game.sln`・`Game.vcxproj`
 - 外部ライブラリ（`External/`）：imgui-docking（**1.80 WIP**）、ImGuizmo、tinygltf、cereal、DirectXTex、Tracy
-- **文字コードはファイルごとに違う。今の文字コードのまま保つ。**
+- **文字コードはファイルごとに違う。手を入れないファイルは、今の文字コードのまま保つ。**
+  - **新しいファイルと、手を入れて渡すファイルは UTF-8（BOM 付き）・CRLF にする**（2026-11-10 にユーザーと決めた）。ユーザーは渡されたファイルをメモ帳で開いてコピーし、VS に貼ることがある。今のメモ帳は BOM の無いファイルを UTF-8 として開くので、Shift-JIS の日本語は壊れたまま貼られる（1-3b の `ViewportPanel.cpp` で起きた）。BOM 付きならメモ帳でも VS でも正しく開け、MSVC もそのままビルドできる（`u8"..."` も、普通の文字列も、今までと同じに動く）。
+  - VS で新しく作って貼ったファイルは Shift-JIS で保存されることがある（`AllyComponent.*`、`Role.h` がそうなった）。次に手を入れるときに UTF-8 BOM にする。
   - ほとんどは **Shift-JIS（CP932）・CRLF**。ツールで読むと日本語コメントが文字化けして見えるが、壊れてはいない。
   - **UTF-8（BOM 付き）・CRLF** のもの：`Editor/` の `InspectorPanel.cpp` `EditorPanels.cpp` `AssetBrowserPanel.cpp` `ImGuiLayer.cpp` `AnimEditorPanels.cpp` `AnimGraphPanel.cpp` `AnimGraphCanvas.cpp` `AnimGraphStateMachineView.cpp` `AnimGraphPanelInternal.h`、`Serialization/StageSerializer.cpp`、`Animation/AnimBlendSpaceNode.*` `AnimationPose.h`、`Graphics/RenderTexture.h`。
   - 調べ方：先頭3バイトが `EF BB BF` なら UTF-8 BOM。貼り付けて保存するときに VS が「Unicode で保存しますか」と聞くことがある。
@@ -227,7 +239,8 @@ Source/Engine/
                  Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Ally / Opponent /
                  Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance
   Scene/         EntityId, Entity, World
-  Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）
+  Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）,
+                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
                  AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
@@ -298,13 +311,13 @@ Source/Engine/
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
 | Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
-| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。今は追従だけ：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まってプレイヤーを向く。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。アニメへ `Speed` を渡す |
-| Opponent | 敵。NavGrid の経路でプレイヤーを追い、近づいたら攻撃。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
+| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。今は追従だけ：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まってプレイヤーを向く。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。アニメへ `Speed / Dead` を渡す（`Dead` は変わったときだけ書く） |
+| Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
 | Spawner | Prefab から敵をウェーブで湧かせる | `prefabPath, waveCount, baseCount, countIncrease, spawnInterval, firstDelay, waveDelay, spawnRadius` |
 | GameRule | 勝敗判定 → Scene遷移 | `winScene, loseScene, endDelay` |
-| ScreenUI | Title / Result 画面 | `title, subtitle, buttonText, nextScene, showResult` |
+| ScreenUI | Title / Result / ロール選択の画面 | `title, subtitle, buttonText, nextScene, showResult, roleSelect`（オンで3つのロールのボタン。1-3b） |
 | PrefabInstance | どの Prefab から作ったか | `path` |
 
 ### 今のゲームの仕様（実装済みの部分。新しい方針は0章）
@@ -313,7 +326,8 @@ Source/Engine/
 - 射撃：基本ダメージ 34。ヒットボックスの頭は倍率（既定2倍）。壁の向こうには当たらない。ヒットボックスが無くHPを持つ物はメッシュで判定。倒れている最中の敵には当たらない。
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
 - NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
-- 流れ：Title →(START)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ Stage
+- 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
+- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
 - 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
@@ -411,7 +425,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 20。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 21。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -433,6 +447,7 @@ Source/Engine/
 | 18 | Animator のグラフのパス（`anGraph`） |
 | 19 | SkinnedMesh の `fpHideBone`（`skFpHide`） |
 | 20 | Ally（`hasAlly, alMoveSpeed, alFollowDist, alResumeDist, alRepath`） |
+| 21 | ScreenUI の `roleSelect`（`uiRoleSelect`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -529,7 +544,9 @@ Source/Engine/
 ## 10. 既知の制限・気づいている問題
 
 - `Game.vcxproj` に、存在しないファイル `External\SphereCast\Include\SphereCast.h` の登録が残っている（ビルドには影響しない）。
-- **日本語のコメントが壊れているファイルが2つある**（2026-11-09 に発見）：`Components/PlayerComponent.cpp`（コミット `53f5734` から）と `Systems/RenderSystem.cpp`（`cce8561` から）。Shift-JIS のファイルを UTF-8（BOM 付き）として保存し直したときに、日本語の部分が空白と記号に置き換わった（コードは無事で、ビルドも通る）。元のコメントは、その直前のコミットから読める（例：`git show b7bf732:Source/Engine/Components/PlayerComponent.cpp`）。PlayerComponent は 1-2 で手を入れるときに直す。
+- **日本語のコメントが壊れているファイルが2つある**（2026-11-09 に発見）：`Components/PlayerComponent.cpp`（コミット `53f5734` から）と `Systems/RenderSystem.cpp`（`cce8561` から）。Shift-JIS のファイルを UTF-8（BOM 付き）として保存し直したときに、日本語の部分が空白と記号に置き換わった（コードは無事で、ビルドも通る）。元のコメントは、その直前のコミットから読める（例：`git show b7bf732:Source/Engine/Components/PlayerComponent.cpp`）。PlayerComponent は 1-2a で直した。**`Editor/ViewportPanel.cpp` もコミット `da24c3c` で同じように壊れた**（メモ帳で開いて貼ったため。2章のミスの表）。直したファイル（UTF-8 BOM）は 2026-11-10 に渡し済み。
+- **グラフ `Player1`（Player と Ally が使う）の倒れる遷移のパラメータが `Death`**。コードが渡すのは `Dead` なので、倒れるアニメにならない。Anim Graph パネルでパラメータの名前を `Dead` に変えて保存すれば直る（名前を変えると遷移の条件も付け替わる）。2026-11-10 にユーザーへ伝えた。
+- AI 仲間の HitboxComponent は付け直したときに初期値になり、見た目（Player と同じロボット）より小さい。Player の値（胴 0〜1.42、太さ 0.35、頭 2.0・0.39）に合わせるとよい。
 - 外部ライブラリの Tracy / DirectXTex、`imgui_demo.cpp` は、今のエンジンからは使われていない。
 - `GraphicsDevice.cpp` の `Present(0, 0)` は VSync オフだが、横のコメントは「VSync ON」のまま。
 - **時間・FPS**
@@ -562,7 +579,7 @@ Source/Engine/
 - ヒットボックスは体の中心線に固定。ボーン（頭など）に追従しない。
 - NavGrid の範囲が固定（原点中心、60×60）。Play 中は毎フレーム作り直している。
 - プレイヤーの移動・攻撃・カメラ・射撃は `PlayerComponent` 1つに全部入っている（ロールごとの差は未対応）。
-- 新しいゲームで足りない土台（0章も参照）：陣営（味方／敵）、味方撃ちの防止、ダウン・蘇生の状態、武器・リロード・アビリティ・クールダウン、親子付け（Attach。`Entity` に `parent` / `children` の欄はあるが未使用。武器を手に持たせるのに要る）、物理（剛体・衝突・トリガ）、ゲーム用の UI（今の HUD は ImGui）、音、エフェクト。
+- 新しいゲームで足りない土台（0章も参照）：ダウン・蘇生の状態、武器・リロード・アビリティ・クールダウン、親子付け（Attach。`Entity` に `parent` / `children` の欄はあるが未使用。武器を手に持たせるのに要る）、物理（剛体・衝突・トリガ）、ゲーム用の UI（今の HUD は ImGui）、音、エフェクト。
 - Play中にコンポーネントを足した／消した結果は、編集用Worldにしか入らない。
 - Prefab の Apply / Revert、Component の追加／削除は Undo できない。
 - **エディタ**
@@ -574,7 +591,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。今は段階 1「3人チーム」の途中（1-1 追従と 1-1b 保存は済み。次は 1-2 陣営）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。今は段階 1「3人チーム」の途中（1-1 追従・1-1b 保存・1-2 陣営・1-3 ロール選択は済み。次は 1-4 Stage の開始時に3人を配置）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 以下はエンジン側の残り（ゲーム作りで必要になったときに取り組む）：
 

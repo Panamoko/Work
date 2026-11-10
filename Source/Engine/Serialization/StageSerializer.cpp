@@ -5,6 +5,7 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Components/AllyComponent.h"
+#include "Engine/Components/PartySetupComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Components/NavObstacleComponent.h"
@@ -56,7 +57,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 21;
+        constexpr int kSchemaLatest = 22;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -102,6 +103,7 @@ namespace uel {
             std::string skFpHide;
             bool  hasAlly = false; float alMoveSpeed = 4.5f, alFollowDist = 3.0f, alResumeDist = 4.5f, alRepath = 0.5f;
             bool  uiRoleSelect = false;
+            bool  hasParty = false; std::string ptPrefab = "Data/Prefabs/Ally.prefab.json"; float ptBack = 2.0f, ptSide = 1.5f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -141,6 +143,7 @@ namespace uel {
                     ar(CEREAL_NVP(hasAlly), CEREAL_NVP(alMoveSpeed), CEREAL_NVP(alFollowDist),
                         CEREAL_NVP(alResumeDist), CEREAL_NVP(alRepath));                                        // v20
                 if (g_loadSchema >= 21) ar(CEREAL_NVP(uiRoleSelect));                                           // v21
+                if (g_loadSchema >= 22) ar(CEREAL_NVP(hasParty), CEREAL_NVP(ptPrefab), CEREAL_NVP(ptBack), CEREAL_NVP(ptSide));   // v22
             }
         };
 
@@ -209,6 +212,9 @@ namespace uel {
                 ed.shToonTexSteps = shc->params.toonTexSteps; ed.shToonTexSmooth = shc->params.toonTexSmooth;
                 ed.shOutlineWidth = shc->params.outlineWidth;
                 ed.shOutlineColor = { shc->params.outlineColor.x, shc->params.outlineColor.y, shc->params.outlineColor.z };
+            }
+            if (auto* ps = e.GetComponent<PartySetupComponent>()) {
+                ed.hasParty = true; ed.ptPrefab = ps->allyPrefab; ed.ptBack = ps->spawnBack; ed.ptSide = ps->spawnSide;
             }
             if (auto* pi = e.GetComponent<PrefabInstanceComponent>()) ed.prefabPath = pi->path;
             if (auto* an = e.GetComponent<AnimatorComponent>()) {
@@ -289,6 +295,10 @@ namespace uel {
                 shc->params.toonTexSteps = ed.shToonTexSteps; shc->params.toonTexSmooth = ed.shToonTexSmooth;
                 shc->params.outlineWidth = ed.shOutlineWidth;
                 shc->params.outlineColor = { ed.shOutlineColor.x, ed.shOutlineColor.y, ed.shOutlineColor.z };
+            }
+            if (ed.hasParty) {
+                auto* ps = e.AddComponent<PartySetupComponent>();
+                ps->allyPrefab = ed.ptPrefab; ps->spawnBack = ed.ptBack; ps->spawnSide = ed.ptSide;
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
             if (ed.hasAnimator) {
