@@ -12,5 +12,6 @@ namespace uel {
         std::string buttonText = "START";
         std::string nextScene = "Stage";
         bool        showResult = false;   // ONならGameFlowの結果（CLEAR/GAME OVER・タイム）を表示
+        bool        roleSelect = false;   // ONならボタン1つの代わりに、3つのロールのボタンを出す。選んだロールを GameFlow に入れて nextScene へ（1-3b）
     };
 }

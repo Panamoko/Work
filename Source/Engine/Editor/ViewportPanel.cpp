@@ -1,4 +1,4 @@
-#include "Engine/Editor/ViewportPanel.h"
+ï»¿#include "Engine/Editor/ViewportPanel.h"
 #include "Engine/Systems/RenderSystem.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Components/TransformComponent.h"
@@ -32,8 +32,8 @@ namespace uel {
 
     void ViewportPanel::Initialize(ID3D11Device* device)
     {
-        rt.Create(device, viewWidth, viewHeight, true);        // ƒV[ƒ“—pFF{–@ü{[“x
-        finalRT.Create(device, viewWidth, viewHeight, false);  // F‚¾‚¯
+        rt.Create(device, viewWidth, viewHeight, true);        //  V [   p F F { @   { [ x
+        finalRT.Create(device, viewWidth, viewHeight, false);  //  F    
         postProcess.Initialize(device);
         shader.Initialize(device);
         cubeMesh = Mesh::CreateCube(device);
@@ -50,8 +50,8 @@ namespace uel {
 
     bool ViewportPanel::ReloadShaders(ID3D11Device* device)
     {
-        // V‚µ‚­ì‚Á‚Ä‚İ‚ÄA‚Å‚«‚½‚à‚Ì‚¾‚¯“ü‚ê‘Ö‚¦‚éiì‚ê‚È‚©‚Á‚½‚ç‘O‚ÌƒVƒF[ƒ_‚Ì‚Ü‚ÜjB
-        // ƒ‰ƒCƒgE‰eEŒiFEƒ|ƒXƒgƒvƒƒZƒX‚Ìİ’è‚ÍA–ˆƒtƒŒ[ƒ€ RenderScene ‚Å“n‚µ’¼‚·‚Ì‚ÅAì‚è’¼‚µ‚Ä‚àÁ‚¦‚È‚¢B
+        //  V        Ä‚İ‚ÄA Å‚     Ì‚       Ö‚   i   È‚       O ÌƒV F [ _ Ì‚Ü‚Üj B
+        //    C g E e E i F E | X g v   Z X Ìİ’ ÍA   t   [   RenderScene  Å“n       Ì‚ÅA  è’¼   Ä‚     È‚  B
         bool allOk = true;
         { EngineSkybox      s; if (s.Initialize(device)) skybox = std::move(s);        else allOk = false; }
         { PostProcess       s; if (s.Initialize(device)) postProcess = std::move(s);   else allOk = false; }
@@ -75,18 +75,18 @@ namespace uel {
                 if (ImGui::SmallButton(label)) gizmoOp = op;
                 if (active) ImGui::PopStyleColor();
                 };
-            modeButton(u8"ˆÚ“®", ImGuizmo::TRANSLATE); ImGui::SameLine();
-            modeButton(u8"‰ñ“]", ImGuizmo::ROTATE);    ImGui::SameLine();
-            modeButton(u8"Šg‘åk¬", ImGuizmo::SCALE);
-            ImGui::SameLine(); ImGui::Checkbox(u8"ƒOƒŠƒbƒh", &showGrid);
-            ImGui::SameLine(); ImGui::Checkbox(u8"ƒXƒiƒbƒv", &snapEnabled);
+            modeButton(u8" Ú“ ", ImGuizmo::TRANSLATE); ImGui::SameLine();
+            modeButton(u8"  ]", ImGuizmo::ROTATE);    ImGui::SameLine();
+            modeButton(u8" g  k  ", ImGuizmo::SCALE);
+            ImGui::SameLine(); ImGui::Checkbox(u8" O   b h", &showGrid);
+            ImGui::SameLine(); ImGui::Checkbox(u8" X i b v", &snapEnabled);
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapT", &snapTranslate, 0.1f, 0.01f, 100.0f, "T:%.2f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapR", &snapRotate, 1.0f, 1.0f, 180.0f, "R:%.0f");
             ImGui::SameLine(); ImGui::SetNextItemWidth(70); ImGui::DragFloat("##snapS", &snapScale, 0.05f, 0.01f, 10.0f, "S:%.2f");
-            ImGui::SameLine(); ImGui::Checkbox(u8"“–‚½‚è”»’è", &showHitboxes);
+            ImGui::SameLine(); ImGui::Checkbox(u8"     è”»  ", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"ƒvƒŒƒC’†i‰Eƒhƒ‰ƒbƒOF‹“_@WASDFˆÚ“®@SpaceFƒWƒƒƒ“ƒv@¶ƒNƒŠƒbƒNFËŒ‚j");
+            ImGui::TextUnformatted(u8" v   C   i E h   b O F   _ @WASD F Ú“  @Space F W     v @   N   b N F ËŒ  j");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -100,11 +100,11 @@ namespace uel {
         using namespace DirectX;
         float aspect = (viewHeight > 0) ? (float)viewWidth / (float)viewHeight : 1.0f;
 
-        // ƒrƒ…[s—ñ
+        //  r   [ s  
         if (playMode) {
-            // ƒvƒŒƒCƒ„[ = PlayerComponent ‚ğ‚ÂEntity
+            //  v   C   [ = PlayerComponent      Entity
             Entity* player = nullptr;
-            // NavGrid‚ğbakeiPlay’†‚ÌŒo˜H’Tõj
+            // NavGrid  bake iPlay   ÌŒo H T   j
             nav.Configure({ 0.0f, 0.0f, 0.0f }, 1.0f, 60, 60);
             nav.Bake(world);
 
@@ -121,16 +121,16 @@ namespace uel {
             in.shootClicked = ImGui::IsMouseClicked(0);
             in.lookActive = io.MouseDown[1];
             in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
-            float dt = ClampDeltaTime(io.DeltaTime);     // ãŒÀ•t‚«iEngineConfig.hj
+            float dt = ClampDeltaTime(io.DeltaTime);     //     t   iEngineConfig.h j
 
-            // “Yš‚Åƒ‹[ƒviSpawner‚ªXV’†‚ÉEntity‚ğ‘‚â‚µ‚Ä‚à‰ó‚ê‚È‚¢‚æ‚¤‚Éj
+            //  Y   Åƒ  [ v iSpawner   X V    Entity ğ‘‚â‚µ Ä‚   È‚  æ‚¤ Éj
             for (size_t i = 0; i < world.Slots().size(); ++i) {
                 Entity* e = world.Slots()[i].get();
                 if (!e) continue;
                 GameContext ctx{ world, *e, cache, device, dt, in, &nav, &flow };
                 for (size_t ci = 0; ci < e->components.size(); ++ci) e->components[ci]->Update(ctx);
             }
-            world.FlushDestroy();     // Update ‚Ì’†‚Å—\–ñ‚³‚ê‚½uŒã‚ÅÁ‚·v‚ğA‚±‚±‚Å‚Ü‚Æ‚ß‚ÄÁ‚·
+            world.FlushDestroy();     // Update  Ì’  Å—\ ñ‚³‚ê‚½ u  Å    v  A     Å‚Ü‚Æ‚ß‚Ä   
             if (player) { view = player->GetComponent<PlayerComponent>()->GetView(); }
             else { view = camera.GetView(); }
         }
@@ -143,7 +143,7 @@ namespace uel {
         ImVec2 imgPos = ImGui::GetCursorScreenPos();
         if (finalRT.GetSRV())
             ImGui::Image((ImTextureID)finalRT.GetSRV(), ImVec2((float)viewWidth, (float)viewHeight));
-        // ƒqƒbƒgƒ{ƒbƒNƒX‚Ì•\¦i•ÒW’†‚Í‘I‘ğ’†‚Ì‚İ^uHitboxvƒ`ƒFƒbƒN‚Å‘SˆõBPlay’†‚à—LŒøj
+        //  q b g { b N X Ì•\   i ÒW   Í‘I ğ’†‚Ì‚İ^ uHitbox v ` F b N Å‘S   BPlay    L   j
         {
             XMMATRIX vpM = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
             ImDrawList* hdl = ImGui::GetWindowDrawList();
@@ -155,7 +155,7 @@ namespace uel {
                 out.y = imgPos.y + (1.0f - (XMVectorGetY(c) / ww * 0.5f + 0.5f)) * viewHeight;
                 return true;
                 };
-            // ‰~iplane 0:…•½XZ / 1:XY / 2:ZYj
+            //  ~ iplane 0:    XZ / 1:XY / 2:ZY j
             auto circle = [&](XMFLOAT3 c, float r, int plane, ImU32 col) {
                 const int N = 24; ImVec2 prev; bool havePrev = false;
                 for (int i = 0; i <= N; ++i) {
@@ -194,7 +194,7 @@ namespace uel {
                 for (int k = 0; k < 4; ++k)
                     line3({ ws.bodyA.x + ox[k] * ws.bodyR, ws.bodyA.y, ws.bodyA.z + oz[k] * ws.bodyR },
                         { ws.bodyB.x + ox[k] * ws.bodyR, ws.bodyB.y, ws.bodyB.z + oz[k] * ws.bodyR }, bodyCol);
-                // Spawner‚Ì—N‚«”ÍˆÍi•ÒW’†‚É‘I‘ğ‚µ‚Ä‚¢‚é‚¾‚¯A‰©F‚Ì‰~
+                // Spawner Ì—N   ÍˆÍi ÒW   É‘I    Ä‚  é     A   F Ì‰~
 
             }
             if (!playMode) {
@@ -205,7 +205,7 @@ namespace uel {
                 }
             }
         }
-        // Play’†‚ÌƒI[ƒo[ƒŒƒCiÆ€Eƒqƒbƒgƒ}[ƒJ[EHPE“GŒo˜HETitle/Result‰æ–Êj
+        // Play   ÌƒI [ o [   C i Æ  E q b g } [ J [ EHP E G o H ETitle/Result  Êj
         if (playMode) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
             ImVec2 c(imgPos.x + viewWidth * 0.5f, imgPos.y + viewHeight * 0.5f);
@@ -215,16 +215,21 @@ namespace uel {
                 if (slot && slot->GetComponent<PlayerComponent>()) { p = slot.get(); break; }
             PlayerComponent* pc = p ? p->GetComponent<PlayerComponent>() : nullptr;
 
-            if (pc) {   // Æ€‚ÍƒvƒŒƒCƒ„[‚ª‚¢‚é‚¾‚¯
+            if (pc) {   //  Æ  Íƒv   C   [     é    
                 dl->AddLine(ImVec2(c.x - 8, c.y), ImVec2(c.x + 8, c.y), IM_COL32(255, 255, 255, 220), 2.0f);
                 dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
             }
+            //    é‚¢  â° Ì Å‚ Ç‚ß‚ æ‚¤ ÉA     Ì‰E   É    e  t   Ä•`  
+            auto shadowText = [&](ImVec2 pos, ImU32 col, const char* txt) {
+                dl->AddText(ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 200), txt);
+                dl->AddText(pos, col, txt);
+                };
+            if (pc) {   //  I ñ‚¾ƒ  [   i    BGameFlow  É“    Ä‚   l    Ì‚Ü‚Üo   j
+                char roleTxt[32]; snprintf(roleTxt, sizeof(roleTxt), "ROLE: %s", RoleName(flow.playerRole));
+                shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 240), roleTxt);
+            }
             if (pc && pc->GetHitMarker() > 0.0f) {
-                if (pc) {   // ‘I‚ñ‚¾ƒ[ƒ‹i¶ãBGameFlow ‚É“ü‚Á‚Ä‚¢‚é’l‚ğ‚»‚Ì‚Ü‚Üo‚·j
-                    char roleTxt[32]; snprintf(roleTxt, sizeof(roleTxt), "ROLE: %s", RoleName(flow.playerRole));
-                    dl->AddText(ImVec2(imgPos.x + 20.0f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 230), roleTxt);
-                }
-                ImU32 col = pc->GetHeadshot() ? IM_COL32(255, 60, 60, 255) : IM_COL32(255, 255, 255, 255);   // “ª=Ô^“·‘Ì=”’
+                ImU32 col = pc->GetHeadshot() ? IM_COL32(255, 60, 60, 255) : IM_COL32(255, 255, 255, 255);   //   = Ô^    =  
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
                 dl->AddLine(ImVec2(c.x + 12, c.y - 12), ImVec2(c.x + 4, c.y - 4), col, 2.0f);
                 dl->AddLine(ImVec2(c.x - 12, c.y + 12), ImVec2(c.x - 4, c.y + 4), col, 2.0f);
@@ -241,7 +246,7 @@ namespace uel {
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
-            // AI ’‡ŠÔ‚Ì HPiƒvƒŒƒCƒ„[‚Ì HP ƒo[‚Ìã‚ÉA1l‚¸‚Â¬‚³‚­•À‚×‚éj
+            // AI    Ô‚  HP i v   C   [   HP  o [ Ì ÉA1 l   Â        ×‚ j
             {
                 const float bx = imgPos.x + 20.0f, bw = 160.0f, bh = 12.0f;
                 float by = imgPos.y + viewHeight - 62.0f;
@@ -255,11 +260,11 @@ namespace uel {
                     dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * frac, by + bh), IM_COL32(80, 200, 120, 230));
                     dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 160));
                     char aTxt[96]; snprintf(aTxt, sizeof(aTxt), "%s  %.0f", slot->name.c_str(), ahp->hp);
-                    dl->AddText(ImVec2(bx + bw + 8.0f, by - 3.0f), IM_COL32(255, 255, 255, 230), aTxt);
+                    shadowText(ImVec2(bx + bw + 8.0f, by - 3.0f), IM_COL32(255, 255, 255, 240), aTxt);
                     by -= 20.0f;
                 }
             }
-            // ƒEƒF[ƒu•\¦iSpawner‚ª‚ ‚éj
+            //  E F [ u \   iSpawner     é j
             {
                 SpawnerComponent* sp = nullptr;
                 int enemies = 0;
@@ -275,211 +280,238 @@ namespace uel {
                     ImVec2 ts = ImGui::CalcTextSize(wbuf);
                     dl->AddText(ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 230), wbuf);
 
-                    if (sp->BannerTime() > 0.0f) {                     // ƒEƒF[ƒuŠJn‚Ì‘å‚«‚È•\¦
-                        char bbuf[32]; snprintf(bbuf, sizeof(bbuf), "WAVE %d", sp->CurrentWave());
+                    if (sp->BannerTime() > 0.0f) {                     //  E F [ u J n Ì‘å‚« È•\  
+                                                char bbuf[32]; snprintf(bbuf, sizeof(bbuf), "WAVE %d", sp->CurrentWave());
                         ImFont* font = ImGui::GetFont();
-                        float a = (sp->BannerTime() > 1.0f) ? 1.0f : sp->BannerTime();   // ÅŒã‚Ì1•b‚ÅƒtƒF[ƒhƒAƒEƒg
+                        float a = (sp->BannerTime() > 1.0f) ? 1.0f : sp->BannerTime();   //  ÅŒ  1 b Åƒt F [ h A E g
                         ImVec2 bs = font->CalcTextSizeA(48.0f, FLT_MAX, 0.0f, bbuf);
                         dl->AddText(font, 48.0f, ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, imgPos.y + viewHeight * 0.25f),
                             IM_COL32(255, 220, 80, (int)(255 * a)), bbuf);
                     }
                 }
             }
-            // “G‚Ì’ÇÕŒo˜H‚ğ3D“Š‰e‚Å•\¦
+            //  G Ì’ÇÕŒo H  3D   e Å•\  
             {
-                XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
-                auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
-                    XMVECTOR clip = XMVector4Transform(XMVectorSet(wpos.x, wpos.y, wpos.z, 1.0f), vp);
-                    float ww = XMVectorGetW(clip);
-                    if (ww <= 0.0001f) return false;
-                    out.x = imgPos.x + (XMVectorGetX(clip) / ww * 0.5f + 0.5f) * viewWidth;
-                    out.y = imgPos.y + (1.0f - (XMVectorGetY(clip) / ww * 0.5f + 0.5f)) * viewHeight;
-                    return true;
-                    };
-                for (const auto& slot : world.Slots()) {
-                    if (!slot) continue;
-                    auto* oc = slot->GetComponent<OpponentComponent>();
-                    if (!oc) continue;
-                    ImVec2 prev; bool havePrev = false;
-                    for (const auto& wp : oc->GetPath()) {
-                        XMFLOAT3 up = wp; up.y += 0.1f;
-                        ImVec2 s; if (!project(up, s)) { havePrev = false; continue; }
-                        dl->AddCircleFilled(s, 3.0f, IM_COL32(255, 220, 60, 220));
-                        if (havePrev) dl->AddLine(prev, s, IM_COL32(255, 220, 60, 230), 2.0f);
-                        prev = s; havePrev = true;
-                    }
-                }
-            }
-
-            // Title / Result ‰æ–ÊiScreenUIComponentj
+            XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
+            auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
+                XMVECTOR clip = XMVector4Transform(XMVectorSet(wpos.x, wpos.y, wpos.z, 1.0f), vp);
+                float ww = XMVectorGetW(clip);
+                if (ww <= 0.0001f) return false;
+                out.x = imgPos.x + (XMVectorGetX(clip) / ww * 0.5f + 0.5f) * viewWidth;
+                out.y = imgPos.y + (1.0f - (XMVectorGetY(clip) / ww * 0.5f + 0.5f)) * viewHeight;
+                return true;
+                };
             for (const auto& slot : world.Slots()) {
                 if (!slot) continue;
-                auto* ui = slot->GetComponent<ScreenUIComponent>();
-                if (!ui) continue;
-
-                dl->AddRectFilled(imgPos, ImVec2(imgPos.x + viewWidth, imgPos.y + viewHeight), IM_COL32(0, 0, 0, 110));
-                ImFont* font = ImGui::GetFont();
-                auto centerText = [&](const std::string& txt, float size, float y, ImU32 col) {
-                    ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, txt.c_str());
-                    dl->AddText(font, size, ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, y), col, txt.c_str());
-                    };
-
-                float y = imgPos.y + viewHeight * 0.28f;
-                centerText(ui->title, 56.0f, y, IM_COL32(255, 255, 255, 255)); y += 72.0f;
-                if (ui->showResult && !flow.lastResult.empty()) {
-                    bool clear = (flow.lastResult == "CLEAR");
-                    centerText(flow.lastResult, 40.0f, y, clear ? IM_COL32(120, 230, 120, 255) : IM_COL32(255, 90, 90, 255)); y += 52.0f;
-                    char tbuf[64]; snprintf(tbuf, sizeof(tbuf), "Time  %.1f s", flow.lastTime);
-                    centerText(tbuf, 22.0f, y, IM_COL32(220, 220, 220, 255)); y += 36.0f;
+                auto* oc = slot->GetComponent<OpponentComponent>();
+                if (!oc) continue;
+                ImVec2 prev; bool havePrev = false;
+                for (const auto& wp : oc->GetPath()) {
+                    XMFLOAT3 up = wp; up.y += 0.1f;
+                    ImVec2 s; if (!project(up, s)) { havePrev = false; continue; }
+                    dl->AddCircleFilled(s, 3.0f, IM_COL32(255, 220, 60, 220));
+                    if (havePrev) dl->AddLine(prev, s, IM_COL32(255, 220, 60, 230), 2.0f);
+                    prev = s; havePrev = true;
                 }
-                if (!ui->subtitle.empty()) { centerText(ui->subtitle, 22.0f, y, IM_COL32(200, 200, 200, 255)); y += 40.0f; }
+            }
+        }
 
-                if (!ui->buttonText.empty() && !ui->nextScene.empty()) {
-                    ImVec2 bs(220.0f, 44.0f);
-                    ImGui::SetCursorScreenPos(ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, y + 10.0f));
-                    ImGui::PushID(slot.get());
-                    bool go = ImGui::Button(ui->buttonText.c_str(), bs);
+        // Title / Result   ÊiScreenUIComponent j
+        for (const auto& slot : world.Slots()) {
+            if (!slot) continue;
+            auto* ui = slot->GetComponent<ScreenUIComponent>();
+            if (!ui) continue;
+
+            dl->AddRectFilled(imgPos, ImVec2(imgPos.x + viewWidth, imgPos.y + viewHeight), IM_COL32(0, 0, 0, 110));
+            ImFont* font = ImGui::GetFont();
+            auto centerText = [&](const std::string& txt, float size, float y, ImU32 col) {
+                ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, txt.c_str());
+                dl->AddText(font, size, ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, y), col, txt.c_str());
+                };
+
+            float y = imgPos.y + viewHeight * 0.28f;
+            centerText(ui->title, 56.0f, y, IM_COL32(255, 255, 255, 255)); y += 72.0f;
+            if (ui->showResult && !flow.lastResult.empty()) {
+                bool clear = (flow.lastResult == "CLEAR");
+                centerText(flow.lastResult, 40.0f, y, clear ? IM_COL32(120, 230, 120, 255) : IM_COL32(255, 90, 90, 255)); y += 52.0f;
+                char tbuf[64]; snprintf(tbuf, sizeof(tbuf), "Time  %.1f s", flow.lastTime);
+                centerText(tbuf, 22.0f, y, IM_COL32(220, 220, 220, 255)); y += 36.0f;
+            }
+            if (!ui->subtitle.empty()) { centerText(ui->subtitle, 22.0f, y, IM_COL32(200, 200, 200, 255)); y += 40.0f; }
+
+            if (ui->roleSelect && !ui->nextScene.empty()) {
+                //    [   I  F { ^  1 Â‚Ì‘   ÉA3 Â‚Ìƒ  [   Ìƒ{ ^      É•  ×‚ i1-3b j B
+                //  L [ { [ h   1 / 2 / 3  Å‚ I ×‚ BEnter  Í  Ìƒ  [   i Â‚  { ^   j Ì‚Ü‚ÜŒ   
+                const float gap = 24.0f, bh = 56.0f;
+                float bw = (viewWidth - gap * (kRoleCount - 1) - 40.0f) / kRoleCount;
+                if (bw > 200.0f) bw = 200.0f;
+                float x = imgPos.x + (viewWidth - (bw * kRoleCount + gap * (kRoleCount - 1))) * 0.5f;
+                int chosen = -1;
+                for (int r = 0; r < kRoleCount; ++r, x += bw + gap) {
+                    const Role role = (Role)r;
+                    const bool current = (role == flow.playerRole);
+                    if (current) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(50, 110, 200, 255));
+                    ImGui::SetCursorScreenPos(ImVec2(x, y + 10.0f));
+                    ImGui::PushID(r);
+                    if (ImGui::Button(RoleName(role), ImVec2(bw, bh))) chosen = r;
                     ImGui::PopID();
-                    if (ImGui::IsKeyPressed(0x0D, false)) go = true;   // Enter‚Å‚àŒˆ’èi0x0D = VK_RETURNj
-                    if (go && flow.requestedScene.empty()) flow.requestedScene = ui->nextScene;
+                    if (current) ImGui::PopStyleColor();
+                    //     F { ^   Ì‰  ÉA { ^   Ì•  ÅÜ‚ Ô‚  Äo  
+                    dl->AddText(font, 18.0f, ImVec2(x, y + 10.0f + bh + 8.0f), IM_COL32(220, 220, 220, 255), RoleDescription(role), nullptr, bw);
+                    if (ImGui::IsKeyPressed('1' + r, false)) chosen = r;
                 }
-                break;   // ‰æ–Ê‚Í1‚Â‚¾‚¯•`‚­
+                if (ImGui::IsKeyPressed(0x0D, false)) chosen = (int)flow.playerRole;   // Enter i0x0D = VK_RETURN j
+                if (chosen >= 0 && flow.requestedScene.empty()) {
+                    flow.playerRole = (Role)chosen;         //  I ñ‚¾ƒ  [     GameFlow  É“    i     Scene    Ç‚Şj
+                    flow.requestedScene = ui->nextScene;
+                }
             }
-
+            else if (!ui->buttonText.empty() && !ui->nextScene.empty()) {
+                ImVec2 bs(220.0f, 44.0f);
+                ImGui::SetCursorScreenPos(ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, y + 10.0f));
+                ImGui::PushID(slot.get());
+                bool go = ImGui::Button(ui->buttonText.c_str(), bs);
+                ImGui::PopID();
+                if (ImGui::IsKeyPressed(0x0D, false)) go = true;   // Enter Å‚    i0x0D = VK_RETURN j
+                if (go && flow.requestedScene.empty()) flow.requestedScene = ui->nextScene;
+            }
+            break;   //   Ê‚ 1 Â‚    `  
         }
 
-        // •ÒW‚Ì‚İFƒhƒƒbƒvEƒL[EƒOƒŠƒbƒhEƒMƒYƒ‚iš•œŒ³j
-        if (!playMode) {
-            if (ImGui::BeginDragDropTarget()) {
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_GLB")) {
-                    std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
-                    if (!pth.empty()) {
-                        std::string name = pth.substr(pth.find_last_of('/') + 1);
-                        EntityId id = EditorCreateEntity(world, history, name.c_str());
-                        if (Entity* e = world.Get(id))
-                            if (auto* m = e->GetComponent<MeshRendererComponent>()) m->assetId = pth;
-                        selected = id;
-                    }
+    }
+
+    //  ÒW   Ì‚İF h   b v E L [ E O   b h E M Y   i       j
+    if (!playMode) {
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_GLB")) {
+                std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
+                if (!pth.empty()) {
+                    std::string name = pth.substr(pth.find_last_of('/') + 1);
+                    EntityId id = EditorCreateEntity(world, history, name.c_str());
+                    if (Entity* e = world.Get(id))
+                        if (auto* m = e->GetComponent<MeshRendererComponent>()) m->assetId = pth;
+                    selected = id;
                 }
-                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB")) {
-                    std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
-                    if (!pth.empty()) {
-                        EntityId id = EditorSpawnPrefab(world, history, pth);
-                        if (id.IsValid()) selected = id;
-                    }
+            }
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PREFAB")) {
+                std::string pth = payload->Data ? static_cast<const char*>(payload->Data) : "";
+                if (!pth.empty()) {
+                    EntityId id = EditorSpawnPrefab(world, history, pth);
+                    if (id.IsValid()) selected = id;
                 }
-                ImGui::EndDragDropTarget();
             }
-
-            ImGuiIO& io = ImGui::GetIO();
-            if ((ImGui::IsWindowFocused() || ImGui::IsWindowHovered()) && !io.WantTextInput && !ImGui::IsMouseDown(1)) {
-                if (ImGui::IsKeyPressed('W')) gizmoOp = ImGuizmo::TRANSLATE;
-                if (ImGui::IsKeyPressed('E')) gizmoOp = ImGuizmo::ROTATE;
-                if (ImGui::IsKeyPressed('R')) gizmoOp = ImGuizmo::SCALE;
-            }
-
-            ImGuizmo::SetOrthographic(false);
-            ImGuizmo::SetDrawlist();
-            ImGuizmo::SetRect(imgPos.x, imgPos.y, (float)viewWidth, (float)viewHeight);
-
-            if (showGrid) {
-                XMFLOAT4X4 gridM; XMStoreFloat4x4(&gridM, XMMatrixIdentity());
-                ImGuizmo::DrawGrid(&view._11, &proj._11, &gridM._11, 10.0f);
-            }
-
-            Entity* e = world.Get(selected);
-            TransformComponent* t = e ? e->GetComponent<TransformComponent>() : nullptr;
-            if (t) {
-                XMFLOAT4X4 model = t->GetWorldMatrix();
-                float snapArr[3];
-                if (gizmoOp == ImGuizmo::TRANSLATE) { snapArr[0] = snapArr[1] = snapArr[2] = snapTranslate; }
-                else if (gizmoOp == ImGuizmo::ROTATE) { snapArr[0] = snapRotate; }
-                else { snapArr[0] = snapScale; }
-                float* snapPtr = snapEnabled ? snapArr : nullptr;
-
-                ImGuizmo::Manipulate(&view._11, &proj._11, (ImGuizmo::OPERATION)gizmoOp, ImGuizmo::LOCAL, &model._11, nullptr, snapPtr);
-
-                bool usingNow = ImGuizmo::IsUsing();
-                if (usingNow && !gizmoSession.active) BeginTransformEdit(gizmoSession, selected, *t);
-                if (usingNow) {
-                    float tr[3], rot[3], sc[3];
-                    ImGuizmo::DecomposeMatrixToComponents(&model._11, tr, rot, sc);
-                    t->position = { tr[0],tr[1],tr[2] };
-                    t->rotationEuler = { rot[0],rot[1],rot[2] };
-                    t->scale = { sc[0],sc[1],sc[2] };
-                }
-                if (!usingNow && gizmoSession.active) CommitTransformEdit(gizmoSession, world, history);
-            }
+            ImGui::EndDragDropTarget();
         }
 
-        ImGui::End();
-        ImGui::PopStyleVar();
+        ImGuiIO& io = ImGui::GetIO();
+        if ((ImGui::IsWindowFocused() || ImGui::IsWindowHovered()) && !io.WantTextInput && !ImGui::IsMouseDown(1)) {
+            if (ImGui::IsKeyPressed('W')) gizmoOp = ImGuizmo::TRANSLATE;
+            if (ImGui::IsKeyPressed('E')) gizmoOp = ImGuizmo::ROTATE;
+            if (ImGui::IsKeyPressed('R')) gizmoOp = ImGuizmo::SCALE;
+        }
+
+        ImGuizmo::SetOrthographic(false);
+        ImGuizmo::SetDrawlist();
+        ImGuizmo::SetRect(imgPos.x, imgPos.y, (float)viewWidth, (float)viewHeight);
+
+        if (showGrid) {
+            XMFLOAT4X4 gridM; XMStoreFloat4x4(&gridM, XMMatrixIdentity());
+            ImGuizmo::DrawGrid(&view._11, &proj._11, &gridM._11, 10.0f);
+        }
+
+        Entity* e = world.Get(selected);
+        TransformComponent* t = e ? e->GetComponent<TransformComponent>() : nullptr;
+        if (t) {
+            XMFLOAT4X4 model = t->GetWorldMatrix();
+            float snapArr[3];
+            if (gizmoOp == ImGuizmo::TRANSLATE) { snapArr[0] = snapArr[1] = snapArr[2] = snapTranslate; }
+            else if (gizmoOp == ImGuizmo::ROTATE) { snapArr[0] = snapRotate; }
+            else { snapArr[0] = snapScale; }
+            float* snapPtr = snapEnabled ? snapArr : nullptr;
+
+            ImGuizmo::Manipulate(&view._11, &proj._11, (ImGuizmo::OPERATION)gizmoOp, ImGuizmo::LOCAL, &model._11, nullptr, snapPtr);
+
+            bool usingNow = ImGuizmo::IsUsing();
+            if (usingNow && !gizmoSession.active) BeginTransformEdit(gizmoSession, selected, *t);
+            if (usingNow) {
+                float tr[3], rot[3], sc[3];
+                ImGuizmo::DecomposeMatrixToComponents(&model._11, tr, rot, sc);
+                t->position = { tr[0],tr[1],tr[2] };
+                t->rotationEuler = { rot[0],rot[1],rot[2] };
+                t->scale = { sc[0],sc[1],sc[2] };
+            }
+            if (!usingNow && gizmoSession.active) CommitTransformEdit(gizmoSession, world, history);
+        }
     }
 
-    void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
-        ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings)
-    {
-        using namespace DirectX;
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
 
-        // ---- ƒ‰ƒCƒg‚Ì view-proji•½s“Š‰ejB‰e‚ªo‚é”ÍˆÍ‚ğAƒJƒƒ‰‚Ì‘O•û‚É’Ç]‚³‚¹‚é ----
-        XMVECTOR ld = XMVector3Normalize(XMVectorSet(lighting.direction.x, lighting.direction.y, lighting.direction.z, 0));
-        XMVECTOR up = (fabsf(XMVectorGetY(ld)) > 0.99f) ? XMVectorSet(0, 0, 1, 0) : XMVectorSet(0, 1, 0, 0);
+void ViewportPanel::RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
+    ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings)
+{
+    using namespace DirectX;
 
-        // ”ÍˆÍ‚Ì’†SFƒJƒƒ‰‚ÌˆÊ’u‚©‚çA…•½‚È‘O•û‚Ö­‚µi‚ß‚½“_iŒã‚ë‚æ‚è‘O‚ğL‚­æ‚éj
-        const float range = (lighting.shadowRange > 1.0f) ? lighting.shadowRange : 1.0f;   // ‰e‚ªo‚é³•ûŒ`‚Ìˆê•Óimj
-        XMMATRIX camWorld = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));               // r[3]=ƒJƒƒ‰ˆÊ’u, r[2]=‘O•û
-        XMVECTOR forward = XMVectorSetY(camWorld.r[2], 0.0f);
-        if (XMVectorGetX(XMVector3LengthSq(forward)) > 1e-6f) forward = XMVector3Normalize(forward);
-        else forward = XMVectorZero();                                                     // ^ãE^‰º‚ğŒü‚¢‚Ä‚¢‚é‚Æ‚«
-        XMVECTOR center = XMVectorAdd(camWorld.r[3], XMVectorScale(forward, range * 0.35f));
+    // ----    C g   view-proj i   s   e j B e   o  ÍˆÍ‚ A J     Ì‘O   É’Ç]       ----
+    XMVECTOR ld = XMVector3Normalize(XMVectorSet(lighting.direction.x, lighting.direction.y, lighting.direction.z, 0));
+    XMVECTOR up = (fabsf(XMVectorGetY(ld)) > 0.99f) ? XMVectorSet(0, 0, 1, 0) : XMVectorSet(0, 1, 0, 0);
 
-        // ’†S‚ğuƒVƒƒƒhƒEƒ}ƒbƒv1‰æ‘f‚Ô‚ñv‚Ì‚İ‚ÉŠÛ‚ß‚éB
-        // ŠÛ‚ß‚È‚¢‚ÆAƒJƒƒ‰‚ª­‚µ“®‚­‚½‚Ñ‚É‰e‚Ì‰‚ª‚¿‚ç‚Â‚­i‰æ‘f‚Ì‹æØ‚è‚ÌˆÊ’u‚ª–ˆƒtƒŒ[ƒ€‚¸‚ê‚é‚½‚ßjB
-        XMMATRIX lightRot = XMMatrixLookAtLH(XMVectorZero(), ld, up);                      // Œü‚«‚¾‚¯‚Ìƒ‰ƒCƒgs—ñ
-        const float texel = range / (float)shadowMap.GetSize();
-        XMFLOAT3 c; XMStoreFloat3(&c, XMVector3TransformCoord(center, lightRot));          // ƒ‰ƒCƒg‚©‚çŒ©‚½À•W‚Ö
-        c.x = floorf(c.x / texel) * texel;
-        c.y = floorf(c.y / texel) * texel;
-        center = XMVector3TransformCoord(XMLoadFloat3(&c), XMMatrixInverse(nullptr, lightRot));   // ƒ[ƒ‹ƒh‚Ö–ß‚·
+    //  ÍˆÍ‚Ì’  S F J     ÌˆÊ’u    A     È‘O   Ö    i ß‚  _ i     O  L     j
+    const float range = (lighting.shadowRange > 1.0f) ? lighting.shadowRange : 1.0f;   //  e   o é³   ` Ìˆ Óim j
+    XMMATRIX camWorld = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));               // r[3]= J     Ê’u, r[2]= O  
+    XMVECTOR forward = XMVectorSetY(camWorld.r[2], 0.0f);
+    if (XMVectorGetX(XMVector3LengthSq(forward)) > 1e-6f) forward = XMVector3Normalize(forward);
+    else forward = XMVectorZero();                                                     //  ^  E ^        Ä‚   Æ‚ 
+    XMVECTOR center = XMVectorAdd(camWorld.r[3], XMVectorScale(forward, range * 0.35f));
 
-        XMVECTOR lpos = XMVectorSubtract(center, XMVectorScale(ld, 25.0f));                // ’†S‚©‚çŒõ‚Æ‹tŒü‚«‚É 25m
-        XMMATRIX lView = XMMatrixLookAtLH(lpos, center, up);
-        XMMATRIX lProj = XMMatrixOrthographicLH(range, range, 0.1f, 60.0f);
-        XMFLOAT4X4 lightVP; XMStoreFloat4x4(&lightVP, lView * lProj);
+    //    S  u V   h E } b v1  f Ô‚ v Ì  İ‚ÉŠÛ‚ß‚ B
+    //  Û‚ß‚È‚  ÆA J                 Ñ‚É‰e Ì‰       Â‚  i  f Ì‹ Ø‚ ÌˆÊ’u     t   [      é‚½ ßj B
+    XMMATRIX lightRot = XMMatrixLookAtLH(XMVectorZero(), ld, up);                      //          Ìƒ  C g s  
+    const float texel = range / (float)shadowMap.GetSize();
+    XMFLOAT3 c; XMStoreFloat3(&c, XMVector3TransformCoord(center, lightRot));          //    C g   çŒ©     W  
+    c.x = floorf(c.x / texel) * texel;
+    c.y = floorf(c.y / texel) * texel;
+    center = XMVector3TransformCoord(XMLoadFloat3(&c), XMMatrixInverse(nullptr, lightRot));   //    [   h Ö–ß‚ 
 
-        // ƒVƒƒƒhƒEƒpƒX
-        shadowMap.BeginPass(context, lightVP);
-        RenderSystem::RenderShadow(world, shadowMap, *cubeMesh, cache, device, context);
-        RenderSystem::RenderShadowSkinned(world, shadowMap, GlobalSkinnedCache(), device, context);
-        // –{•`‰æ
-        rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
-        if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
+    XMVECTOR lpos = XMVectorSubtract(center, XMVectorScale(ld, 25.0f));                //    S      Æ‹t       25m
+    XMMATRIX lView = XMMatrixLookAtLH(lpos, center, up);
+    XMMATRIX lProj = XMMatrixOrthographicLH(range, range, 0.1f, 60.0f);
+    XMFLOAT4X4 lightVP; XMStoreFloat4x4(&lightVP, lView * lProj);
 
-        XMFLOAT4X4 viewProj;
-        XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
-        XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
-        XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
+    //  V   h E p X
+    shadowMap.BeginPass(context, lightVP);
+    RenderSystem::RenderShadow(world, shadowMap, *cubeMesh, cache, device, context);
+    RenderSystem::RenderShadowSkinned(world, shadowMap, GlobalSkinnedCache(), device, context);
+    //  { `  
+    rt.Begin(context, 0.10f, 0.12f, 0.15f, 1.0f);
+    if (rt.GetWidth() <= 0 || rt.GetHeight() <= 0 || !cubeMesh) return;
 
-        skybox.Render(context, viewProj, camPos, envMap.Sky(), lighting);
-        // ‹ó‚ÍF‚¾‚¯‚ğ•`‚­B‚±‚±‚©‚çæiƒƒbƒVƒ…j‚ÍAF‚É‰Á‚¦‚Ä–@ü‚à‘‚«o‚·
-        rt.BindSceneTargets(context);
-        shader.SetLight(lighting);
-        shader.SetShadow(shadowMap.GetSRV(), lightVP);
-        shader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
-        shader.SetCameraPosition(camPos);
-        RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
-        skinnedShader.SetLight(lighting);
-        skinnedShader.SetShadow(shadowMap.GetSRV(), lightVP);
-        skinnedShader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
-        skinnedShader.SetCameraPosition(camPos);
-        RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
-        // ƒVƒƒƒhƒESRV‚ğŠO‚·iŸƒtƒŒ[ƒ€‚ÌƒVƒƒƒhƒE‘‚«‚İ‚Æ‹£‡‚³‚¹‚È‚¢j
-        ID3D11ShaderResourceView* nul = nullptr;
-        context->PSSetShaderResources(1, 1, &nul);
+    XMFLOAT4X4 viewProj;
+    XMStoreFloat4x4(&viewProj, XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj));
+    XMMATRIX invView = XMMatrixInverse(nullptr, XMLoadFloat4x4(&view));
+    XMFLOAT3 camPos; XMStoreFloat3(&camPos, invView.r[3]);
 
-        // ƒ|ƒXƒgƒvƒƒZƒXFƒV[ƒ“‚Ì‰æ‘œirtj‚ğ“Ç‚ñ‚ÅA•\¦—p‚Ì‰æ‘œifinalRTj‚É‘‚«o‚·
-                // ƒ|ƒXƒgƒvƒƒZƒXFƒV[ƒ“‚Ì‰æ‘œirt ‚ÌFE–@üE[“xj‚ğ“Ç‚ñ‚ÅA•\¦—p‚Ì‰æ‘œifinalRTj‚É‘‚«o‚·
-        postProcess.Apply(context, rt, finalRT, postSettings, proj);
-    }
+    skybox.Render(context, viewProj, camPos, envMap.Sky(), lighting);
+    //   ÍF      `   B         i   b V   j ÍA F É‰    Ä–@        o  
+    rt.BindSceneTargets(context);
+    shader.SetLight(lighting);
+    shader.SetShadow(shadowMap.GetSRV(), lightVP);
+    shader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
+    shader.SetCameraPosition(camPos);
+    RenderSystem::Render(world, shader, *cubeMesh, cache, device, context, viewProj);
+    skinnedShader.SetLight(lighting);
+    skinnedShader.SetShadow(shadowMap.GetSRV(), lightVP);
+    skinnedShader.SetEnvironment(envMap.Specular(), envMap.BrdfLut());
+    skinnedShader.SetCameraPosition(camPos);
+    RenderSystem::RenderSkinned(world, skinnedShader, GlobalSkinnedCache(), device, context, viewProj);
+    //  V   h ESRV  O   i   t   [   ÌƒV   h E       İ‚Æ‹        È‚  j
+    ID3D11ShaderResourceView* nul = nullptr;
+    context->PSSetShaderResources(1, 1, &nul);
+
+    //  | X g v   Z X F V [   Ì‰æ‘œ irt j  Ç‚ ÅA \   p Ì‰æ‘œ ifinalRT j É    o  
+            //  | X g v   Z X F V [   Ì‰æ‘œ irt  ÌF E @   E [ x j  Ç‚ ÅA \   p Ì‰æ‘œ ifinalRT j É    o  
+    postProcess.Apply(context, rt, finalRT, postSettings, proj);
+}
 
 } // namespace uel

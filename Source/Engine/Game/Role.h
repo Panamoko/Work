@@ -21,4 +21,15 @@ namespace uel {
         return "?";
     }
 
+    // ロール選択の画面に出す、短い説明（UTF-8）
+    inline const char* RoleDescription(Role r)
+    {
+        switch (r) {
+        case Role::Tank:    return u8"前に出て、敵の攻撃を引き受ける";
+        case Role::DPS:     return u8"敵をすばやく倒す";
+        case Role::Support: return u8"味方の HP を回復する";
+        }
+        return "";
+    }
+
 } // namespace uel

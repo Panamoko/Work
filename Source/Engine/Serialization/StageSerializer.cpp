@@ -56,7 +56,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 20;
+        constexpr int kSchemaLatest = 21;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -101,6 +101,7 @@ namespace uel {
             std::string anGraph;
             std::string skFpHide;
             bool  hasAlly = false; float alMoveSpeed = 4.5f, alFollowDist = 3.0f, alResumeDist = 4.5f, alRepath = 0.5f;
+            bool  uiRoleSelect = false;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -139,6 +140,7 @@ namespace uel {
                 if (g_loadSchema >= 20)
                     ar(CEREAL_NVP(hasAlly), CEREAL_NVP(alMoveSpeed), CEREAL_NVP(alFollowDist),
                         CEREAL_NVP(alResumeDist), CEREAL_NVP(alRepath));                                        // v20
+                if (g_loadSchema >= 21) ar(CEREAL_NVP(uiRoleSelect));                                           // v21
             }
         };
 
@@ -178,6 +180,7 @@ namespace uel {
             if (auto* ui = e.GetComponent<ScreenUIComponent>()) {
                 ed.hasUI = true; ed.uiTitle = ui->title; ed.uiSub = ui->subtitle;
                 ed.uiButton = ui->buttonText; ed.uiNext = ui->nextScene; ed.uiShowResult = ui->showResult;
+                ed.uiRoleSelect = ui->roleSelect;
             }
             if (auto* gr = e.GetComponent<GameRuleComponent>()) {
                 ed.hasRule = true; ed.ruleWin = gr->winScene; ed.ruleLose = gr->loseScene; ed.ruleDelay = gr->endDelay;
@@ -254,6 +257,7 @@ namespace uel {
                 auto* ui = e.AddComponent<ScreenUIComponent>();
                 ui->title = ed.uiTitle; ui->subtitle = ed.uiSub; ui->buttonText = ed.uiButton;
                 ui->nextScene = ed.uiNext; ui->showResult = ed.uiShowResult;
+                ui->roleSelect = ed.uiRoleSelect;
             }
             if (ed.hasRule) {
                 auto* gr = e.AddComponent<GameRuleComponent>();

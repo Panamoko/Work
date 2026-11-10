@@ -619,6 +619,7 @@ namespace uel {
                 editStr(u8"ボタンの文字", ui->buttonText);
                 editStr(u8"次の Scene", ui->nextScene);
                 ImGui::Checkbox(u8"結果を表示", &ui->showResult);
+                ImGui::Checkbox(u8"ロールを選ぶ画面にする", &ui->roleSelect);
             }
             ImGui::PopID();
         }
