@@ -130,6 +130,7 @@ namespace uel {
                 auto* hb = ge->GetComponent<HitboxComponent>();
                 if (!gt || !hb) continue;
                 if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
+                if (auto* al = ge->GetComponent<AllyComponent>()) if (al->IsIncapacitated()) continue;   // 戦闘不能の味方は弾を止めない（倒れているのに、立った形の当たり判定で止まらないように）
                 auto ws = hb->GetWorldShapes(*gt);
                 float tt;
                 if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
@@ -143,6 +144,7 @@ namespace uel {
                 if (ge == &self) continue;
                 if (ge->GetComponent<HitboxComponent>()) continue;
                 if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
+                if (auto* al = ge->GetComponent<AllyComponent>()) if (al->IsIncapacitated()) continue;   // 戦闘不能の味方は弾を止めない（倒れているのに、立った形の当たり判定で止まらないように）
                 auto* gt = ge->GetComponent<TransformComponent>();
                 auto* gm = ge->GetComponent<MeshRendererComponent>();
                 bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);

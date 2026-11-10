@@ -5,6 +5,7 @@
 #include "Engine/Components/MeshRendererComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
+#include "Engine/Components/HPComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -65,6 +66,18 @@ namespace uel {
         auto* t = self.GetComponent<TransformComponent>();
         if (!t) return;
         const float dt = ctx.dt;
+        AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // 無くても動く（アニメが変わらないだけ）
+
+        // 0) 戦闘不能：HP が 0 になったら、その場で止まる（追いかけない・向きも変えない）。
+        //    HP が戻ったら（回復・蘇生）、また動き出す。段階 4 で「ダウン（蘇生を待つ・時間切れで Dead）」に置き換える
+        auto* myHp = self.GetComponent<HPComponent>();
+        const bool down = (myHp && myHp->hp <= 0.0f);
+        if (down != incapacitated) {
+            incapacitated = down;
+            following = false;
+            path.clear();
+            SetAnimValue(an, kAnimDead, down ? 1.0f : 0.0f);    // Bool なので、変わったときだけ書けば値が残る（毎フレーム名前で探さない）
+        }
 
         // 1) 追いかける相手。覚えている相手がいなくなったときだけ World を探し直す（毎フレーム全員を調べない）
         Entity* lead = ctx.world.Get(leader);
@@ -81,7 +94,7 @@ namespace uel {
 
         const XMFLOAT3 before = t->position;
         float movedSpeed = 0.0f;
-        if (lt) {
+        if (lt && !incapacitated) {
             // 2) 動くか止まるか。止まる距離と動き出す距離を分けて、境目で動いたり止まったりを繰り返さないようにする
             const float dist = DistXZ(t->position, lt->position);
             if (following && dist <= followDistance) { following = false; path.clear(); }
@@ -145,7 +158,7 @@ namespace uel {
         }
 
         // 5) アニメーションへ：いまの移動の速さ
-        SetAnimValue(self.GetComponent<AnimatorComponent>(), kAnimSpeed, movedSpeed);
+        SetAnimValue(an, kAnimSpeed, movedSpeed);
     }
 
 } // namespace uel

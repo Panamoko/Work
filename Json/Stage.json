@@ -691,7 +691,7 @@
             "ruleWin": "",
             "ruleLose": "",
             "ruleDelay": 2.0,
-            "prefabPath": "",
+            "prefabPath": "Data/Prefabs/Ally.prefab.json",
             "hasHitbox": true,
             "hbBodyBottom": 0.30000001192092898,
             "hbBodyTop": 1.2999999523162842,

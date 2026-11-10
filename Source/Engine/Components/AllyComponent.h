@@ -9,8 +9,9 @@ namespace uel {
     // AI 仲間の「頭」（UE の AIController に当たる）。どのロールでも共通の判断をここに書く。
     // 「何ができるか」（武器・アビリティ）は、ロールの Component（Tank / DPS / Support）に持たせる予定。
     //
-    // 今できること（1-1）：プレイヤーを経路探索で追いかけ、近くまで来たら止まって、プレイヤーのほうを向く。
-    // まだ無いこと：攻撃・回復・蘇生、陣営（敵はまだ AI 仲間を狙わない）、壁との当たり判定（経路だけで避ける）。
+    // 今できること：プレイヤーを経路探索で追いかけ、近くまで来たら止まって、プレイヤーのほうを向く（1-1）。
+    //   HP が 0 になったら、その場で戦闘不能（止まって倒れる。1-2c）。段階 4 で「ダウン（蘇生を待つ）」に置き換える。
+    // まだ無いこと：攻撃・回復・蘇生、壁との当たり判定（経路だけで避ける）。
     class AllyComponent : public Component {
     public:
         std::unique_ptr<Component> Clone() const override { return std::make_unique<AllyComponent>(*this); }
@@ -24,6 +25,10 @@ namespace uel {
 
         // アニメーショングラフに渡すパラメータの名前（Player / Opponent と同じ名前）
         static constexpr const char* kAnimSpeed = "Speed";      // Float：いまの移動の速さ（m/s）。止まっていれば 0
+        static constexpr const char* kAnimDead = "Dead";        // Bool ：戦闘不能（HP 0）。HP が戻るまで true のまま
+
+        // HP が 0 で、戦闘不能か（動かない。敵に狙われない。プレイヤーの弾を止めない）
+        bool IsIncapacitated() const { return incapacitated; }
 
     private:
         // ---- 実行時の状態（保存しない）----
@@ -35,6 +40,7 @@ namespace uel {
         bool     following = false;                 // いま追いかけている（動いている）
         bool     grounded = false;                  // 地面に立っている（止まって立っている間は、地面を調べ直さない）
         float    velY = 0.0f;
+        bool     incapacitated = false;             // 戦闘不能（HP 0）。変わったフレームだけアニメに Dead を書く
     };
 
 } // namespace uel
