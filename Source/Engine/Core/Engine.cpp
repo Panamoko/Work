@@ -248,6 +248,7 @@ namespace uel {
     {
         mode = EditorMode::Play;
         viewport->GetFlow().lastResult.clear();
+        viewport->GetFlow().playerRole = kDefaultRole;     // ロールも既定に戻す（前の Play で選んだロールが残らないように）
         LoadPlayScene(activeScene, true);
     }
 

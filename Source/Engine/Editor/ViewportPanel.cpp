@@ -220,6 +220,10 @@ namespace uel {
                 dl->AddLine(ImVec2(c.x, c.y - 8), ImVec2(c.x, c.y + 8), IM_COL32(255, 255, 255, 220), 2.0f);
             }
             if (pc && pc->GetHitMarker() > 0.0f) {
+                if (pc) {   // 選んだロール（左上。GameFlow に入っている値をそのまま出す）
+                    char roleTxt[32]; snprintf(roleTxt, sizeof(roleTxt), "ROLE: %s", RoleName(flow.playerRole));
+                    dl->AddText(ImVec2(imgPos.x + 20.0f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 230), roleTxt);
+                }
                 ImU32 col = pc->GetHeadshot() ? IM_COL32(255, 60, 60, 255) : IM_COL32(255, 255, 255, 255);   // 頭=赤／胴体=白
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
                 dl->AddLine(ImVec2(c.x + 12, c.y - 12), ImVec2(c.x + 4, c.y - 4), col, 2.0f);

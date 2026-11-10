@@ -332,6 +332,9 @@
     <ClInclude Include="Source\Engine\Game\Team.h">
       <Filter>Source\Engine\Game</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\Role.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
