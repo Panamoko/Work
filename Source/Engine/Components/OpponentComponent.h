@@ -1,5 +1,6 @@
 #pragma once
 #include "Engine/Components/Component.h"
+#include "Engine/Scene/EntityId.h"
 #include <DirectXMath.h>
 #include <vector>
 
@@ -18,6 +19,8 @@ namespace uel {
         float attackMoveLock = 0.6f;    // 攻撃を始めてから、この秒数は移動しない（攻撃のクリップの長さに合わせる）
         float deathDelay = 1.5f;        // HP が 0 になってから、消えるまでの時間（死亡のクリップの長さに合わせる）
         float hitReactTime = 0.4f;      // 撃たれてひるんでいる時間（この間は動かない・攻撃しない）。グラフに "HitReact" のモンタージュがあるときだけ
+        float retargetInterval = 0.5f;  // 狙う相手（プレイヤー・AI 仲間）を選び直す間隔（秒）
+        float retargetMargin = 1.0f;    // 今の相手よりこれ（m）以上近い相手がいるときだけ乗り換える（狙いがころころ変わらないように）
 
         // アニメーショングラフに渡すパラメータの名前。
         // 同じ Entity の AnimatorComponent のグラフに、この名前のパラメータがあれば値を書く（無ければ何もしない）。
@@ -48,6 +51,8 @@ namespace uel {
         float lastHp = -1.0f;       // 前のフレームの HP（減ったら撃たれたと分かる。マイナス = まだ見ていない）
         bool  dying = false;
         float deathTimer = 0.0f;    // 消えるまでの残り時間（dying のときだけ使う）
+        EntityId targetId;          // 今狙っている相手（無効 = まだ選んでいない）。毎フレーム World を探さないように覚えておく
+        float retargetTimer = 0.0f; // 次に狙う相手を選び直すまでの残り時間
         float repathTimer = 0.0f;
         size_t wpIndex = 0;   // 現在向かっている経路インデックス（前進のみ）
         std::vector<DirectX::XMFLOAT3> path;

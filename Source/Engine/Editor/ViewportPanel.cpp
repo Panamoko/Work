@@ -18,6 +18,7 @@
 #include "Engine/Components/HitboxComponent.h"
 #include "Engine/Components/SpawnerComponent.h"
 #include "Engine/Config/EngineConfig.h"
+#include "Engine/Components/AllyComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -235,6 +236,24 @@ namespace uel {
                 char hpTxt[32]; snprintf(hpTxt, sizeof(hpTxt), "HP %.0f/%.0f", php->hp, php->maxHp);
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
+            }
+            // AI 仲間の HP（プレイヤーの HP バーの上に、1人ずつ小さく並べる）
+            {
+                const float bx = imgPos.x + 20.0f, bw = 160.0f, bh = 12.0f;
+                float by = imgPos.y + viewHeight - 62.0f;
+                for (const auto& slot : world.Slots()) {
+                    if (!slot || !slot->GetComponent<AllyComponent>()) continue;
+                    auto* ahp = slot->GetComponent<HPComponent>();
+                    if (!ahp) continue;
+                    float frac = (ahp->maxHp > 0.0f) ? ahp->hp / ahp->maxHp : 0.0f;
+                    if (frac < 0) frac = 0; if (frac > 1) frac = 1;
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(40, 40, 40, 200));
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * frac, by + bh), IM_COL32(80, 200, 120, 230));
+                    dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 160));
+                    char aTxt[96]; snprintf(aTxt, sizeof(aTxt), "%s  %.0f", slot->name.c_str(), ahp->hp);
+                    dl->AddText(ImVec2(bx + bw + 8.0f, by - 3.0f), IM_COL32(255, 255, 255, 230), aTxt);
+                    by -= 20.0f;
+                }
             }
             // ウェーブ表示（Spawnerがある時）
             {
