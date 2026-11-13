@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 21,
+    "schemaVersion": 22,
     "entities": [
         {
             "name": "TitleUI",
@@ -124,7 +124,11 @@
             "alFollowDist": 3.0,
             "alResumeDist": 4.5,
             "alRepath": 0.5,
-            "uiRoleSelect": false
+            "uiRoleSelect": false,
+            "hasParty": false,
+            "ptPrefab": "Data/Prefabs/Ally.prefab.json",
+            "ptBack": 2.0,
+            "ptSide": 1.5
         }
     ]
 }

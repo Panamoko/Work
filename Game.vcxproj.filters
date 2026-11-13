@@ -350,6 +350,9 @@
     <ClInclude Include="Source\Engine\Components\TankComponent.h">
       <Filter>Source\Engine\Components</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Game\WeaponTrace.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -534,6 +537,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Components\PartySetupComponent.cpp">
       <Filter>Source\Engine\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\WeaponTrace.cpp">
+      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

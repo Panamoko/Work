@@ -8,12 +8,8 @@
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
 #include "Engine/Components/HPComponent.h"
-#include "Engine/Components/SkinnedMeshComponent.h"
-#include "Engine/Components/HitboxComponent.h"
-#include "Engine/Physics/HitShapes.h"
-#include "Engine/Components/OpponentComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
-#include "Engine/Game/Team.h"
+#include "Engine/Game/WeaponTrace.h"
 
 #include <cmath>
 #include <memory>
@@ -120,68 +116,11 @@ namespace uel {
         if (shot) {
             XMFLOAT3 rd = { cp * sy, sp, cp * cy };
             const float baseDamage = 34.0f;
-
-            // (1) ヒットボックス（胴体カプセル＋頭の球）
-            Entity* hbE = nullptr; float hbT = 1000.0f; bool head = false;
-            for (const auto& slot : ctx.world.Slots()) {
-                if (!slot) continue; Entity* ge = slot.get();
-                if (ge == &self) continue;
-                auto* gt = ge->GetComponent<TransformComponent>();
-                auto* hb = ge->GetComponent<HitboxComponent>();
-                if (!gt || !hb) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
-                if (auto* al = ge->GetComponent<AllyComponent>()) if (al->IsIncapacitated()) continue;   // 戦闘不能の味方は弾を止めない（倒れているのに、立った形の当たり判定で止まらないように）
-                auto ws = hb->GetWorldShapes(*gt);
-                float tt;
-                if (RaySphere(eyePos, rd, ws.headC, ws.headR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = true; }
-                if (RayCapsule(eyePos, rd, ws.bodyA, ws.bodyB, ws.bodyR, tt) && tt < hbT) { hbT = tt; hbE = ge; head = false; }
-            }
-
-            // (2) メッシュ（壁・床などの遮蔽物。ヒットボックスを持つものはヒットボックスで判定済みなので除外）
-            Entity* meshE = nullptr; float meshT = 1000.0f;
-            for (const auto& slot : ctx.world.Slots()) {
-                if (!slot) continue; Entity* ge = slot.get();
-                if (ge == &self) continue;
-                if (ge->GetComponent<HitboxComponent>()) continue;
-                if (auto* oc = ge->GetComponent<OpponentComponent>()) if (oc->IsDying()) continue;   // 倒れている最中の敵には当たらない
-                if (auto* al = ge->GetComponent<AllyComponent>()) if (al->IsIncapacitated()) continue;   // 戦闘不能の味方は弾を止めない（倒れているのに、立った形の当たり判定で止まらないように）
-                auto* gt = ge->GetComponent<TransformComponent>();
-                auto* gm = ge->GetComponent<MeshRendererComponent>();
-                bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
-                if (!gt || !gm) continue;
-                if (!gm->visible && !skinned) continue;
-                auto mp = meshOf(ge);
-                if (!mp || !mp->IsValid()) continue;
-                XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
-                float tt;
-                if (RaycastMesh(*mp, gw, eyePos, rd, meshT, tt)) { meshT = tt; meshE = ge; }
-            }
-
-            // (3) 近いほうに当たる（壁の向こうのヒットボックスには当たらない）
-            Entity* hitE = nullptr; float mul = 1.0f; bool headHit = false;
-            if (hbE && hbT <= meshT) {
-                hitE = hbE; headHit = head;
-                if (head) mul = hbE->GetComponent<HitboxComponent>()->headMultiplier;
-            }
-            else if (meshE) hitE = meshE;
-
-            // 味方（同じ陣営）に当たった弾は、そこで止まる（奥の敵には届かない）。ダメージ・ヒットマーカー・赤くする表示は無し
-            if (hitE && IsFriendly(self, *hitE)) hitE = nullptr;
-
-            if (hitE) {
-                if (auto* hpc = hitE->GetComponent<HPComponent>()) {
-                    hitMarker = 0.15f;
-                    lastHeadshot = headHit;
-                    hpc->hp -= baseDamage * mul;                        // ダメージ（頭は倍率）
-                    if (auto* hm = hitE->GetComponent<MeshRendererComponent>())
-                        hm->color = { 1.0f, 0.3f, 0.3f, 1.0f };        // 被弾表示（赤み）
-                    if (auto* sk = hitE->GetComponent<SkinnedMeshComponent>())
-                        sk->color = { 1.0f, 0.3f, 0.3f, 1.0f };
-                    // 撃破：陣営の無い物（的・箱など）だけ、その場で消す。
-                    // 敵（Enemies）は自分で死亡アニメを再生してから消える。味方（Players）は消さない（戦闘不能・ダウンは自分で扱う）
-                    if (hpc->hp <= 0.0f && GetTeam(*hitE) == Team::None)
-                        ctx.world.DestroyEntity(hitE->id);
-                }
+            // 弾の線が何に当たるか（UE の LineTrace）→ ダメージ（UE の ApplyPointDamage）。AI 仲間も同じ関数で撃つ（Game/WeaponTrace）
+            const ShotHit hit = TraceShot(ctx, eyePos, rd);
+            if (ApplyShotDamage(ctx, hit, baseDamage)) {     // 味方・壁にはダメージが入らない（ヒットマーカーも出ない）
+                hitMarker = 0.15f;
+                lastHeadshot = hit.headshot;
             }
         }
 

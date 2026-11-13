@@ -178,6 +178,7 @@
     <ClInclude Include="Source\Engine\Game\GameFlow.h" />
     <ClInclude Include="Source\Engine\Game\Role.h" />
     <ClInclude Include="Source\Engine\Game\Team.h" />
+    <ClInclude Include="Source\Engine\Game\WeaponTrace.h" />
     <ClInclude Include="Source\Engine\Graphics\DdsTexture.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineShadowMap.h" />
     <ClInclude Include="Source\Engine\Graphics\EngineSkybox.h" />
@@ -247,6 +248,7 @@
     <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp" />
     <ClCompile Include="Source\Engine\Editor\InspectorPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\ViewportPanel.cpp" />
+    <ClCompile Include="Source\Engine\Game\WeaponTrace.cpp" />
     <ClCompile Include="Source\Engine\Graphics\DdsTexture.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineShadowMap.cpp" />
     <ClCompile Include="Source\Engine\Graphics\EngineSkybox.cpp" />
