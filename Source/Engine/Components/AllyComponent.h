@@ -14,7 +14,8 @@ namespace uel {
     //   追従：プレイヤーを経路探索で追いかけ、近くまで来たら止まる（1-1）。
     //   戦闘不能：HP が 0 になったら、その場で止まって倒れる（1-2c）。段階 4 で「ダウン（蘇生を待つ）」に置き換える。
     //   攻撃：射程の中のいちばん近い敵を選び、見えていれば一定の間隔で撃つ。追いかけながらでも撃つ（2-2）。
-    // まだ無いこと：回復・蘇生、ロールごとの武器（段階 3）、撃ちやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
+    //   回復：SupportComponent が付いていれば、HP の割合が低い味方（自分も含む）を線でつないで回復する。回復中は撃たない（2-3）。
+    // まだ無いこと：蘇生、ロールごとの武器（段階 3）、撃ちやすい位置・回復しやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
     class AllyComponent : public Component {
     public:
         std::unique_ptr<Component> Clone() const override { return std::make_unique<AllyComponent>(*this); }
@@ -39,6 +40,7 @@ namespace uel {
         static constexpr const char* kAnimSpeed = "Speed";      // Float  ：いまの移動の速さ（m/s）。止まっていれば 0
         static constexpr const char* kAnimDead = "Dead";        // Bool   ：戦闘不能（HP 0）。HP が戻るまで true のまま
         static constexpr const char* kAnimAttack = "Attack";    // Trigger：撃った
+        static constexpr const char* kAnimHeal = "Heal";        // Bool   ：回復の線をつないでいる（グラフに無ければ何もしない）
 
         // HP が 0 で、戦闘不能か（動かない。撃たない。敵に狙われない。プレイヤーの弾を止めない）
         bool IsIncapacitated() const { return incapacitated; }
@@ -50,6 +52,12 @@ namespace uel {
         const DirectX::XMFLOAT3& GetShotFrom() const { return shotFrom; }
         const DirectX::XMFLOAT3& GetShotTo() const { return shotTo; }
         float GetShotTime() const { return shotTime; }
+
+        // 回復（Support のときだけ。2-3）。回復している間、線の両端（HUD で描くため。2-3b）
+        bool IsHealing() const { return healTargetId.IsValid(); }
+        EntityId GetHealTarget() const { return healTargetId; }
+        const DirectX::XMFLOAT3& GetHealFrom() const { return healFrom; }
+        const DirectX::XMFLOAT3& GetHealTo() const { return healTo; }
 
     private:
         // ---- 実行中の状態（保存しない）----
@@ -73,6 +81,13 @@ namespace uel {
         DirectX::XMFLOAT3 shotFrom{ 0.0f, 0.0f, 0.0f };    // 最後に撃った弾の線の始まり
         DirectX::XMFLOAT3 shotTo{ 0.0f, 0.0f, 0.0f };      // 最後に撃った弾の線の終わり（当たった所。外れたら射程の先）
         float    shotTime = 0.0f;                   // 弾の線を出しておく残り時間
+
+        // 回復
+        EntityId healTargetId;                      // 今回復している味方（無効 = 回復していない。自分のこともある）
+        float    healSearchTimer = 0.0f;            // 次に回復する相手を選び直すまでの残り時間（searchInterval ごと）
+        bool     healAnim = false;                  // アニメに渡した Heal の値（変わったときだけ書く）
+        DirectX::XMFLOAT3 healFrom{ 0.0f, 0.0f, 0.0f };    // 回復の線の始まり（自分）
+        DirectX::XMFLOAT3 healTo{ 0.0f, 0.0f, 0.0f };      // 回復の線の終わり（相手の胴体の真ん中）
     };
 
 } // namespace uel

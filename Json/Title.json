@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 22,
+    "schemaVersion": 23,
     "entities": [
         {
             "name": "TitleUI",
@@ -128,7 +128,14 @@
             "hasParty": false,
             "ptPrefab": "Data/Prefabs/Ally.prefab.json",
             "ptBack": 2.0,
-            "ptSide": 1.5
+            "ptSide": 1.5,
+            "alAtkRange": 25.0,
+            "alAtkDamage": 34.0,
+            "alAtkInterval": 0.800000011920929,
+            "alAimSpread": 2.0,
+            "alAimHeight": 1.600000023841858,
+            "alSearch": 0.30000001192092898,
+            "alReaction": 0.30000001192092898
         }
     ]
 }

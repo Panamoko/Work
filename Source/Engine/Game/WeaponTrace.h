@@ -25,4 +25,9 @@ namespace uel {
     //   戻り値：ダメージが入ったか（ヒットマーカーを出すかどうかに使う）
     bool ApplyShotDamage(GameContext& ctx, const ShotHit& hit, float baseDamage);
 
+    // from から to までの線が、壁・床などの「キャラ以外の物」でさえぎられているか（UE の「Visibility」チャンネルで
+    // 静的な物だけを調べる LineTraceTest に当たる）。キャラ（ヒットボックスを持つ物）は線を止めない。
+    // 回復の線（味方の体を通り抜けてよい）など、「間に壁があるか」だけを知りたいときに使う。撃った本人（ctx.self）は調べない
+    bool IsLineBlocked(GameContext& ctx, const DirectX::XMFLOAT3& from, const DirectX::XMFLOAT3& to);
+
 } // namespace uel

@@ -13,6 +13,7 @@
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
 #include "Engine/Physics/HitShapes.h"
+#include <cmath>
 #include <memory>
 
 using namespace DirectX;
@@ -26,6 +27,33 @@ namespace uel {
             if (auto* oc = e.GetComponent<OpponentComponent>()) if (oc->IsDying()) return true;
             if (auto* al = e.GetComponent<AllyComponent>()) if (al->IsIncapacitated()) return true;
             return false;
+        }
+
+        // メッシュ（壁・床などの遮蔽物）への線。ヒットボックスを持つ物はヒットボックスで調べるので除く。
+        // いちばん手前の物と距離を返す（TraceShot と IsLineBlocked で共用）
+        Entity* TraceMeshes(GameContext& ctx, const XMFLOAT3& origin, const XMFLOAT3& dir, float maxDistance, float& outT)
+        {
+            const Entity& self = ctx.self;
+            Entity* meshE = nullptr;
+            float meshT = maxDistance;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot) continue; Entity* ge = slot.get();
+                if (ge == &self || IgnoredByShots(*ge)) continue;
+                if (ge->GetComponent<HitboxComponent>()) continue;
+                auto* gt = ge->GetComponent<TransformComponent>();
+                auto* gm = ge->GetComponent<MeshRendererComponent>();
+                const bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
+                if (!gt || !gm) continue;
+                if (!gm->visible && !skinned) continue;     // 見えないメッシュは、スキンドのキャラの体だけ調べる
+                auto mp = gm->assetId.empty() ? ctx.meshCache.GetCube(ctx.device)
+                    : ctx.meshCache.GetOrLoad(ctx.device, gm->assetId);
+                if (!mp || !mp->IsValid()) continue;
+                XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
+                float tt;
+                if (RaycastMesh(*mp, gw, origin, dir, meshT, tt)) { meshT = tt; meshE = ge; }
+            }
+            outT = meshT;
+            return meshE;
         }
 
     } // namespace
@@ -49,23 +77,8 @@ namespace uel {
         }
 
         // (2) メッシュ（壁・床などの遮蔽物。ヒットボックスを持つ物はヒットボックスで調べたので除く）
-        Entity* meshE = nullptr; float meshT = maxDistance;
-        for (const auto& slot : ctx.world.Slots()) {
-            if (!slot) continue; Entity* ge = slot.get();
-            if (ge == &self || IgnoredByShots(*ge)) continue;
-            if (ge->GetComponent<HitboxComponent>()) continue;
-            auto* gt = ge->GetComponent<TransformComponent>();
-            auto* gm = ge->GetComponent<MeshRendererComponent>();
-            const bool skinned = (ge->GetComponent<SkinnedMeshComponent>() != nullptr);
-            if (!gt || !gm) continue;
-            if (!gm->visible && !skinned) continue;     // 見えないメッシュは、スキンドのキャラの体だけ調べる
-            auto mp = gm->assetId.empty() ? ctx.meshCache.GetCube(ctx.device)
-                : ctx.meshCache.GetOrLoad(ctx.device, gm->assetId);
-            if (!mp || !mp->IsValid()) continue;
-            XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
-            float tt;
-            if (RaycastMesh(*mp, gw, origin, dir, meshT, tt)) { meshT = tt; meshE = ge; }
-        }
+        float meshT = maxDistance;
+        Entity* meshE = TraceMeshes(ctx, origin, dir, maxDistance, meshT);
 
         // (3) 近いほうに当たる（壁の向こうのヒットボックスには当たらない）
         ShotHit hit;
@@ -97,6 +110,16 @@ namespace uel {
         if (hpc->hp <= 0.0f && GetTeam(*target) == Team::None)
             ctx.world.DestroyEntity(target->id);
         return true;
+    }
+
+    bool IsLineBlocked(GameContext& ctx, const XMFLOAT3& from, const XMFLOAT3& to)
+    {
+        const float dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+        const float len = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-4f) return false;
+        const XMFLOAT3 dir = { dx / len, dy / len, dz / len };
+        float t = len;
+        return TraceMeshes(ctx, from, dir, len, t) != nullptr;     // to より手前で、何かのメッシュに当たった
     }
 
 } // namespace uel

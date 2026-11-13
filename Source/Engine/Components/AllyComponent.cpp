@@ -1,4 +1,4 @@
-#include "Engine/Components/AllyComponent.h"
+ï»¿#include "Engine/Components/AllyComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/Team.h"
 #include "Engine/Game/WeaponTrace.h"
@@ -9,6 +9,7 @@
 #include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/HitboxComponent.h"
+#include "Engine/Components/SupportComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -21,20 +22,22 @@ using namespace DirectX;
 namespace uel {
     namespace {
 
-        // ¡‚Ì“G‚æ‚èA‚±‚êimjˆÈã‹ß‚¢“G‚ª‚¢‚é‚Æ‚«‚¾‚¯æ‚èŠ·‚¦‚éi“G‚Ì OpponentComponent ‚Æ“¯‚¶l‚¦•ûj
+        // ä»Šã®æ•µã‚ˆã‚Šã€ã“ã‚Œï¼ˆmï¼‰ä»¥ä¸Šè¿‘ã„æ•µãŒã„ã‚‹ã¨ãã ã‘ä¹—ã‚Šæ›ãˆã‚‹ï¼ˆæ•µã® OpponentComponent ã¨åŒã˜è€ƒãˆæ–¹ï¼‰
         constexpr float kRetargetMargin = 1.0f;
-        // Œ©‚¦‚È‚©‚Á‚½“G‚ğAŒó•â‚©‚çŠO‚µ‚Ä‚¨‚­ŠÔi•bjB‚±‚ÌŠÔ‚ÍA‚»‚Ì“G‚Öæ‚èŠ·‚¦‚æ‚¤‚Æ‚µ‚È‚¢iƒŒƒC‚à”ò‚Î‚³‚È‚¢j
+        // è¦‹ãˆãªã‹ã£ãŸæ•µã‚’ã€å€™è£œã‹ã‚‰å¤–ã—ã¦ãŠãæ™‚é–“ï¼ˆç§’ï¼‰ã€‚ã“ã®é–“ã¯ã€ãã®æ•µã¸ä¹—ã‚Šæ›ãˆã‚ˆã†ã¨ã—ãªã„ï¼ˆãƒ¬ã‚¤ã‚‚é£›ã°ã•ãªã„ï¼‰
         constexpr float kBlockedMemory = 1.0f;
+        // å›å¾©ã—ã¦ã„ã‚‹ç›¸æ‰‹ã‚ˆã‚Šã€HP ã®å‰²åˆãŒã“ã‚Œä»¥ä¸Šä½ã„å‘³æ–¹ãŒã„ã‚‹ã¨ãã ã‘ä¹—ã‚Šæ›ãˆã‚‹ï¼ˆ0.2 = 20%ï¼‰
+        constexpr float kHealSwitchMargin = 0.2f;
 
-        // XZ •½–Ê‚Å‚Ì‹——£i‚‚³‚Ìˆá‚¢‚ÍŒ©‚È‚¢j
+        // XZ å¹³é¢ã§ã®è·é›¢ï¼ˆé«˜ã•ã®é•ã„ã¯è¦‹ãªã„ï¼‰
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
         {
             const float dx = a.x - b.x, dz = a.z - b.z;
             return std::sqrt(dx * dx + dz * dz);
         }
 
-        // ‘«Œ³‚Ì’n–Ê‚Ì‚‚³BOpponentComponent ‚Æ“¯‚¶’²‚×•ûi•\¦’†‚Ì MeshRenderer ‚ÌƒƒbƒVƒ…‚ğ^‰º‚É’²‚×‚éjB
-        // ¡‚ÌˆÊ’u‚æ‚è 1.5m ˆÈã‚‚¢–Ê‚ÍA“ª‚Ìã‚Ì•¨‚Æ‚İ‚È‚µ‚Ä–³‹‚·‚éB
+        // è¶³å…ƒã®åœ°é¢ã®é«˜ã•ã€‚OpponentComponent ã¨åŒã˜èª¿ã¹æ–¹ï¼ˆè¡¨ç¤ºä¸­ã® MeshRenderer ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‚’çœŸä¸‹ã«èª¿ã¹ã‚‹ï¼‰ã€‚
+        // ä»Šã®ä½ç½®ã‚ˆã‚Š 1.5m ä»¥ä¸Šé«˜ã„é¢ã¯ã€é ­ã®ä¸Šã®ç‰©ã¨ã¿ãªã—ã¦ç„¡è¦–ã™ã‚‹ã€‚
         bool FindGround(GameContext& ctx, const Entity& self, const XMFLOAT3& p, float& outY)
         {
             bool  found = false;
@@ -59,14 +62,14 @@ namespace uel {
             return found;
         }
 
-        // ƒOƒ‰ƒt‚ÉA‚»‚Ì–¼‘O‚Ìƒpƒ‰ƒ[ƒ^‚ª‚ ‚é‚Æ‚«‚¾‚¯’l‚ğ‘‚­i–³‚¢‚Æ‚«‚Éì‚ç‚È‚¢j
+        // ã‚°ãƒ©ãƒ•ã«ã€ãã®åå‰ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãŒã‚ã‚‹ã¨ãã ã‘å€¤ã‚’æ›¸ãï¼ˆç„¡ã„ã¨ãã«ä½œã‚‰ãªã„ï¼‰
         void SetAnimValue(AnimatorComponent* an, const char* name, float value)
         {
             if (!an) return;
             an->params.SetIfExists(name, value);
         }
 
-        // ‘_‚¦‚é“G‚©F“G‘Î‚·‚éw‰c‚ÅAHP ‚ªc‚Á‚Ä‚¢‚éi“|‚ê‚Ä‚¢‚éÅ’†‚Ì“G‚Í HP 0 ‚È‚Ì‚Å“ü‚ç‚È‚¢j
+        // ç‹™ãˆã‚‹æ•µã‹ï¼šæ•µå¯¾ã™ã‚‹é™£å–¶ã§ã€HP ãŒæ®‹ã£ã¦ã„ã‚‹ï¼ˆå€’ã‚Œã¦ã„ã‚‹æœ€ä¸­ã®æ•µã¯ HP 0 ãªã®ã§å…¥ã‚‰ãªã„ï¼‰
         bool IsTargetable(const Entity& self, const Entity& e)
         {
             if (!IsHostile(self, e)) return false;
@@ -74,8 +77,8 @@ namespace uel {
             return hp && hp->hp > 0.0f;
         }
 
-        // Ë’ö range ‚Ì’†‚ÅA‚¢‚¿‚Î‚ñ‹ß‚¢‘_‚¦‚é“GBavoidi­‚µ‘O‚ÉŒ©‚¦‚È‚©‚Á‚½“Gj‚Í‘I‚Î‚È‚¢B
-        // ‹——£‚¾‚¯‚Å‘I‚ÑAŒ©‚¦‚é‚©‚Ç‚¤‚©iƒŒƒCj‚Í‚±‚±‚Å‚Í’²‚×‚È‚¢iŒó•â‚²‚Æ‚ÉƒŒƒC‚ğ”ò‚Î‚·‚Æd‚¢‚Ì‚ÅA‘I‚ñ‚¾1‘Ì‚¾‚¯‚ğ’²‚×‚éj
+        // å°„ç¨‹ range ã®ä¸­ã§ã€ã„ã¡ã°ã‚“è¿‘ã„ç‹™ãˆã‚‹æ•µã€‚avoidï¼ˆå°‘ã—å‰ã«è¦‹ãˆãªã‹ã£ãŸæ•µï¼‰ã¯é¸ã°ãªã„ã€‚
+        // è·é›¢ã ã‘ã§é¸ã³ã€è¦‹ãˆã‚‹ã‹ã©ã†ã‹ï¼ˆãƒ¬ã‚¤ï¼‰ã¯ã“ã“ã§ã¯èª¿ã¹ãªã„ï¼ˆå€™è£œã”ã¨ã«ãƒ¬ã‚¤ã‚’é£›ã°ã™ã¨é‡ã„ã®ã§ã€é¸ã‚“ã 1ä½“ã ã‘ã‚’èª¿ã¹ã‚‹ï¼‰
         Entity* FindNearestEnemy(GameContext& ctx, const Entity& self, const XMFLOAT3& from, float range, EntityId avoid, float& outDist)
         {
             Entity* best = nullptr;
@@ -91,7 +94,7 @@ namespace uel {
             return best;
         }
 
-        // ‘_‚¤“_Fƒqƒbƒgƒ{ƒbƒNƒX‚ª‚ ‚ê‚Î“·‘Ì‚Ì^‚ñ’†A–³‚¯‚ê‚Î‘«Œ³‚©‚ç 1m ã
+        // ç‹™ã†ç‚¹ï¼šãƒ’ãƒƒãƒˆãƒœãƒƒã‚¯ã‚¹ãŒã‚ã‚Œã°èƒ´ä½“ã®çœŸã‚“ä¸­ã€ç„¡ã‘ã‚Œã°è¶³å…ƒã‹ã‚‰ 1m ä¸Š
         XMFLOAT3 AimPoint(const Entity& e, const TransformComponent& et)
         {
             if (auto* hb = e.GetComponent<HitboxComponent>()) {
@@ -101,8 +104,8 @@ namespace uel {
             return { et.position.x, et.position.y + 1.0f, et.position.z };
         }
 
-        // Œ‚‚ÂˆÊ’u origin ‚©‚ç“G‚ªŒ©‚¦‚é‚©iŠÔ‚É•Ç‚â–¡•û‚ª‚¢‚È‚¢‚©jB’e‚Æ“¯‚¶üiTraceShotj‚Å’²‚×AÅ‰‚É“–‚½‚Á‚½•¨‚ª‚»‚Ì“G‚È‚çŒ©‚¦‚éB
-        // Œ©‚¦‚é‚Æ‚«‚ÍA‘_‚¤“_‚Ö‚ÌŒü‚«i’·‚³ 1j‚Æ‹——£‚à•Ô‚·BŒ‚‚Â–{lictx.selfj‚Íü‚É“–‚½‚ç‚È‚¢
+        // æ’ƒã¤ä½ç½® origin ã‹ã‚‰æ•µãŒè¦‹ãˆã‚‹ã‹ï¼ˆé–“ã«å£ã‚„å‘³æ–¹ãŒã„ãªã„ã‹ï¼‰ã€‚å¼¾ã¨åŒã˜ç·šï¼ˆTraceShotï¼‰ã§èª¿ã¹ã€æœ€åˆã«å½“ãŸã£ãŸç‰©ãŒãã®æ•µãªã‚‰è¦‹ãˆã‚‹ã€‚
+        // è¦‹ãˆã‚‹ã¨ãã¯ã€ç‹™ã†ç‚¹ã¸ã®å‘ãï¼ˆé•·ã• 1ï¼‰ã¨è·é›¢ã‚‚è¿”ã™ã€‚æ’ƒã¤æœ¬äººï¼ˆctx.selfï¼‰ã¯ç·šã«å½“ãŸã‚‰ãªã„
         bool CanSee(GameContext& ctx, Entity& enemy, const XMFLOAT3& origin, XMFLOAT3& outDir, float& outLen)
         {
             auto* et = enemy.GetComponent<TransformComponent>();
@@ -116,23 +119,38 @@ namespace uel {
             return TraceShot(ctx, origin, outDir, len + 1.0f).entity == &enemy;
         }
 
-        // 0 ˆÈã 1 –¢–‚Ì—”ixorshift32BUE ‚Ì FRandomStream ‚Ì‚æ‚¤‚ÉAComponent ‚²‚Æ‚É©•ª‚Ì—”‚Ìó‘Ô‚ğ‚Âj
+        // HP ã®å‰²åˆï¼ˆ0ã€œ1ï¼‰ã€‚HP ã‚’æŒãŸãªã„ç‰©ã¯ -1
+        float HpRatio(const Entity& e)
+        {
+            auto* hp = e.GetComponent<HPComponent>();
+            if (!hp || hp->maxHp <= 0.0f) return -1.0f;
+            return hp->hp / hp->maxHp;
+        }
+
+        // å›å¾©ã§ãã‚‹ç›¸æ‰‹ã‹ï¼šè‡ªåˆ†ã‹å‘³æ–¹ã®é™£å–¶ã§ã€HP ãŒæ®‹ã£ã¦ã„ã‚‹ï¼ˆHP 0 ã®æˆ¦é—˜ä¸èƒ½ã¯å›å¾©ã—ãªã„ã€‚è˜‡ç”Ÿã¯åˆ¥ã®ä»•çµ„ã¿ï¼æ®µéš 4ï¼‰
+        bool IsHealable(const Entity& self, const Entity& e)
+        {
+            if (&e != &self && !IsFriendly(self, e)) return false;
+            return HpRatio(e) > 0.0f;
+        }
+
+        // 0 ä»¥ä¸Š 1 æœªæº€ã®ä¹±æ•°ï¼ˆxorshift32ã€‚UE ã® FRandomStream ã®ã‚ˆã†ã«ã€Component ã”ã¨ã«è‡ªåˆ†ã®ä¹±æ•°ã®çŠ¶æ…‹ã‚’æŒã¤ï¼‰
         float Rand01(std::uint32_t& s)
         {
             s ^= s << 13; s ^= s >> 17; s ^= s << 5;
             return static_cast<float>(s >> 8) * (1.0f / 16777216.0f);
         }
 
-        // Œü‚« diri’·‚³ 1j‚ğA”¼Šp spreadDeg “x‚Ì‰~‚Ì’†‚Å‚¸‚ç‚·iUE ‚Ì FMath::VRandCone ‚É“–‚½‚éj
+        // å‘ã dirï¼ˆé•·ã• 1ï¼‰ã‚’ã€åŠè§’ spreadDeg åº¦ã®å††éŒã®ä¸­ã§ãšã‚‰ã™ï¼ˆUE ã® FMath::VRandCone ã«å½“ãŸã‚‹ï¼‰
         XMFLOAT3 SpreadDir(const XMFLOAT3& dir, float spreadDeg, std::uint32_t& rng)
         {
             if (spreadDeg <= 0.0f) return dir;
             const XMVECTOR d = XMLoadFloat3(&dir);
-            // dir ‚É‚’¼‚È2–{‚Ì²idir ‚ª^ãE^‰º‚É‹ß‚¢‚Æ‚«‚ÍAX ²‚ğŒ³‚Éì‚éj
+            // dir ã«å‚ç›´ãª2æœ¬ã®è»¸ï¼ˆdir ãŒçœŸä¸Šãƒ»çœŸä¸‹ã«è¿‘ã„ã¨ãã¯ã€X è»¸ã‚’å…ƒã«ä½œã‚‹ï¼‰
             const XMVECTOR base = (std::fabs(dir.y) < 0.99f) ? XMVectorSet(0, 1, 0, 0) : XMVectorSet(1, 0, 0, 0);
             const XMVECTOR right = XMVector3Normalize(XMVector3Cross(base, d));
             const XMVECTOR up = XMVector3Cross(d, right);
-            // ‰~‚Ì’†‚Éˆê—l‚ÉU‚ç‚·i”¼Œa‚Í—”‚Ì•½•ûªB‚»‚¤‚µ‚È‚¢‚Æ^‚ñ’†‚ÉW‚Ü‚è‚·‚¬‚éj
+            // å††ã®ä¸­ã«ä¸€æ§˜ã«æ•£ã‚‰ã™ï¼ˆåŠå¾„ã¯ä¹±æ•°ã®å¹³æ–¹æ ¹ã€‚ãã†ã—ãªã„ã¨çœŸã‚“ä¸­ã«é›†ã¾ã‚Šã™ãã‚‹ï¼‰
             const float radius = std::tan(XMConvertToRadians(spreadDeg)) * std::sqrt(Rand01(rng));
             const float angle = XM_2PI * Rand01(rng);
             XMVECTOR v = XMVectorAdd(d, XMVectorScale(right, radius * std::cos(angle)));
@@ -150,10 +168,10 @@ namespace uel {
         auto* t = self.GetComponent<TransformComponent>();
         if (!t) return;
         const float dt = ctx.dt;
-        AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // –³‚­‚Ä‚à“®‚­iƒAƒjƒ‚ª•Ï‚í‚ç‚È‚¢‚¾‚¯j
+        AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // ç„¡ãã¦ã‚‚å‹•ãï¼ˆã‚¢ãƒ‹ãƒ¡ãŒå¤‰ã‚ã‚‰ãªã„ã ã‘ï¼‰
 
-        // 0) í“¬•s”\FHP ‚ª 0 ‚É‚È‚Á‚½‚çA‚»‚Ìê‚Å~‚Ü‚éi’Ç‚¢‚©‚¯‚È‚¢EŒü‚«‚à•Ï‚¦‚È‚¢EŒ‚‚½‚È‚¢jB
-        //    HP ‚ª–ß‚Á‚½‚çi‰ñ•œE‘h¶jA‚Ü‚½“®‚«o‚·B’iŠK 4 ‚Åuƒ_ƒEƒ“i‘h¶‚ğ‘Ò‚ÂEŠÔØ‚ê‚Å Deadjv‚É’u‚«Š·‚¦‚é
+        // 0) æˆ¦é—˜ä¸èƒ½ï¼šHP ãŒ 0 ã«ãªã£ãŸã‚‰ã€ãã®å ´ã§æ­¢ã¾ã‚‹ï¼ˆè¿½ã„ã‹ã‘ãªã„ãƒ»å‘ãã‚‚å¤‰ãˆãªã„ãƒ»æ’ƒãŸãªã„ï¼‰ã€‚
+        //    HP ãŒæˆ»ã£ãŸã‚‰ï¼ˆå›å¾©ãƒ»è˜‡ç”Ÿï¼‰ã€ã¾ãŸå‹•ãå‡ºã™ã€‚æ®µéš 4 ã§ã€Œãƒ€ã‚¦ãƒ³ï¼ˆè˜‡ç”Ÿã‚’å¾…ã¤ãƒ»æ™‚é–“åˆ‡ã‚Œã§ Deadï¼‰ã€ã«ç½®ãæ›ãˆã‚‹
         auto* myHp = self.GetComponent<HPComponent>();
         const bool down = (myHp && myHp->hp <= 0.0f);
         if (down != incapacitated) {
@@ -161,10 +179,11 @@ namespace uel {
             following = false;
             path.clear();
             targetId = EntityId{};
-            SetAnimValue(an, kAnimDead, down ? 1.0f : 0.0f);    // Bool ‚È‚Ì‚ÅA•Ï‚í‚Á‚½‚Æ‚«‚¾‚¯‘‚¯‚Î’l‚ªc‚éi–ˆƒtƒŒ[ƒ€–¼‘O‚Å’T‚³‚È‚¢j
+            healTargetId = EntityId{};
+            SetAnimValue(an, kAnimDead, down ? 1.0f : 0.0f);    // Bool ãªã®ã§ã€å¤‰ã‚ã£ãŸã¨ãã ã‘æ›¸ã‘ã°å€¤ãŒæ®‹ã‚‹ï¼ˆæ¯ãƒ•ãƒ¬ãƒ¼ãƒ åå‰ã§æ¢ã•ãªã„ï¼‰
         }
 
-        // 1) ’Ç‚¢‚©‚¯‚é‘ŠèBŠo‚¦‚Ä‚¢‚é‘Šè‚ª‚¢‚È‚­‚È‚Á‚½‚Æ‚«‚¾‚¯ World ‚ğ’T‚µ’¼‚·i–ˆƒtƒŒ[ƒ€‘S•”‚ğ’²‚×‚È‚¢j
+        // 1) è¿½ã„ã‹ã‘ã‚‹ç›¸æ‰‹ã€‚è¦šãˆã¦ã„ã‚‹ç›¸æ‰‹ãŒã„ãªããªã£ãŸã¨ãã ã‘ World ã‚’æ¢ã—ç›´ã™ï¼ˆæ¯ãƒ•ãƒ¬ãƒ¼ãƒ å…¨éƒ¨ã‚’èª¿ã¹ãªã„ï¼‰
         Entity* lead = ctx.world.Get(leader);
         if (!lead) {
             for (const auto& slot : ctx.world.Slots()) {
@@ -177,12 +196,12 @@ namespace uel {
         }
         TransformComponent* lt = lead ? lead->GetComponent<TransformComponent>() : nullptr;
 
-        // 1b) ‘_‚¤“GBsearchInterval ‚²‚Æ‚ÉAË’ö‚Ì’†‚Ì‚¢‚¿‚Î‚ñ‹ß‚¢“G‚ğ‘I‚Ñ’¼‚·i–ˆƒtƒŒ[ƒ€‚Í’T‚³‚È‚¢jB
-        //     ¡‚Ì“G‚ª“|‚ê‚½EÁ‚¦‚½‚Æ‚«‚ÍAŸ‚ÌƒtƒŒ[ƒ€‚Å‚·‚®‘I‚Ñ’¼‚·B
-        //     ¡‚Ì“G‚æ‚è kRetargetMargin ˆÈã‹ß‚¢“G‚ª‚¢‚é‚Æ‚«‚¾‚¯æ‚èŠ·‚¦‚éi“¯‚¶‚­‚ç‚¢‚Ì‹——£‚Ì2‘Ì‚ÌŠÔ‚ÅA‘_‚¢‚ªs‚Á‚½‚è—ˆ‚½‚è‚µ‚È‚¢jB
-        //     æ‚èŠ·‚¦‚é‘O‚ÉA‚»‚Ì“G‚ªŒ©‚¦‚é‚©‚ğ1‰ñ‚¾‚¯’²‚×‚éBŒ©‚¦‚È‚¯‚ê‚Îæ‚èŠ·‚¦‚¸A‚»‚Ì“G‚ğ kBlockedMemory •b‚ÍŒó•â‚©‚çŠO‚·
-        //     i•Ç‚â–¡•û‚ÌŒü‚±‚¤‚Ì‹ß‚¢“G‚ÆAŒ©‚¦‚Ä‚¢‚é‰“‚¢“G‚ÌŠÔ‚ÅA‘_‚¢‚ªs‚Á‚½‚è—ˆ‚½‚è‚µ‚È‚¢j
-        const XMFLOAT3 muzzle = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // Œ‚‚ÂˆÊ’ui‚±‚ÌƒtƒŒ[ƒ€‚ÌÅ‰‚ÌˆÊ’uj
+        // 1b) ç‹™ã†æ•µã€‚searchInterval ã”ã¨ã«ã€å°„ç¨‹ã®ä¸­ã®ã„ã¡ã°ã‚“è¿‘ã„æ•µã‚’é¸ã³ç›´ã™ï¼ˆæ¯ãƒ•ãƒ¬ãƒ¼ãƒ ã¯æ¢ã•ãªã„ï¼‰ã€‚
+        //     ä»Šã®æ•µãŒå€’ã‚ŒãŸãƒ»æ¶ˆãˆãŸã¨ãã¯ã€æ¬¡ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã§ã™ãé¸ã³ç›´ã™ã€‚
+        //     ä»Šã®æ•µã‚ˆã‚Š kRetargetMargin ä»¥ä¸Šè¿‘ã„æ•µãŒã„ã‚‹ã¨ãã ã‘ä¹—ã‚Šæ›ãˆã‚‹ï¼ˆåŒã˜ãã‚‰ã„ã®è·é›¢ã®2ä½“ã®é–“ã§ã€ç‹™ã„ãŒè¡Œã£ãŸã‚Šæ¥ãŸã‚Šã—ãªã„ï¼‰ã€‚
+        //     ä¹—ã‚Šæ›ãˆã‚‹å‰ã«ã€ãã®æ•µãŒè¦‹ãˆã‚‹ã‹ã‚’1å›ã ã‘èª¿ã¹ã‚‹ã€‚è¦‹ãˆãªã‘ã‚Œã°ä¹—ã‚Šæ›ãˆãšã€ãã®æ•µã‚’ kBlockedMemory ç§’ã¯å€™è£œã‹ã‚‰å¤–ã™
+        //     ï¼ˆå£ã‚„å‘³æ–¹ã®å‘ã“ã†ã®è¿‘ã„æ•µã¨ã€è¦‹ãˆã¦ã„ã‚‹é ã„æ•µã®é–“ã§ã€ç‹™ã„ãŒè¡Œã£ãŸã‚Šæ¥ãŸã‚Šã—ãªã„ï¼‰
+        const XMFLOAT3 muzzle = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // æ’ƒã¤ä½ç½®ï¼ˆã“ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã®æœ€åˆã®ä½ç½®ï¼‰
         Entity* target = ctx.world.Get(targetId);
         if (targetId.IsValid() && (!target || !IsTargetable(self, *target))) {
             target = nullptr;
@@ -197,7 +216,7 @@ namespace uel {
             float curDist = 1e9f;
             if (target) {
                 if (auto* ct = target->GetComponent<TransformComponent>()) curDist = DistXZ(ct->position, t->position);
-                if (curDist > attackRange) target = nullptr;        // Ë’ö‚ÌŠO‚Öo‚½
+                if (curDist > attackRange) target = nullptr;        // å°„ç¨‹ã®å¤–ã¸å‡ºãŸ
             }
             float foundDist = 0.0f;
             Entity* found = FindNearestEnemy(ctx, self, t->position, attackRange, blockedId, foundDist);
@@ -205,10 +224,10 @@ namespace uel {
                 XMFLOAT3 dir; float len;
                 if (CanSee(ctx, *found, muzzle, dir, len)) {
                     target = found;
-                    attackTimer = (std::max)(attackTimer, reactionTime);    // V‚µ‚¢“G‚É\‚¦’¼‚·ŠÔ
+                    attackTimer = (std::max)(attackTimer, reactionTime);    // æ–°ã—ã„æ•µã«æ§‹ãˆç›´ã™æ™‚é–“
                 }
                 else {
-                    blockedId = found->id;                                  // Œ©‚¦‚È‚¢F‚µ‚Î‚ç‚­Œó•â‚©‚çŠO‚·
+                    blockedId = found->id;                                  // è¦‹ãˆãªã„ï¼šã—ã°ã‚‰ãå€™è£œã‹ã‚‰å¤–ã™
                     blockedTimer = kBlockedMemory;
                 }
             }
@@ -216,27 +235,86 @@ namespace uel {
         }
         TransformComponent* tt = target ? target->GetComponent<TransformComponent>() : nullptr;
 
+        // 1c) å›å¾©ã™ã‚‹ç›¸æ‰‹ï¼ˆSupportComponent ãŒã‚ã‚‹ã¨ãã ã‘ã€‚2-3ï¼‰ã€‚
+        //     HP ã®å‰²åˆãŒ healStartRatio ä»¥ä¸‹ã®å‘³æ–¹ï¼ˆè‡ªåˆ†ã‚‚å«ã‚€ï¼‰ã®ä¸­ã§ã€ã„ã¡ã°ã‚“ä½ã„ç›¸æ‰‹ã‚’é¸ã¶ã€‚
+        //     å§‹ã‚ãŸã‚‰ healStopRatioï¼ˆæº€ã‚¿ãƒ³ï¼‰ã¾ã§ç¶šã‘ã‚‹ï¼ˆå§‹ã‚ã‚‹å€¤ã¨æ­¢ã‚ã‚‹å€¤ã‚’åˆ†ã‘ã¦ã€è¡Œã£ãŸã‚Šæ¥ãŸã‚Šã—ãªã„ï¼‰ã€‚
+        //     é¸ã¶ã®ã¯ searchInterval ã”ã¨ã€‚ä¹—ã‚Šæ›ãˆã‚‹ã®ã¯ã€ä»Šã®ç›¸æ‰‹ã‚ˆã‚Š kHealSwitchMargin ä»¥ä¸Šä½ã„å‘³æ–¹ãŒã„ã‚‹ã¨ãã ã‘ã€‚
+        //     ç·šãŒå£ã«ã•ãˆãã‚‰ã‚Œã¦ã„ãªã„ã‹ï¼ˆIsLineBlockedï¼‰ã¯ã€é¸ã‚“ã ç›¸æ‰‹ã¨ä»Šã®ç›¸æ‰‹ã ã‘ã‚’ã€é¸ã³ç›´ã™ã¨ãã«èª¿ã¹ã‚‹ï¼ˆæ¯ãƒ•ãƒ¬ãƒ¼ãƒ ã¯èª¿ã¹ãªã„ï¼‰
+        const SupportComponent* support = self.GetComponent<SupportComponent>();
+        Entity* healTarget = ctx.world.Get(healTargetId);
+        if (healTargetId.IsValid()) {
+            // æ¯ãƒ•ãƒ¬ãƒ¼ãƒ ã®ç¢ºã‹ã‚ï¼ˆè»½ã„ç‰©ã ã‘ï¼‰ï¼šã„ãªããªã£ãŸãƒ»æˆ¦é—˜ä¸èƒ½ãƒ»æº€ã‚¿ãƒ³ãƒ»å±Šã‹ãªã„ã€ãªã‚‰æ­¢ã‚ã‚‹
+            bool keep = support && !incapacitated && healTarget && IsHealable(self, *healTarget)
+                && HpRatio(*healTarget) < support->healStopRatio;
+            if (keep && healTarget != &self) {
+                auto* ht = healTarget->GetComponent<TransformComponent>();
+                keep = ht && DistXZ(ht->position, t->position) <= support->healRange;
+            }
+            if (!keep) {
+                healTarget = nullptr;
+                healTargetId = EntityId{};
+                healSearchTimer = 0.0f;                                 // ã™ãæ¬¡ã®ç›¸æ‰‹ã‚’æ¢ã™
+                attackTimer = (std::max)(attackTimer, reactionTime);    // æ”»æ’ƒã«æŒã¡æ›¿ãˆã‚‹æ™‚é–“
+            }
+        }
+        healSearchTimer -= dt;
+        if (support && !incapacitated && healSearchTimer <= 0.0f) {
+            healSearchTimer = searchInterval;
+            // ä»Šã®ç›¸æ‰‹ã¨ã®é–“ã«å£ãŒå…¥ã£ãŸã‚‰æ­¢ã‚ã‚‹
+            if (healTarget && healTarget != &self) {
+                auto* ht = healTarget->GetComponent<TransformComponent>();
+                if (!ht || IsLineBlocked(ctx, muzzle, AimPoint(*healTarget, *ht))) {
+                    healTarget = nullptr;
+                    attackTimer = (std::max)(attackTimer, reactionTime);
+                }
+            }
+            // ã„ã¡ã°ã‚“ HP ã®å‰²åˆãŒä½ã„å‘³æ–¹ï¼ˆå§‹ã‚ã‚‹å€¤ä»¥ä¸‹ã€å±Šãè·é›¢ï¼‰
+            Entity* best = nullptr;
+            float bestRatio = support->healStartRatio;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot || !IsHealable(self, *slot)) continue;
+                const float r = HpRatio(*slot);
+                if (r > bestRatio) continue;
+                if (slot.get() != &self) {
+                    auto* ht = slot->GetComponent<TransformComponent>();
+                    if (!ht || DistXZ(ht->position, t->position) > support->healRange) continue;
+                }
+                bestRatio = r;
+                best = slot.get();
+            }
+            if (best && best != healTarget && (!healTarget || bestRatio < HpRatio(*healTarget) - kHealSwitchMargin)) {
+                bool visible = true;
+                if (best != &self) {
+                    auto* bt = best->GetComponent<TransformComponent>();
+                    visible = !IsLineBlocked(ctx, muzzle, AimPoint(*best, *bt));
+                }
+                if (visible) healTarget = best;
+            }
+            healTargetId = healTarget ? healTarget->id : EntityId{};
+        }
+        TransformComponent* ht = (healTarget && healTarget != &self) ? healTarget->GetComponent<TransformComponent>() : nullptr;
+
         const XMFLOAT3 before = t->position;
         float movedSpeed = 0.0f;
         if (lt && !incapacitated) {
-            // 2) “®‚­‚©~‚Ü‚é‚©B~‚Ü‚é‹——£‚Æ“®‚«o‚·‹——£‚ğ•ª‚¯‚ÄA‹«–Ú‚Å“®‚­E~‚Ü‚é‚ğŒJ‚è•Ô‚³‚È‚¢‚æ‚¤‚É‚·‚é
+            // 2) å‹•ãã‹æ­¢ã¾ã‚‹ã‹ã€‚æ­¢ã¾ã‚‹è·é›¢ã¨å‹•ãå‡ºã™è·é›¢ã‚’åˆ†ã‘ã¦ã€å¢ƒç›®ã§å‹•ããƒ»æ­¢ã¾ã‚‹ã‚’ç¹°ã‚Šè¿”ã•ãªã„ã‚ˆã†ã«ã™ã‚‹
             const float dist = DistXZ(t->position, lt->position);
             if (following && dist <= followDistance) { following = false; path.clear(); }
             else if (!following && dist > resumeDistance) { following = true; repathTimer = 0.0f; }
 
             if (following) {
-                // 3) Œo˜HFˆê’è‚ÌŠÔŠu‚ÅA‚µ‚©‚à‘Šè‚ª­‚µ“®‚¢‚Ä‚¢‚½‚Æ‚«‚¾‚¯ŒvZ‚µ’¼‚·iA* ‚ğ–ˆƒtƒŒ[ƒ€‰ñ‚³‚È‚¢j
+                // 3) çµŒè·¯ï¼šä¸€å®šã®é–“éš”ã§ã€ã—ã‹ã‚‚ç›¸æ‰‹ãŒå°‘ã—å‹•ã„ã¦ã„ãŸã¨ãã ã‘è¨ˆç®—ã—ç›´ã™ï¼ˆA* ã‚’æ¯ãƒ•ãƒ¬ãƒ¼ãƒ å›ã•ãªã„ï¼‰
                 repathTimer -= dt;
                 if (ctx.nav && repathTimer <= 0.0f) {
                     repathTimer = repathInterval;
                     if (path.empty() || DistXZ(pathGoal, lt->position) > 0.5f) {
                         ctx.nav->FindPath(t->position, lt->position, path);
                         pathGoal = lt->position;
-                        wpIndex = (path.size() > 1) ? 1 : 0;    // Å‰‚Ì“_‚Í©•ª‚Ì‚¢‚éƒ}ƒX‚È‚Ì‚Å”ò‚Î‚·
+                        wpIndex = (path.size() > 1) ? 1 : 0;    // æœ€åˆã®ç‚¹ã¯è‡ªåˆ†ã®ã„ã‚‹ãƒã‚¹ãªã®ã§é£›ã°ã™
                     }
                 }
 
-                // Ÿ‚ÉŒü‚©‚¤“_BŒo˜H‚ª–³‚¢iƒOƒŠƒbƒh‚ÌŠO‚È‚Çj‚Æ‚«‚ÍA‘Šè‚Ö‚Ü‚Á‚·‚®Œü‚©‚¤
+                // æ¬¡ã«å‘ã‹ã†ç‚¹ã€‚çµŒè·¯ãŒç„¡ã„ï¼ˆã‚°ãƒªãƒƒãƒ‰ã®å¤–ãªã©ï¼‰ã¨ãã¯ã€ç›¸æ‰‹ã¸ã¾ã£ã™ãå‘ã‹ã†
                 XMFLOAT3 goal = lt->position;
                 if (!path.empty()) {
                     if (wpIndex >= path.size()) wpIndex = path.size() - 1;
@@ -248,24 +326,24 @@ namespace uel {
                 const float dz = goal.z - t->position.z;
                 const float len = std::sqrt(dx * dx + dz * dz);
                 if (len > 1e-4f && dt > 0.0f) {
-                    const float step = (std::min)(moveSpeed * dt, len);    // Œü‚©‚¤“_‚ğ’Ê‚è‰ß‚¬‚È‚¢
+                    const float step = (std::min)(moveSpeed * dt, len);    // å‘ã‹ã†ç‚¹ã‚’é€šã‚Šéããªã„
                     t->position.x += dx / len * step;
                     t->position.z += dz / len * step;
-                    t->rotationEuler.y = std::atan2(dx, dz) * 57.2958f;    // i‚ŞŒü‚«‚ğŒü‚­
+                    t->rotationEuler.y = std::atan2(dx, dz) * 57.2958f;    // é€²ã‚€å‘ãã‚’å‘ã
                     movedSpeed = step / dt;
                 }
             }
             else {
-                // ~‚Ü‚Á‚Ä‚¢‚éŠÔ‚ÍA‘_‚Á‚Ä‚¢‚é“G‚Ì‚Ù‚¤‚ğŒü‚­i“G‚ª‚¢‚È‚¯‚ê‚ÎAƒvƒŒƒCƒ„[‚Ì‚Ù‚¤j
-                const XMFLOAT3& face = tt ? tt->position : lt->position;
+                // æ­¢ã¾ã£ã¦ã„ã‚‹é–“ã¯ã€å›å¾©ã—ã¦ã„ã‚‹å‘³æ–¹ â†’ ç‹™ã£ã¦ã„ã‚‹æ•µ â†’ ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã€ã®é †ã«ã€ã„ã‚‹ç›¸æ‰‹ã®ã»ã†ã‚’å‘ã
+                const XMFLOAT3& face = ht ? ht->position : (tt ? tt->position : lt->position);
                 const float fx = face.x - t->position.x;
                 const float fz = face.z - t->position.z;
                 if (fx * fx + fz * fz > 0.01f) t->rotationEuler.y = std::atan2(fx, fz) * 57.2958f;
             }
         }
 
-        // 4) ’n–Ê‚Æd—ÍB’n–Ê‚Ì”»’è‚Í‘S•”‚ÌƒƒbƒVƒ…‚ÌOŠpŒ`‚ğ’²‚×‚Äd‚¢‚Ì‚ÅA
-        //    u‰¡‚É“®‚¢‚½‚Æ‚«v‚Æu‹ó’†‚É‚¢‚é‚Æ‚«v‚¾‚¯s‚¤i~‚Ü‚Á‚Ä—§‚Á‚Ä‚¢‚éŠÔ‚Í’²‚×‚È‚¢j
+        // 4) åœ°é¢ã¨é‡åŠ›ã€‚åœ°é¢ã®åˆ¤å®šã¯å…¨éƒ¨ã®ãƒ¡ãƒƒã‚·ãƒ¥ã®ä¸‰è§’å½¢ã‚’èª¿ã¹ã¦é‡ã„ã®ã§ã€
+        //    ã€Œæ¨ªã«å‹•ã„ãŸã¨ãã€ã¨ã€Œç©ºä¸­ã«ã„ã‚‹ã¨ãã€ã ã‘è¡Œã†ï¼ˆæ­¢ã¾ã£ã¦ç«‹ã£ã¦ã„ã‚‹é–“ã¯èª¿ã¹ãªã„ï¼‰
         const bool movedXZ = (t->position.x != before.x || t->position.z != before.z);
         if (movedXZ || !grounded) {
             velY -= 15.0f * dt;
@@ -282,23 +360,34 @@ namespace uel {
             t->position.y = ny;
         }
 
-        // 5) UŒ‚FŒ‚‚Ä‚éŠÔ‚É‚È‚Á‚½‚çA‚à‚¤ˆê“x“G‚ªŒ©‚¦‚é‚©‚ğ’²‚×i‘I‚ñ‚¾Œã‚É•Ç‚Ì‰A‚Ö“ü‚Á‚½‚©‚à‚µ‚ê‚È‚¢jAŒ©‚¦‚Ä‚¢‚ê‚ÎŒ‚‚ÂB
-        //    Œ©‚¦‚È‚¯‚ê‚ÎŒ‚‚½‚¸A‚»‚Ì“G‚ğ‚µ‚Î‚ç‚­Œó•â‚©‚çŠO‚µ‚ÄAŸ‚ÌƒtƒŒ[ƒ€‚Å‘I‚Ñ’¼‚·i•Ç‚ÌŒü‚±‚¤‚Ì“G‚É‚±‚¾‚í‚ç‚È‚¢jB
-        //    ƒŒƒC‚ğ”ò‚Î‚·‚Ì‚ÍuŒ‚‚Â‚Æ‚«v‚Æuæ‚èŠ·‚¦‚é‚Æ‚«v‚¾‚¯i1”­‚É‚Â‚«AŒ©‚¦‚é‚©‚ÌŠm”F‚Æ–{”Ô‚Ì2–{j
+        // 5) å›å¾©ã¨æ”»æ’ƒï¼ˆåŒæ™‚ã«ã¯ä½¿ã‚ãªã„ã€‚å›å¾©ãŒå…ˆï¼å›å¾©ã™ã‚‹ç›¸æ‰‹ãŒã„ã‚Œã°æ’ƒãŸãªã„ï¼‰ã€‚
+        //    æ”»æ’ƒï¼šæ’ƒã¦ã‚‹æ™‚é–“ã«ãªã£ãŸã‚‰ã€ã‚‚ã†ä¸€åº¦æ•µãŒè¦‹ãˆã‚‹ã‹ã‚’èª¿ã¹ï¼ˆé¸ã‚“ã å¾Œã«å£ã®é™°ã¸å…¥ã£ãŸã‹ã‚‚ã—ã‚Œãªã„ï¼‰ã€è¦‹ãˆã¦ã„ã‚Œã°æ’ƒã¤ã€‚
+        //    è¦‹ãˆãªã‘ã‚Œã°æ’ƒãŸãšã€ãã®æ•µã‚’ã—ã°ã‚‰ãå€™è£œã‹ã‚‰å¤–ã—ã¦ã€æ¬¡ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã§é¸ã³ç›´ã™ï¼ˆå£ã®å‘ã“ã†ã®æ•µã«ã“ã ã‚ã‚‰ãªã„ï¼‰ã€‚
+        //    ãƒ¬ã‚¤ã‚’é£›ã°ã™ã®ã¯ã€Œæ’ƒã¤ã¨ãã€ã¨ã€Œä¹—ã‚Šæ›ãˆã‚‹ã¨ãã€ã ã‘ï¼ˆ1ç™ºã«ã¤ãã€è¦‹ãˆã‚‹ã‹ã®ç¢ºèªã¨æœ¬ç•ªã®2æœ¬ï¼‰
         if (shotTime > 0.0f) shotTime -= dt;
         attackTimer -= dt;
         bool fired = false;
-        if (tt && !incapacitated && attackTimer <= 0.0f) {
-            const XMFLOAT3 origin = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // “®‚¢‚½Œã‚ÌˆÊ’u‚©‚çŒ‚‚Â
+
+        // 5a) å›å¾©ï¼šç·šã§ã¤ãªã„ã§ã„ã‚‹é–“ã€æ¯ç§’ healPerSecond ãšã¤å›å¾©ã™ã‚‹ï¼ˆæº€ã‚¿ãƒ³ã‚’è¶…ãˆãªã„ï¼‰ã€‚å›å¾©ã—ã¦ã„ã‚‹é–“ã¯æ’ƒãŸãªã„
+        if (healTarget && support) {
+            if (auto* hhp = healTarget->GetComponent<HPComponent>())
+                hhp->hp = (std::min)(hhp->maxHp, hhp->hp + support->healPerSecond * dt);
+            healFrom = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };     // å‹•ã„ãŸå¾Œã®ä½ç½®
+            if (ht) healTo = AimPoint(*healTarget, *ht);
+            else    healTo = AimPoint(self, *t);                                                    // è‡ªåˆ†ã‚’å›å¾©ï¼šè‡ªåˆ†ã®èƒ´ä½“
+            if (attackTimer < reactionTime) attackTimer = reactionTime;     // å›å¾©ãŒçµ‚ã‚ã£ã¦ã‹ã‚‰æ’ƒã¤ã¾ã§ã®ã€æŒã¡æ›¿ãˆã®æ™‚é–“
+        }
+        else if (tt && !incapacitated && attackTimer <= 0.0f) {
+            const XMFLOAT3 origin = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // å‹•ã„ãŸå¾Œã®ä½ç½®ã‹ã‚‰æ’ƒã¤
             XMFLOAT3 dir; float len;
             if (CanSee(ctx, *target, origin, dir, len)) {
-                // Œ©‚¦‚Ä‚¢‚éF‚¸‚ç‚µ‚½Œü‚«‚ÅŒ‚‚ÂiŠO‚ê‚é‚±‚Æ‚à‚ ‚éjB“–‚½‚è•ûEƒ_ƒ[ƒW‚ÍƒvƒŒƒCƒ„[‚Æ“¯‚¶ŠÖ”
-                if (rng == 0) rng = ((self.id.index + 1u) * 2654435761u) ^ (self.id.generation * 40503u) ^ 0x9E3779B9u;  // Entity ‚²‚Æ‚Éˆá‚¤í
+                // è¦‹ãˆã¦ã„ã‚‹ï¼šãšã‚‰ã—ãŸå‘ãã§æ’ƒã¤ï¼ˆå¤–ã‚Œã‚‹ã“ã¨ã‚‚ã‚ã‚‹ï¼‰ã€‚å½“ãŸã‚Šæ–¹ãƒ»ãƒ€ãƒ¡ãƒ¼ã‚¸ã¯ãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ã¨åŒã˜é–¢æ•°
+                if (rng == 0) rng = ((self.id.index + 1u) * 2654435761u) ^ (self.id.generation * 40503u) ^ 0x9E3779B9u;  // Entity ã”ã¨ã«é•ã†ç¨®
                 if (rng == 0) rng = 1u;
                 const XMFLOAT3 shotDir = SpreadDir(dir, aimSpread, rng);
                 const float maxDist = attackRange * 1.5f;
                 const ShotHit hit = TraceShot(ctx, origin, shotDir, maxDist);
-                ApplyShotDamage(ctx, hit, attackDamage);       // –¡•ûE•Ç‚É‚Íƒ_ƒ[ƒW‚ª“ü‚ç‚È‚¢
+                ApplyShotDamage(ctx, hit, attackDamage);       // å‘³æ–¹ãƒ»å£ã«ã¯ãƒ€ãƒ¡ãƒ¼ã‚¸ãŒå…¥ã‚‰ãªã„
                 const float d = hit.entity ? hit.distance : maxDist;
                 shotFrom = origin;
                 shotTo = { origin.x + shotDir.x * d, origin.y + shotDir.y * d, origin.z + shotDir.z * d };
@@ -307,7 +396,7 @@ namespace uel {
                 fired = true;
             }
             else {
-                // Œ©‚¦‚È‚¢F‚±‚Ì“G‚Í‚µ‚Î‚ç‚­Œó•â‚©‚çŠO‚µ‚ÄAŸ‚ÌƒtƒŒ[ƒ€‚Å‘I‚Ñ’¼‚·
+                // è¦‹ãˆãªã„ï¼šã“ã®æ•µã¯ã—ã°ã‚‰ãå€™è£œã‹ã‚‰å¤–ã—ã¦ã€æ¬¡ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã§é¸ã³ç›´ã™
                 blockedId = target->id;
                 blockedTimer = kBlockedMemory;
                 targetId = EntityId{};
@@ -315,9 +404,14 @@ namespace uel {
             }
         }
 
-        // 6) ƒAƒjƒ[ƒVƒ‡ƒ“‚ÖF‚¢‚Ü‚ÌˆÚ“®‚Ì‘¬‚³‚ÆAŒ‚‚Á‚½‚±‚Æ
+        // 6) ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã¸ï¼šã„ã¾ã®ç§»å‹•ã®é€Ÿã•ã€æ’ƒã£ãŸã“ã¨ã€å›å¾©ã—ã¦ã„ã‚‹ã‹
         SetAnimValue(an, kAnimSpeed, movedSpeed);
         if (fired) SetAnimValue(an, kAnimAttack, 1.0f);    // Trigger
+        const bool healingNow = healTargetId.IsValid();
+        if (healingNow != healAnim) {                        // Boolï¼šå¤‰ã‚ã£ãŸã¨ãã ã‘æ›¸ã
+            healAnim = healingNow;
+            SetAnimValue(an, kAnimHeal, healingNow ? 1.0f : 0.0f);
+        }
     }
 
 } // namespace uel

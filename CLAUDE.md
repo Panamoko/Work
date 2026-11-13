@@ -28,7 +28,7 @@
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
 | 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | **済み**（2026-11-13）。1-1 AI 仲間1体の追従 → 1-1b AllyComponent の保存（版 20）→ 1-2 陣営（a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（版 21）→ 1-4 Stage 開始時に3人を配置（ロールの Component・PartySetup・名札。版 22） |
-| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：**済み** → b 弾の線の表示：**済み** → c Inspector と保存：渡し済み。版 23）→ 2-3 Support の回復（線でつないで少しずつ） |
+| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：**済み** → b 弾の線の表示：**済み** → c Inspector と保存：**済み**。版 23）→ 2-3 Support の回復（a 選んで回復する：渡し済み → b 回復の線の表示） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
 | 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | |
@@ -56,6 +56,9 @@
   - AI 仲間の頭の上に名札（ロールの名前をロールの色で。Tank 青・DPS 橙・Support 緑、戦闘不能は灰色）。ユーザーが選んだ。Prefab が読めないと HUD に `PartySetup: ally prefab not found`。
 - **射撃は共通の処理**（2-1。`Game/WeaponTrace.h/.cpp`）：`TraceShot(ctx, 位置, 向き)`（UE の `LineTraceSingleByChannel`。いちばん手前の当たり＝`ShotHit`。撃った本人・倒れている最中の敵・戦闘不能の味方は素通り）と `ApplyShotDamage(ctx, 当たり, ダメージ)`（UE の `ApplyPointDamage`。味方・HP の無い物には入らない。戻り値はダメージが入ったか）。プレイヤーも AI 仲間もこれで撃つ。
 - **AI 仲間の攻撃**（2-2a）：0.3 秒ごとに射程（25m）の中のいちばん近い敵を選ぶ（今の敵より 1m 以上近いときだけ乗り換え）。乗り換える前と撃つ直前に `TraceShot` で見えるか（間に壁・味方がいないか）を調べ、見えない敵は 1 秒候補から外す。新しい敵には 0.3 秒構えてから撃つ。34 ダメージを 0.8 秒ごと、2 度のずれ（10m でほぼ全部当たり、20m で約 6 割）。追いかけながらでも撃ち、止まっているときは敵を向く。強さはユーザーの答え「プレイヤーより少し弱い」に合わせた。武器の値は段階 3 でロールの Component へ移す。
+- **Support の回復**（2-3a。ユーザーが選んだ 2026-11-13）：Overwatch のイラリーのように「左クリック＝攻撃、右クリック＝回復の線」の2つを持ち、**同時には使わない（回復が先）**。値は `SupportComponent`（`healPerSecond` 12、`healRange` 15m、`healStartRatio` 0.65、`healStopRatio` 1.0。Play の始めに付くので保存しない）、判断は `AllyComponent`。
+  - HP の割合が 65% 以下の味方（**自分も含む**。戦闘不能は蘇生で扱うので除く）のうち、いちばん低い相手を 0.3 秒ごとに選び、満タンまで回復。今の相手より 20% 以上低い味方がいれば乗り換え。線が壁でさえぎられたら止める（`IsLineBlocked`。味方の体は線を止めない）。回復をやめてから撃つまで 0.3 秒（持ち替え）。止まっているときは回復の相手を向く。アニメへ `Heal`（Bool）。
+  - プレイヤーが Support のときの回復（右クリック）は段階 3・6。**今は右ドラッグが視点の操作なので、右クリックをどう割り当てるかを決める必要がある。** イラリーの「回復のエネルギー（使うと減り、休むとたまる）」はまだ無い。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
 - **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
@@ -246,7 +249,7 @@ Source/Engine/
                  Role（ロールの親）/ Tank / DPS / Support / PartySetup
   Scene/         EntityId, Entity, World
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）,
-                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ。プレイヤーと AI 仲間で共用）
+                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ、壁でさえぎられているか。プレイヤーと AI 仲間で共用）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
                  AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
@@ -318,7 +321,7 @@ Source/Engine/
 | HP | 体力 | `hp, maxHp` |
 | Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
 | Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を撃つ。止まっている間は敵（いなければプレイヤー）を向く（2-2a。0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackDamage, attackInterval, aimSpread, aimHeight, searchInterval, reactionTime`（7つとも保存する。版 23。Inspector の「攻撃」欄）。アニメへ `Speed / Dead / Attack` を渡す（`Dead` は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()` |
-| Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`。今は中身なし（段階 3・6 で武器・アビリティ）。保存しない（PartySetup が付ける） | なし |
+| Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`。Support だけ回復の値を持つ（2-3a）。ほかは中身なし（段階 3・6 で武器・アビリティ）。保存しない（PartySetup が付ける） | Support：`healPerSecond, healRange, healStartRatio, healStopRatio` |
 | PartySetup | Stage の開始時に3人をそろえる（UE の GameMode）。0章「3人の配置」 | `allyPrefab, spawnBack, spawnSide`（保存する）。`HasError()` |
 | Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
@@ -601,7 +604,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃は済み。2-2b 弾の線の表示は済み。2-2c 攻撃の値の Inspector と保存（版 23）を渡し済み。次は 2-3 Support の回復）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃は済み。2-2b 弾の線の表示は済み。2-2 AI 仲間の攻撃は済み。2-3a Support の回復を渡し済み。次は 2-3b 回復の線の表示）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 
