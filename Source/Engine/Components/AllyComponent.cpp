@@ -1,11 +1,14 @@
 #include "Engine/Components/AllyComponent.h"
 #include "Engine/Game/GameContext.h"
+#include "Engine/Game/Team.h"
+#include "Engine/Game/WeaponTrace.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Components/TransformComponent.h"
 #include "Engine/Components/MeshRendererComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Components/HPComponent.h"
+#include "Engine/Components/HitboxComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -17,6 +20,11 @@ using namespace DirectX;
 
 namespace uel {
     namespace {
+
+        // 今の敵より、これ（m）以上近い敵がいるときだけ乗り換える（敵の OpponentComponent と同じ考え方）
+        constexpr float kRetargetMargin = 1.0f;
+        // 見えなかった敵を、候補から外しておく時間（秒）。この間は、その敵へ乗り換えようとしない（レイも飛ばさない）
+        constexpr float kBlockedMemory = 1.0f;
 
         // XZ 平面での距離（高さの違いは見ない）
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
@@ -58,6 +66,82 @@ namespace uel {
             an->params.SetIfExists(name, value);
         }
 
+        // 狙える敵か：敵対する陣営で、HP が残っている（倒れている最中の敵は HP 0 なので入らない）
+        bool IsTargetable(const Entity& self, const Entity& e)
+        {
+            if (!IsHostile(self, e)) return false;
+            auto* hp = e.GetComponent<HPComponent>();
+            return hp && hp->hp > 0.0f;
+        }
+
+        // 射程 range の中で、いちばん近い狙える敵。avoid（少し前に見えなかった敵）は選ばない。
+        // 距離だけで選び、見えるかどうか（レイ）はここでは調べない（候補ごとにレイを飛ばすと重いので、選んだ1体だけを調べる）
+        Entity* FindNearestEnemy(GameContext& ctx, const Entity& self, const XMFLOAT3& from, float range, EntityId avoid, float& outDist)
+        {
+            Entity* best = nullptr;
+            float bestDist = range;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot || slot.get() == &self || slot->id == avoid || !IsTargetable(self, *slot)) continue;
+                auto* et = slot->GetComponent<TransformComponent>();
+                if (!et) continue;
+                const float d = DistXZ(et->position, from);
+                if (d <= bestDist) { bestDist = d; best = slot.get(); }
+            }
+            outDist = bestDist;
+            return best;
+        }
+
+        // 狙う点：ヒットボックスがあれば胴体の真ん中、無ければ足元から 1m 上
+        XMFLOAT3 AimPoint(const Entity& e, const TransformComponent& et)
+        {
+            if (auto* hb = e.GetComponent<HitboxComponent>()) {
+                const auto ws = hb->GetWorldShapes(et);
+                return { (ws.bodyA.x + ws.bodyB.x) * 0.5f, (ws.bodyA.y + ws.bodyB.y) * 0.5f, (ws.bodyA.z + ws.bodyB.z) * 0.5f };
+            }
+            return { et.position.x, et.position.y + 1.0f, et.position.z };
+        }
+
+        // 撃つ位置 origin から敵が見えるか（間に壁や味方がいないか）。弾と同じ線（TraceShot）で調べ、最初に当たった物がその敵なら見える。
+        // 見えるときは、狙う点への向き（長さ 1）と距離も返す。撃つ本人（ctx.self）は線に当たらない
+        bool CanSee(GameContext& ctx, Entity& enemy, const XMFLOAT3& origin, XMFLOAT3& outDir, float& outLen)
+        {
+            auto* et = enemy.GetComponent<TransformComponent>();
+            if (!et) return false;
+            const XMFLOAT3 aim = AimPoint(enemy, *et);
+            XMFLOAT3 d = { aim.x - origin.x, aim.y - origin.y, aim.z - origin.z };
+            const float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+            if (len < 1e-4f) return false;
+            outDir = { d.x / len, d.y / len, d.z / len };
+            outLen = len;
+            return TraceShot(ctx, origin, outDir, len + 1.0f).entity == &enemy;
+        }
+
+        // 0 以上 1 未満の乱数（xorshift32。UE の FRandomStream のように、Component ごとに自分の乱数の状態を持つ）
+        float Rand01(std::uint32_t& s)
+        {
+            s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+            return static_cast<float>(s >> 8) * (1.0f / 16777216.0f);
+        }
+
+        // 向き dir（長さ 1）を、半角 spreadDeg 度の円錐の中でずらす（UE の FMath::VRandCone に当たる）
+        XMFLOAT3 SpreadDir(const XMFLOAT3& dir, float spreadDeg, std::uint32_t& rng)
+        {
+            if (spreadDeg <= 0.0f) return dir;
+            const XMVECTOR d = XMLoadFloat3(&dir);
+            // dir に垂直な2本の軸（dir が真上・真下に近いときは、X 軸を元に作る）
+            const XMVECTOR base = (std::fabs(dir.y) < 0.99f) ? XMVectorSet(0, 1, 0, 0) : XMVectorSet(1, 0, 0, 0);
+            const XMVECTOR right = XMVector3Normalize(XMVector3Cross(base, d));
+            const XMVECTOR up = XMVector3Cross(d, right);
+            // 円の中に一様に散らす（半径は乱数の平方根。そうしないと真ん中に集まりすぎる）
+            const float radius = std::tan(XMConvertToRadians(spreadDeg)) * std::sqrt(Rand01(rng));
+            const float angle = XM_2PI * Rand01(rng);
+            XMVECTOR v = XMVectorAdd(d, XMVectorScale(right, radius * std::cos(angle)));
+            v = XMVectorAdd(v, XMVectorScale(up, radius * std::sin(angle)));
+            XMFLOAT3 out;
+            XMStoreFloat3(&out, XMVector3Normalize(v));
+            return out;
+        }
+
     } // namespace
 
     void AllyComponent::Update(GameContext& ctx)
@@ -68,7 +152,7 @@ namespace uel {
         const float dt = ctx.dt;
         AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // 無くても動く（アニメが変わらないだけ）
 
-        // 0) 戦闘不能：HP が 0 になったら、その場で止まる（追いかけない・向きも変えない）。
+        // 0) 戦闘不能：HP が 0 になったら、その場で止まる（追いかけない・向きも変えない・撃たない）。
         //    HP が戻ったら（回復・蘇生）、また動き出す。段階 4 で「ダウン（蘇生を待つ・時間切れで Dead）」に置き換える
         auto* myHp = self.GetComponent<HPComponent>();
         const bool down = (myHp && myHp->hp <= 0.0f);
@@ -76,10 +160,11 @@ namespace uel {
             incapacitated = down;
             following = false;
             path.clear();
+            targetId = EntityId{};
             SetAnimValue(an, kAnimDead, down ? 1.0f : 0.0f);    // Bool なので、変わったときだけ書けば値が残る（毎フレーム名前で探さない）
         }
 
-        // 1) 追いかける相手。覚えている相手がいなくなったときだけ World を探し直す（毎フレーム全員を調べない）
+        // 1) 追いかける相手。覚えている相手がいなくなったときだけ World を探し直す（毎フレーム全部を調べない）
         Entity* lead = ctx.world.Get(leader);
         if (!lead) {
             for (const auto& slot : ctx.world.Slots()) {
@@ -92,10 +177,49 @@ namespace uel {
         }
         TransformComponent* lt = lead ? lead->GetComponent<TransformComponent>() : nullptr;
 
+        // 1b) 狙う敵。searchInterval ごとに、射程の中のいちばん近い敵を選び直す（毎フレームは探さない）。
+        //     今の敵が倒れた・消えたときは、次のフレームですぐ選び直す。
+        //     今の敵より kRetargetMargin 以上近い敵がいるときだけ乗り換える（同じくらいの距離の2体の間で、狙いが行ったり来たりしない）。
+        //     乗り換える前に、その敵が見えるかを1回だけ調べる。見えなければ乗り換えず、その敵を kBlockedMemory 秒は候補から外す
+        //     （壁や味方の向こうの近い敵と、見えている遠い敵の間で、狙いが行ったり来たりしない）
+        const XMFLOAT3 muzzle = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // 撃つ位置（このフレームの最初の位置）
+        Entity* target = ctx.world.Get(targetId);
+        if (targetId.IsValid() && (!target || !IsTargetable(self, *target))) {
+            target = nullptr;
+            targetId = EntityId{};
+            searchTimer = 0.0f;
+        }
+        if (blockedTimer > 0.0f) blockedTimer -= dt;
+        if (blockedTimer <= 0.0f) blockedId = EntityId{};
+        searchTimer -= dt;
+        if (!incapacitated && searchTimer <= 0.0f) {
+            searchTimer = searchInterval;
+            float curDist = 1e9f;
+            if (target) {
+                if (auto* ct = target->GetComponent<TransformComponent>()) curDist = DistXZ(ct->position, t->position);
+                if (curDist > attackRange) target = nullptr;        // 射程の外へ出た
+            }
+            float foundDist = 0.0f;
+            Entity* found = FindNearestEnemy(ctx, self, t->position, attackRange, blockedId, foundDist);
+            if (found && found != target && (!target || foundDist < curDist - kRetargetMargin)) {
+                XMFLOAT3 dir; float len;
+                if (CanSee(ctx, *found, muzzle, dir, len)) {
+                    target = found;
+                    attackTimer = (std::max)(attackTimer, reactionTime);    // 新しい敵に構え直す時間
+                }
+                else {
+                    blockedId = found->id;                                  // 見えない：しばらく候補から外す
+                    blockedTimer = kBlockedMemory;
+                }
+            }
+            targetId = target ? target->id : EntityId{};
+        }
+        TransformComponent* tt = target ? target->GetComponent<TransformComponent>() : nullptr;
+
         const XMFLOAT3 before = t->position;
         float movedSpeed = 0.0f;
         if (lt && !incapacitated) {
-            // 2) 動くか止まるか。止まる距離と動き出す距離を分けて、境目で動いたり止まったりを繰り返さないようにする
+            // 2) 動くか止まるか。止まる距離と動き出す距離を分けて、境目で動く・止まるを繰り返さないようにする
             const float dist = DistXZ(t->position, lt->position);
             if (following && dist <= followDistance) { following = false; path.clear(); }
             else if (!following && dist > resumeDistance) { following = true; repathTimer = 0.0f; }
@@ -113,15 +237,15 @@ namespace uel {
                 }
 
                 // 次に向かう点。経路が無い（グリッドの外など）ときは、相手へまっすぐ向かう
-                XMFLOAT3 target = lt->position;
+                XMFLOAT3 goal = lt->position;
                 if (!path.empty()) {
                     if (wpIndex >= path.size()) wpIndex = path.size() - 1;
                     if (DistXZ(path[wpIndex], t->position) < 0.5f && wpIndex + 1 < path.size()) ++wpIndex;
-                    target = path[wpIndex];
+                    goal = path[wpIndex];
                 }
 
-                const float dx = target.x - t->position.x;
-                const float dz = target.z - t->position.z;
+                const float dx = goal.x - t->position.x;
+                const float dz = goal.z - t->position.z;
                 const float len = std::sqrt(dx * dx + dz * dz);
                 if (len > 1e-4f && dt > 0.0f) {
                     const float step = (std::min)(moveSpeed * dt, len);    // 向かう点を通り過ぎない
@@ -132,9 +256,10 @@ namespace uel {
                 }
             }
             else {
-                // 止まっている間は、相手のほうを向く
-                const float fx = lt->position.x - t->position.x;
-                const float fz = lt->position.z - t->position.z;
+                // 止まっている間は、狙っている敵のほうを向く（敵がいなければ、プレイヤーのほう）
+                const XMFLOAT3& face = tt ? tt->position : lt->position;
+                const float fx = face.x - t->position.x;
+                const float fz = face.z - t->position.z;
                 if (fx * fx + fz * fz > 0.01f) t->rotationEuler.y = std::atan2(fx, fz) * 57.2958f;
             }
         }
@@ -157,8 +282,42 @@ namespace uel {
             t->position.y = ny;
         }
 
-        // 5) アニメーションへ：いまの移動の速さ
+        // 5) 攻撃：撃てる時間になったら、もう一度敵が見えるかを調べ（選んだ後に壁の陰へ入ったかもしれない）、見えていれば撃つ。
+        //    見えなければ撃たず、その敵をしばらく候補から外して、次のフレームで選び直す（壁の向こうの敵にこだわらない）。
+        //    レイを飛ばすのは「撃つとき」と「乗り換えるとき」だけ（1発につき、見えるかの確認と本番の2本）
+        if (shotTime > 0.0f) shotTime -= dt;
+        attackTimer -= dt;
+        bool fired = false;
+        if (tt && !incapacitated && attackTimer <= 0.0f) {
+            const XMFLOAT3 origin = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // 動いた後の位置から撃つ
+            XMFLOAT3 dir; float len;
+            if (CanSee(ctx, *target, origin, dir, len)) {
+                // 見えている：ずらした向きで撃つ（外れることもある）。当たり方・ダメージはプレイヤーと同じ関数
+                if (rng == 0) rng = ((self.id.index + 1u) * 2654435761u) ^ (self.id.generation * 40503u) ^ 0x9E3779B9u;  // Entity ごとに違う種
+                if (rng == 0) rng = 1u;
+                const XMFLOAT3 shotDir = SpreadDir(dir, aimSpread, rng);
+                const float maxDist = attackRange * 1.5f;
+                const ShotHit hit = TraceShot(ctx, origin, shotDir, maxDist);
+                ApplyShotDamage(ctx, hit, attackDamage);       // 味方・壁にはダメージが入らない
+                const float d = hit.entity ? hit.distance : maxDist;
+                shotFrom = origin;
+                shotTo = { origin.x + shotDir.x * d, origin.y + shotDir.y * d, origin.z + shotDir.z * d };
+                shotTime = 0.08f;
+                attackTimer = attackInterval;
+                fired = true;
+            }
+            else {
+                // 見えない：この敵はしばらく候補から外して、次のフレームで選び直す
+                blockedId = target->id;
+                blockedTimer = kBlockedMemory;
+                targetId = EntityId{};
+                searchTimer = 0.0f;
+            }
+        }
+
+        // 6) アニメーションへ：いまの移動の速さと、撃ったこと
         SetAnimValue(an, kAnimSpeed, movedSpeed);
+        if (fired) SetAnimValue(an, kAnimAttack, 1.0f);    // Trigger
     }
 
 } // namespace uel

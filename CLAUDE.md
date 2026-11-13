@@ -2,6 +2,7 @@
 
 **協力型 PvE FPS**（Left 4 Dead 2 の協力プレイ ＋ Overwatch のロール制）を、自作の UE ライクなエンジン（C++17 / DirectX11）で作るプロジェクト。2026-11-09 に「Overwatch 風 FPS」から方針を変えた（0章）。
 このファイルは、別セッションでも同じ前提で作業するための「ルール」と「現状」のまとめ。
+将来、AI の挙動を本格的にするために AI Editor（Behavior Tree・Utility AI・AI Perception・Pathfinding・EQS・AI Debugger）を入れる計画がある（12章。2026-11-13）。
 
 ---
 
@@ -26,15 +27,15 @@
 | 段階 | 内容 | 終わりの目安 | 状況 |
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
-| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | 作業中。1-1 AI 仲間1体の追従（**済み**）→ 1-1b AllyComponent の保存（**済み**。版 20）→ 1-2 陣営（**済み**。a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（**済み**。版 21）→ 1-4 Stage 開始時に3人を配置（次） |
-| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | |
+| 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | **済み**（2026-11-13）。1-1 AI 仲間1体の追従 → 1-1b AllyComponent の保存（版 20）→ 1-2 陣営（a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（版 21）→ 1-4 Stage 開始時に3人を配置（ロールの Component・PartySetup・名札。版 22） |
+| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：渡し済み → b 弾の線の表示 → c Inspector と保存）→ 2-3 Support の回復（線でつないで少しずつ） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
 | 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | |
 | 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
 | 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
-| 9 AI の高度化 | 蘇生の判断、危険回避、連携、集合 | AI を仲間と感じられる | |
+| 9 AI の高度化 | 蘇生の判断、危険回避、連携、集合 | AI を仲間と感じられる | AI Editor（BT・Utility・Perception・EQS・Debugger）の計画は12章。いつ始めるかは未定 |
 
 ### 決めた設計
 - **「誰が操作するか」と「何ができるか（ロール）」を別の Component に分ける**（2026-11-09 決定）。
@@ -51,13 +52,17 @@
 - **ロール**（1-3。`Game/Role.h`）：`enum class Role { Tank, DPS, Support }`（並び順を変えない）、`RoleName` / `RoleDescription`。選んだロールは `GameFlow::playerRole`（UE の GameInstance に当たる）。Play を始めるたびに既定の **DPS** に戻す（`Engine::StartPlay`）。
   - ロール選択の画面は `ScreenUIComponent` の `roleSelect`（オンでボタン1つの代わりに3つのロール。1 / 2 / 3 キー、Enter は今のロール）。
   - 流れ：Title →(START)→ **RoleSelect** →(ロールを選ぶ)→ Stage →… → Result →(RETRY)→ **RoleSelect**（RETRY でロール選択へ戻る。ユーザーが選んだ）。
+- **3人の配置**（1-4）：ロールの Component は `RoleComponent`（`GetRole()` だけの親）と `TankComponent` / `DPSComponent` / `SupportComponent`。今は中身が無く、保存もしない（Play 開始時に付ける）。`PartySetupComponent`（UE の GameMode に当たる）を Stage の GameRule の Entity に付けておくと、Play の最初のフレームに1回だけ、プレイヤーに選んだロールを付け、残り2ロールの AI 仲間を `allyPrefab`（既定 `Data/Prefabs/Ally.prefab.json`）から作ってプレイヤーの左後ろ・右後ろ（`spawnBack` 2m、`spawnSide` 1.5m）に置き、名前を「Ally (Tank)」のようにする。AI 仲間は Prefab から出す（Scene に置かない）。ユーザーが選んだ。
+  - AI 仲間の頭の上に名札（ロールの名前をロールの色で。Tank 青・DPS 橙・Support 緑、戦闘不能は灰色）。ユーザーが選んだ。Prefab が読めないと HUD に `PartySetup: ally prefab not found`。
+- **射撃は共通の処理**（2-1。`Game/WeaponTrace.h/.cpp`）：`TraceShot(ctx, 位置, 向き)`（UE の `LineTraceSingleByChannel`。いちばん手前の当たり＝`ShotHit`。撃った本人・倒れている最中の敵・戦闘不能の味方は素通り）と `ApplyShotDamage(ctx, 当たり, ダメージ)`（UE の `ApplyPointDamage`。味方・HP の無い物には入らない。戻り値はダメージが入ったか）。プレイヤーも AI 仲間もこれで撃つ。
+- **AI 仲間の攻撃**（2-2a）：0.3 秒ごとに射程（25m）の中のいちばん近い敵を選ぶ（今の敵より 1m 以上近いときだけ乗り換え）。乗り換える前と撃つ直前に `TraceShot` で見えるか（間に壁・味方がいないか）を調べ、見えない敵は 1 秒候補から外す。新しい敵には 0.3 秒構えてから撃つ。34 ダメージを 0.8 秒ごと、2 度のずれ（10m でほぼ全部当たり、20m で約 6 割）。追いかけながらでも撃ち、止まっているときは敵を向く。強さはユーザーの答え「プレイヤーより少し弱い」に合わせた。武器の値は段階 3 でロールの Component へ移す。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
 - **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
 - **敵はプレイヤーしか狙わない**（追跡も攻撃も）。AI 仲間も狙わせるには陣営（味方／敵）の考え方が要る。
 - **プレイヤーの射撃は「Hitbox を持つ物すべて」に当たる**（味方撃ちが起きる）。また、**敵以外で HP が 0 になった物はその場で `DestroyEntity` される**（`PlayerComponent.cpp` の射撃の処理）。AI 仲間に HP・Hitbox を付ける前に、ここを直す（ダウンの仕組みとぶつかる）。
 - **プレイヤーの HP が 0 で即ゲームオーバー**（`GameRuleComponent`）。ダウンを入れるときに変える。
-- **射撃の処理は `PlayerComponent::Update` に直接書いてある**。AI も同じ撃ち方をするなら、先に共通の処理として外に出す。
+- **射撃の処理は `PlayerComponent::Update` に直接書いてある**。AI も同じ撃ち方をするなら、先に共通の処理として外に出す。→ 2-1 で `Game/WeaponTrace` に出した。
 - **`SpawnerComponent` は「全滅で次のウェーブ」までできている**（資料の「追加が必要」は誤り）。足りないのは、ウェーブごとに違う敵を出すこと（今は1つの Spawner に Prefab 1種類）と、最後のボス。
 - `HPComponent` は `hp` と `maxHp` だけで、敵も使う。ダウン・死亡・蘇生の状態は別の部品に分けるのが安全。
 - 選んだロールは `GameFlow`（Scene をまたいで残る）に持たせて、ロール選択の画面から Stage へ渡せる。
@@ -120,7 +125,7 @@
 - **作業を始める前に、今のファイルを読み直す**（`git status` と `git log` も見る）。セッションの途中でも、ユーザーがほかのセッションの変更を貼っていることがある。覚えている中身を前提に指示を書かない。
 - **1つの変更を貼ってもらったら、すぐコミットしてもらう**（コミットはユーザーが行う）。ほかのセッションの作業に移る前にコミットされていると、どの変更がどこから来たか分かり、戻すこともできる。
 - **保存の版**（Scene の `kSchemaLatest`、Environment の `kEnvSchemaLatest`、グラフの `kAnimGraphVersion`）**を上げるのは、一度に1つのセッションだけ。** 上げる前に今の値をファイルで確かめ、上げたらコミットしてもらってから次の作業へ。2つのセッションが同じ番号を使うと、違う項目が同じ版になり、古いファイルの読み込みが壊れる。
-- **CLAUDE.md は、直す直前に読み直す。** 各セッションは自分の章だけを直す（ゲームは0章・5章・7章、Animation は6章、Shader は9章。共通の章（1〜4、8、10、11）は、必要な行だけを足す）。ほかのセッションが書いた内容を消さない。
+- **CLAUDE.md は、直す直前に読み直す。** 各セッションは自分の章だけを直す（ゲームは0章・5章・7章・12章（AI Editor）、Animation は6章、Shader は9章。共通の章（1〜4、8、10、11）は、必要な行だけを足す）。ほかのセッションが書いた内容を消さない。
 - **ほかのセッションでできた物に気づいたら**（CLAUDE.md に無いファイルや機能、未コミットの変更など）、前提をユーザーに確かめ、CLAUDE.md の該当の章に足す（2026-11-09 に、LayeredBlend・エイムオフセットが CLAUDE.md に書かれていなかったことがある）。
 - ユーザーがほかのセッションに戻るときは、最初に「CLAUDE.md の〇章を読み直して。前回から〇〇が変わった」と伝えてもらうとよい。
 
@@ -237,10 +242,11 @@ Source/Engine/
   Config/        EngineConfig（kAssetRoot, kSceneDir, SceneFilePath, kTargetFps, kMaxDeltaTime, ClampDeltaTime）
   Components/    Component（基底）と、すべての Component（フォルダの中は分けない）
                  Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Ally / Opponent /
-                 Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance
+                 Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance /
+                 Role（ロールの親）/ Tank / DPS / Support / PartySetup
   Scene/         EntityId, Entity, World
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）,
-                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）
+                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ。プレイヤーと AI 仲間で共用）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
                  AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
@@ -311,7 +317,9 @@ Source/Engine/
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
 | Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
-| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。今は追従だけ：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まってプレイヤーを向く。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。アニメへ `Speed / Dead` を渡す（`Dead` は変わったときだけ書く） |
+| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を撃つ。止まっている間は敵（いなければプレイヤー）を向く（2-2a。0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackDamage, attackInterval, aimSpread, aimHeight, searchInterval, reactionTime`（まだ保存しない）。アニメへ `Speed / Dead / Attack` を渡す（`Dead` は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()` |
+| Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`。今は中身なし（段階 3・6 で武器・アビリティ）。保存しない（PartySetup が付ける） | なし |
+| PartySetup | Stage の開始時に3人をそろえる（UE の GameMode）。0章「3人の配置」 | `allyPrefab, spawnBack, spawnSide`（保存する）。`HasError()` |
 | Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
@@ -327,7 +335,7 @@ Source/Engine/
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
 - NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
 - 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
-- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
+- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
 - 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
@@ -425,7 +433,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 21。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 22。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -448,6 +456,7 @@ Source/Engine/
 | 19 | SkinnedMesh の `fpHideBone`（`skFpHide`） |
 | 20 | Ally（`hasAlly, alMoveSpeed, alFollowDist, alResumeDist, alRepath`） |
 | 21 | ScreenUI の `roleSelect`（`uiRoleSelect`） |
+| 22 | PartySetup（`hasParty, ptPrefab, ptBack, ptSide`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -591,7 +600,9 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。今は段階 1「3人チーム」の途中（1-1 追従・1-1b 保存・1-2 陣営・1-3 ロール選択は済み。次は 1-4 Stage の開始時に3人を配置）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃を渡し済み。次は 2-2b 弾の線の表示）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+
+**AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 
 以下はエンジン側の残り（ゲーム作りで必要になったときに取り組む）：
 
@@ -605,3 +616,82 @@ Source/Engine/
 - ~~プレイヤーのキャラごとの攻撃方法・移動方法~~ → 0章のロードマップ（段階 3 武器・段階 6 アビリティ）に入った
 - （必要になったら）ゲームの更新を固定ステップにする（物理を作るとき、60FPS を下回るほど重くなったとき）。入力の「押した1フレーム」を取りこぼさない工夫が要る
 - （必要になったら）Inspector の Component を折りたためるようにする（`CollapsingHeader`）
+
+---
+
+## 12. AI Editor（将来の計画。2026-11-13 にユーザーから受け取った）
+
+**基準の資料**：`C:\Users\2240192\Desktop\AI_Editor_Project_Specification_for_Claude.docx`（2026-11-13）。AI の挙動を本格的にするために、エディタと AI の技術をエンジンに入れていく計画。細かい所はこの資料に従い、**資料の「既存の状態」は実際のコードで確かめる**（0章の資料と同じ扱い）。
+
+### 目的
+ゲームの敵 AI・味方 AI を、コードを書き換えるだけでなく、エディタで目で見ながら設定・編集・確認できるようにする。次の5つを、別々の道具にせず、**共通の AI Runtime・Blackboard・データ形式**でつなげる。一度に全部は作らず、段階的に足す。
+
+| システム | 役割 | エディタでしたいこと |
+|---|---|---|
+| Behavior Tree | 行動の流れ | ノードの配置・接続・条件・Task の設定、実行中のノードの表示 |
+| Utility AI | 複数の行動の優先度をスコアで比べる | Action の追加、評価条件、スコア・カーブ、今のスコアと選ばれた Action の表示 |
+| AI Perception | 視覚・聴覚・ダメージで周りを知る | 方式のオン・オフ、距離・角度・しきい値、視界コーン・認識した相手・音の範囲の表示 |
+| Pathfinding | 障害物を避けて目的地へ | 歩ける所・障害物・経路・Waypoint・目的地・再計算の表示 |
+| EQS（Environment Query System） | 周りの候補地点を評価して選ぶ | Generator・Test・重み、候補とスコアの 3D 表示、選んだ地点 |
+
+### 全体の形（層）
+- **AI Editor**（作る・編集・保存・読み込み・デバッグ表示）→ **AI Data / Asset**（BT・Utility・Perception・EQS の設定）→ **AI Runtime**（データを読んでゲーム中に AI を動かす）→ **Game / Engine Systems**（Entity・Component・Transform・当たり判定・Navigation・Animation）。
+- エディタの UI と AI の実行の処理を密にくっつけない。エディタ無しでもゲームが動く形にする（今の Anim Graph と同じ考え方：アセット＋Runtime＋編集画面）。
+- **Blackboard**：AI が判断に使う情報の Key-Value の入れ物。BT・Utility・Perception・EQS の受け渡しの土台。Key の例：`TargetActor`（Entity ID）、`TargetLocation`、`HasTarget`、`LastKnownLocation`、`Health`、`MoveLocation`、`BestCoverLocation`。型の安全さ、未登録の Key、値が変わったときの通知、Entity の参照の寿命（`EntityId` の generation が使える）、保存の方法は、エンジンに合わせて決める。
+
+### 各システムの要件（資料の 4章）
+- **Behavior Tree**：最初のノードは Root / Selector / Sequence / Condition / Task。結果は Success / Failure / Running。後で Decorator・Service・Abort（条件が変わったら実行中を止める）。エディタ：ノードの追加・削除・移動・接続、選んだノードの詳細の編集、保存・読み込み、実行中のノードを光らせる。
+- **Utility AI**：攻撃・回復・逃げるなどの Action に、体力・距離・弾・味方の状態からスコアを付け、高いものを選ぶ。BT の戦闘中の Task から呼んで選択を任せる案（BT と役割を重ねない）。
+- **AI Perception**：Sight（距離・視野角・遮蔽物）、Hearing（音の位置・大きさ・減衰）、Damage（攻撃された・攻撃者・位置）。結果を Blackboard に書く。
+- **Pathfinding**：**まず今の A* / NavGrid を調べてから**。広げるか NavMesh（Recast & Detour も候補。決定ではない）にするかを比べる。
+- **EQS**：Generator（候補を作る）・Context（自分・相手・味方など基準）・Test（距離・視線・歩いて行けるか）・Weight / Score。初めの例：遮蔽物を探す、プレイヤーと適当な距離をとる、撃ちやすい位置を探す。候補が経路で行けるかも見る。
+- **AI Debugger**（重要）：実行中に AI の Entity を選んで、BT の実行中のノードと結果・失敗の理由、Utility の候補とスコア、Perception の視界と認識した相手・最後に見た位置、経路と目的地、EQS の候補とスコアを見る。最初は大きな専用ウィンドウでなく、Inspector と Viewport への表示から始めてよい。
+
+### 資料の開発の順番（6章。今のコードを見てから調整してよい）
+| 段階 | 内容 | 終わりの目安 |
+|---|---|---|
+| 0 | 今のエンジン・AI・エディタの調査 | 関係するクラス・データ形式・機能・課題の一覧 |
+| 1 | AI Core / Blackboard | AI が共通の情報を保存・取得できる |
+| 2 | Pathfinding の確認・拡張 | 敵が障害物を避けて目的地へ行ける |
+| 3 | AI Perception | 視覚・聴覚・ダメージを検知して情報を更新 |
+| 4 | Behavior Tree の Runtime | Selector / Sequence / Condition / Task が動く |
+| 5 | Behavior Tree のエディタ | ノードを編集・保存・読み込みしてゲームで動く |
+| 6 | Utility AI | 複数の Action をスコアで選ぶ |
+| 7 | EQS | 候補地点を作って評価し、いちばん良い所を選ぶ |
+| 8 | 統合 AI Debugger | 5つの状態を実行中に見られる |
+| 9 | 敵・味方の AI で検証 | 複数の AI の種類で使い回せる |
+
+- **ノードの UI だけを先に作らない。** まず Runtime で最小の AI を動かし、その後でエディタから編集できるようにする。
+- **最初の完成目標（MVP）**：敵 AI が①プレイヤーを視界で見つける ②見つけた情報を Blackboard に入れる ③BT で巡回・追跡・攻撃を切り替える ④経路で障害物を避ける ⑤エディタで BT のノードを編集・保存・読み込みできる ⑥実行中の BT と経路を確認できる。これが安定してから Utility AI と EQS。
+
+### 保存（資料の 9章）
+- エディタで作った AI の設定は、ゲームで読めるアセットとして保存する。JSON が候補だが、今の Prefab・Serialization を先に調べる（参考：`AnimGraphSerializer` の「版を持ち、その版以降だけ読む」形）。
+- 中身：ノードの種類・ID・つながり・パラメータ・参照する Task / Action。読むときに、知らない種類・無い参照・型の違い・輪になったつながりを調べて、分かりやすくエラーを出す。データの版を持つ。
+
+### 資料のフォルダの案（8章。今の構成と名前に合わせて変えてよい）
+`Engine/AI/` の下に `Core/`（AIController, Blackboard）、`BehaviorTree/`（BehaviorTree, BTNode, BTSelector, BTSequence, BTCondition, BTTask）、`UtilityAI/`（UtilityAI, UtilityAction, UtilityConsideration）、`Perception/`（AIPerception, SightSensor, HearingSensor, DamageSensor）、`Navigation/`（NavigationSystem, Pathfinding）、`EQS/`（EnvironmentQuery, EQSGenerator, EQSTest）。`Editor/AIEditor/` に AIEditor, BehaviorTreeEditor, UtilityAIEditor, PerceptionEditor, NavigationDebugView, EQSEditor, AIDebugger。
+- **`.cpp` の名前は `Source/` 全体で重複させない**（1章の 4）。たとえば `Pathfinding.cpp` などを作る前に検索する。
+
+### 今回は対象外（資料の 10章）
+機械学習・強化学習、LLM の会話・生成 AI、大規模な群衆、高度な Squad AI・Director AI、EQS の Generator / Test を全部そろえること、汎用の AI フレームワーク化。**まずルールベースの AI を安定して作り・編集し・デバッグできること。**
+
+### 資料の作業のルール（0章・11章。この CLAUDE.md のルールと同じ向き）
+- 最初に今のコード・フォルダ・エディタを確かめ、資料だけで「できている」と決めつけない。今のクラス名・命名・設計を尊重する。
+- 小さく実装 → ビルド → 動作確認。ファイルのパス・場所・理由を書く。実装済み・今回・将来を分ける。選択肢は推奨案と良い点・悪い点。
+- 資料を受けて最初にすること：関係するフォルダ・クラス・AI の処理・エディタを調べ、「使える／広げる必要／無い／要確認」に分ける（特に A* / NavGrid、ImGui エディタ、Entity / Component、Serialization / Prefab との接続）。資料の構成と今のコードの差を整理し、最初の小さな作業を1つに絞って、変えるファイル・内容・テストのしかたを出す。了承を得てから実装する。
+
+### 資料の決まっていないこと（13章。勝手に決めず、調べてから案を出す）
+今の A* / NavGrid を広げるか NavMesh か、AI の設定を今の Serialization に入れるか独立した JSON アセットにするか、BT の動かし方（毎フレーム・一定間隔・イベント）、Utility のスコアの正規化・カーブ・同点の扱い、Perception の視線を今の Raycast にどうつなぐか、EQS の候補の作り方・Test・到達できるかの確認、エディタの Undo/Redo・コピー＆ペースト・複数の AI の選択をいつ作るか。
+
+### 今のコードで関係しそうな物（2026-11-13 時点で分かっている所。着手するときに調べ直す）
+- **Pathfinding**：`AI/EngineNavGrid`（A*。Play 中に毎フレーム作り直し、原点中心 60×60・セル 1m で固定。塞ぐのは NavObstacle だけ）。敵（`OpponentComponent`）と AI 仲間（`AllyComponent`）が使っている。デバッグ表示は NavGrid パネルと、敵の経路の線（`ViewportPanel`）。
+- **AIController に当たる物**：`AllyComponent`（AI 仲間）と `OpponentComponent`（敵）。判断を直接 C++ で書いている。陣営は `Game/Team.h`。
+- **Perception（Sight）の芽**：`AllyComponent` の「見えるか」（`CanSee`。`Game/WeaponTrace` の `TraceShot` で間に壁・味方がいないか調べる。距離だけで候補を選び、線は選んだ1体だけ）。敵は距離だけで狙っている（視野角・遮蔽は見ていない）。
+- **Damage の芽**：敵は「HP が減った」でひるむ（`OpponentComponent`。攻撃者は記録していない）。
+- **ノードエディタの土台**：Anim Graph のキャンバス（`AnimGraphCanvas` / `AnimGraphStateMachineView`。拡大縮小・ドラッグ・右クリックの追加・全体表示）と、アセットの保存（`AnimGraphSerializer`）。BT エディタに使い回せるかを調べる。
+- **昔の Behavior Tree**：削除前のコミット `2df15d7` に `Source/AI/BehaviorTree.*`・`BehaviorNode.*`・`BehaviorStatus.h`・`BehaviorAction.h`・`BehaviorJudgment.h`・`EnemyBehaviors.*` がある（`git show 2df15d7:Source/AI/BehaviorTree.cpp`）。参考になるかは中身を見て判断する。
+
+### この CLAUDE.md とぶつかる所（着手する前にユーザーに確かめる）
+- **エディタの文字**：資料は「Editor の UI は英語が基本」、2章は「エディタの説明・ボタン・メッセージは日本語（`u8"..."`）」。AI Editor の部分だけ英語にするか、ユーザーに聞く。
+- **`.vcxproj`**：資料は「理由を説明せずに変えない」、1章は「変えない（ユーザーが VS で足す）」。**1章のほうに従う。**
+- **ゲームのロードマップとの順番**：資料の MVP は「敵 AI（巡回・追跡・攻撃）」から。0章のロードマップは AI 仲間が中心で、AI の高度化は段階 9。いつ・どちらから始めるか（たとえば段階 2〜5 のゲームの形ができてから、敵と AI 仲間の判断を BT へ移す、など）はユーザーと決める。
