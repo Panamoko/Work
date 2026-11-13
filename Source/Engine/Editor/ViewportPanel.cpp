@@ -19,6 +19,8 @@
 #include "Engine/Components/SpawnerComponent.h"
 #include "Engine/Config/EngineConfig.h"
 #include "Engine/Components/AllyComponent.h"
+#include "Engine/Components/RoleComponent.h"
+#include "Engine/Components/PartySetupComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -290,7 +292,7 @@ namespace uel {
                     }
                 }
             }
-            // 敵の追跡経路を3D投影で表示
+            // 敵の追跡経路と、AI 仲間の名札を3D投影で表示
             {
                 XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
                 auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
@@ -314,6 +316,33 @@ namespace uel {
                         prev = s; havePrev = true;
                     }
                 }
+
+                // AI 仲間の名札：頭の少し上に、ロールの名前をロールの色で出す（1-4d）。
+                // 壁の向こうでも見える（味方の位置が分かるように。FPS の味方の名前表示でよくある作り）。戦闘不能なら灰色
+                bool partyError = false;
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    if (auto* ps = slot->GetComponent<PartySetupComponent>()) if (ps->HasError()) partyError = true;
+                    auto* al = slot->GetComponent<AllyComponent>();
+                    auto* rc = slot->GetComponent<RoleComponent>();
+                    auto* t = slot->GetComponent<TransformComponent>();
+                    if (!al || !rc || !t) continue;
+                    // 頭の上端：Hitbox があれば頭の球の上、無ければ 2m（どちらも Scale.y を掛ける）
+                    float top = 2.0f * t->scale.y;
+                    if (auto* hb = slot->GetComponent<HitboxComponent>()) top = (hb->headHeight + hb->headRadius) * t->scale.y;
+                    ImVec2 s;
+                    if (!project(XMFLOAT3{ t->position.x, t->position.y + top + 0.25f, t->position.z }, s)) continue;   // カメラの後ろ
+                    if (s.x < imgPos.x || s.x > imgPos.x + viewWidth || s.y < imgPos.y || s.y > imgPos.y + viewHeight) continue;   // 画面の外
+                    ImU32 col = IM_COL32(120, 230, 140, 255);                                   // Support：緑
+                    if (rc->GetRole() == Role::Tank) col = IM_COL32(110, 170, 255, 255);        // Tank：青
+                    else if (rc->GetRole() == Role::DPS) col = IM_COL32(255, 150, 90, 255);     // DPS：オレンジ
+                    if (al->IsIncapacitated()) col = IM_COL32(160, 160, 160, 220);
+                    const char* name = RoleName(rc->GetRole());
+                    const ImVec2 ts = ImGui::CalcTextSize(name);
+                    shadowText(ImVec2(s.x - ts.x * 0.5f, s.y - ts.y), col, name);
+                }
+                if (partyError)     // AI 仲間の Prefab が読めなかった（PartySetup）
+                    shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 34.0f), IM_COL32(255, 120, 120, 255), "PartySetup: ally prefab not found");
             }
 
             // Title / Result 画面（ScreenUIComponent）
