@@ -57,7 +57,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 22;
+        constexpr int kSchemaLatest = 23;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -104,6 +104,9 @@ namespace uel {
             bool  hasAlly = false; float alMoveSpeed = 4.5f, alFollowDist = 3.0f, alResumeDist = 4.5f, alRepath = 0.5f;
             bool  uiRoleSelect = false;
             bool  hasParty = false; std::string ptPrefab = "Data/Prefabs/Ally.prefab.json"; float ptBack = 2.0f, ptSide = 1.5f;
+            // AI 仲間の攻撃（v23）。初期値は AllyComponent の初期値と同じにする（版 22 以前のファイルは、この値で読まれる）
+            float alAtkRange = 25.0f, alAtkDamage = 34.0f, alAtkInterval = 0.8f, alAimSpread = 2.0f, alAimHeight = 1.6f;
+            float alSearch = 0.3f, alReaction = 0.3f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -144,6 +147,9 @@ namespace uel {
                         CEREAL_NVP(alResumeDist), CEREAL_NVP(alRepath));                                        // v20
                 if (g_loadSchema >= 21) ar(CEREAL_NVP(uiRoleSelect));                                           // v21
                 if (g_loadSchema >= 22) ar(CEREAL_NVP(hasParty), CEREAL_NVP(ptPrefab), CEREAL_NVP(ptBack), CEREAL_NVP(ptSide));   // v22
+                if (g_loadSchema >= 23)
+                    ar(CEREAL_NVP(alAtkRange), CEREAL_NVP(alAtkDamage), CEREAL_NVP(alAtkInterval), CEREAL_NVP(alAimSpread),
+                        CEREAL_NVP(alAimHeight), CEREAL_NVP(alSearch), CEREAL_NVP(alReaction));                 // v23
             }
         };
 
@@ -169,6 +175,9 @@ namespace uel {
             if (auto* al = e.GetComponent<AllyComponent>()) {
                 ed.hasAlly = true; ed.alMoveSpeed = al->moveSpeed; ed.alFollowDist = al->followDistance;
                 ed.alResumeDist = al->resumeDistance; ed.alRepath = al->repathInterval;
+                ed.alAtkRange = al->attackRange; ed.alAtkDamage = al->attackDamage; ed.alAtkInterval = al->attackInterval;
+                ed.alAimSpread = al->aimSpread; ed.alAimHeight = al->aimHeight;
+                ed.alSearch = al->searchInterval; ed.alReaction = al->reactionTime;
             }
             if (e.GetComponent<PlayerComponent>()) ed.hasPlayer = true;
             if (auto* sk = e.GetComponent<SkinnedMeshComponent>()) {
@@ -248,6 +257,9 @@ namespace uel {
                 auto* al = e.AddComponent<AllyComponent>();
                 al->moveSpeed = ed.alMoveSpeed; al->followDistance = ed.alFollowDist;
                 al->resumeDistance = ed.alResumeDist; al->repathInterval = ed.alRepath;
+                al->attackRange = ed.alAtkRange; al->attackDamage = ed.alAtkDamage; al->attackInterval = ed.alAtkInterval;
+                al->aimSpread = ed.alAimSpread; al->aimHeight = ed.alAimHeight;
+                al->searchInterval = ed.alSearch; al->reactionTime = ed.alReaction;
             }
             if (ed.hasPlayer)   e.AddComponent<PlayerComponent>();
             if (ed.hasSkinned) {

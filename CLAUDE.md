@@ -28,7 +28,7 @@
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
 | 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | **済み**（2026-11-13）。1-1 AI 仲間1体の追従 → 1-1b AllyComponent の保存（版 20）→ 1-2 陣営（a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（版 21）→ 1-4 Stage 開始時に3人を配置（ロールの Component・PartySetup・名札。版 22） |
-| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：渡し済み → b 弾の線の表示 → c Inspector と保存）→ 2-3 Support の回復（線でつないで少しずつ） |
+| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：**済み** → b 弾の線の表示：**済み** → c Inspector と保存：渡し済み。版 23）→ 2-3 Support の回復（線でつないで少しずつ） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
 | 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | |
@@ -317,7 +317,7 @@ Source/Engine/
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
 | Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
-| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を撃つ。止まっている間は敵（いなければプレイヤー）を向く（2-2a。0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackDamage, attackInterval, aimSpread, aimHeight, searchInterval, reactionTime`（まだ保存しない）。アニメへ `Speed / Dead / Attack` を渡す（`Dead` は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()` |
+| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を撃つ。止まっている間は敵（いなければプレイヤー）を向く（2-2a。0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackDamage, attackInterval, aimSpread, aimHeight, searchInterval, reactionTime`（7つとも保存する。版 23。Inspector の「攻撃」欄）。アニメへ `Speed / Dead / Attack` を渡す（`Dead` は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()` |
 | Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`。今は中身なし（段階 3・6 で武器・アビリティ）。保存しない（PartySetup が付ける） | なし |
 | PartySetup | Stage の開始時に3人をそろえる（UE の GameMode）。0章「3人の配置」 | `allyPrefab, spawnBack, spawnSide`（保存する）。`HasError()` |
 | Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
@@ -335,7 +335,7 @@ Source/Engine/
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
 - NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
 - 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
-- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
+- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
 - 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
@@ -433,7 +433,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 22。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 23。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -457,6 +457,7 @@ Source/Engine/
 | 20 | Ally（`hasAlly, alMoveSpeed, alFollowDist, alResumeDist, alRepath`） |
 | 21 | ScreenUI の `roleSelect`（`uiRoleSelect`） |
 | 22 | PartySetup（`hasParty, ptPrefab, ptBack, ptSide`） |
+| 23 | Ally の攻撃（`alAtkRange, alAtkDamage, alAtkInterval, alAimSpread, alAimHeight, alSearch, alReaction`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -600,7 +601,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃を渡し済み。次は 2-2b 弾の線の表示）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃は済み。2-2b 弾の線の表示は済み。2-2c 攻撃の値の Inspector と保存（版 23）を渡し済み。次は 2-3 Support の回復）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 

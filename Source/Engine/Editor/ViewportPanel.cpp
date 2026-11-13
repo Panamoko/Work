@@ -292,7 +292,7 @@ namespace uel {
                     }
                 }
             }
-            // 敵の追跡経路と、AI 仲間の名札を3D投影で表示
+            // 敵の追跡経路と、AI 仲間の弾の線・名札を3D投影で表示
             {
                 XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
                 auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
@@ -315,6 +315,40 @@ namespace uel {
                         if (havePrev) dl->AddLine(prev, s, IM_COL32(255, 220, 60, 230), 2.0f);
                         prev = s; havePrev = true;
                     }
+                }
+
+                // AI 仲間の弾の線（2-2b）：撃った直後の短い間（AllyComponent の GetShotTime() が 0 より大きい間）だけ、
+                // 撃った位置から当たった所（外れたら射程の先）まで線を引く（UE なら弾道のエフェクト＝Tracer に当たる）。
+                // AI 仲間はプレイヤーの後ろにいることが多く、線の始まりがカメラの後ろになりやすい。そのまま写すと線が消えるか
+                // 裏返るので、カメラのすぐ前の面（w = kNearW）で線を切ってから画面に写す（描画の「ニアクリップ」と同じ考え方）。
+                // ImGui で画像の上に描くので、壁の後ろでも隠れない（撃つのは見えている敵だけなので、ほとんど目立たない）
+                auto projectSegment = [&](const XMFLOAT3& a, const XMFLOAT3& b, ImVec2& sa, ImVec2& sb) -> bool {
+                    const float kNearW = 0.1f;      // カメラの near と同じ
+                    XMVECTOR ca = XMVector4Transform(XMVectorSet(a.x, a.y, a.z, 1.0f), vp);
+                    XMVECTOR cb = XMVector4Transform(XMVectorSet(b.x, b.y, b.z, 1.0f), vp);
+                    const float wa = XMVectorGetW(ca), wb = XMVectorGetW(cb);
+                    if (wa < kNearW && wb < kNearW) return false;                                   // 両方カメラの後ろ
+                    if (wa < kNearW) ca = XMVectorLerp(ca, cb, (kNearW - wa) / (wb - wa));          // a 側を切る
+                    else if (wb < kNearW) cb = XMVectorLerp(cb, ca, (kNearW - wb) / (wa - wb));     // b 側を切る
+                    auto toScreen = [&](FXMVECTOR c) {
+                        const float w = XMVectorGetW(c);
+                        return ImVec2(imgPos.x + (XMVectorGetX(c) / w * 0.5f + 0.5f) * viewWidth,
+                            imgPos.y + (1.0f - (XMVectorGetY(c) / w * 0.5f + 0.5f)) * viewHeight);
+                        };
+                    sa = toScreen(ca);
+                    sb = toScreen(cb);
+                    return true;
+                    };
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    auto* al = slot->GetComponent<AllyComponent>();
+                    if (!al || al->GetShotTime() <= 0.0f) continue;
+                    ImVec2 sa, sb;
+                    if (!projectSegment(al->GetShotFrom(), al->GetShotTo(), sa, sb)) continue;
+                    // 黒い縁の上に明るい線を重ねる（空の上でも白い床の上でも見え、敵の経路の黄色い線とも見分けられる）。
+                    // 名札より先に描くので、名札が上に出る
+                    dl->AddLine(sa, sb, IM_COL32(0, 0, 0, 140), 4.0f);
+                    dl->AddLine(sa, sb, IM_COL32(255, 245, 200, 255), 2.0f);
                 }
 
                 // AI 仲間の名札：頭の少し上に、ロールの名前をロールの色で出す（1-4d）。
