@@ -106,7 +106,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃）");
+            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　右クリック：回復（Support））");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -178,6 +178,7 @@ namespace uel {
             in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
             in.jumpPressed = ImGui::IsKeyPressed(' ', false);
             in.shootClicked = mouseCaptured && !justCaptured && ImGui::IsMouseClicked(0);   // 固定したときのクリックでは撃たない
+            in.healHeld = mouseCaptured && io.MouseDown[1];                                 // 右クリックを押している間（Support の回復。3-2）
             in.lookActive = mouseCaptured;                  // 固定している間は、いつでも視点が回る
             in.mouseDX = lookDX; in.mouseDY = lookDY;
             float dt = ClampDeltaTime(io.DeltaTime);     // 上限付き（EngineConfig.h）
@@ -446,6 +447,17 @@ namespace uel {
                 // プレイヤーが回復されているとき：線はカメラの中へ入っていくので分かりにくい。HP バーの右に「+ HEAL」を出す
                 if (playerHealed)
                     shadowText(ImVec2(imgPos.x + 20.0f + 220.0f + 10.0f, imgPos.y + viewHeight - 40.0f), IM_COL32(90, 255, 140, 255), "+ HEAL");   // 文字は脈打たせない（読みやすさ優先）
+
+                // プレイヤー（Support）の回復の線（3-2）：一人称なので、線の始まりは画面の下の右寄り（手に持った物から出ている見せ方）。
+                // 終わりは相手の胴体。AI 仲間の回復の線と同じ色・同じ脈打ち方で、少し太くする（手前にあるので）
+                if (pc && pc->IsHealing()) {
+                    ImVec2 sb;
+                    if (project(pc->GetHealTo(), sb)) {
+                        const ImVec2 sa(imgPos.x + viewWidth * 0.68f, imgPos.y + viewHeight);
+                        dl->AddLine(sa, sb, IM_COL32(0, 0, 0, 140), 8.0f);
+                        dl->AddLine(sa, sb, healCol, 4.0f);
+                    }
+                }
 
                 // AI 仲間の名札：頭の少し上に、ロールの名前をロールの色で出す（1-4d）。
                 // 壁の向こうでも見える（味方の位置が分かるように。FPS の味方の名前表示でよくある作り）。戦闘不能なら灰色

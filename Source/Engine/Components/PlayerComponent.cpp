@@ -10,13 +10,34 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Game/WeaponTrace.h"
+#include "Engine/Game/Team.h"
+#include "Engine/Components/SupportComponent.h"
+#include "Engine/Components/HitboxComponent.h"
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
 using namespace DirectX;
 
 namespace uel {
+    namespace {
+
+        // 照準の線上に味方がいるかを調べ直す間隔（秒）。線はメッシュの三角形まで調べて重いので、毎フレームは飛ばさない。
+        // 0.1 秒なら、照準を外してから線が切れるまでの遅れは目立たない
+        constexpr float kHealTraceInterval = 0.1f;
+
+        // 回復の線の終わり：ヒットボックスがあれば胴体の真ん中、無ければ足元から 1m 上（AllyComponent の AimPoint と同じ決め方）
+        XMFLOAT3 HealPoint(const Entity& e, const TransformComponent& et)
+        {
+            if (auto* hb = e.GetComponent<HitboxComponent>()) {
+                const auto ws = hb->GetWorldShapes(et);
+                return { (ws.bodyA.x + ws.bodyB.x) * 0.5f, (ws.bodyA.y + ws.bodyB.y) * 0.5f, (ws.bodyA.z + ws.bodyB.z) * 0.5f };
+            }
+            return { et.position.x, et.position.y + 1.0f, et.position.z };
+        }
+
+    } // namespace
 
     void PlayerComponent::Update(GameContext& ctx)
     {
@@ -112,9 +133,43 @@ namespace uel {
         // 射撃（前方レイ、当たったEntityを赤く）
         float cp = cosf(pitch), sp = sinf(pitch);
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
-        const bool shot = canAct && in.shootClicked;
+        const XMFLOAT3 rd = { cp * sy, sp, cp * cy };     // 照準の向き（長さ 1）
+
+        // 回復（3-2）：Support のときだけ。右クリックを押している間、照準の線上（healRange まで）にいる味方へ回復の線をつなぐ。
+        //   線上を調べるのは弾と同じ線（TraceShot）。いちばん手前に当たった物が、HP の残っている味方なら回復する
+        //   （壁・敵が手前にあれば回復しない。戦闘不能の味方は線が素通りする＝回復しない。蘇生は段階 4）。
+        //   自分は回復しない（イラリーと同じ。ユーザーが選んだ）。調べ直すのは kHealTraceInterval ごと（その間は同じ相手を回復する）。
+        //   右クリックを押している間は撃たない（攻撃と回復は同時に使わない。AI 仲間と同じ決まり）
+        const SupportComponent* support = self.GetComponent<SupportComponent>();
+        const bool healHeld = support && canAct && in.healHeld;
+        if (!healHeld) {
+            healTargetId = EntityId{};
+            healTraceTimer = 0.0f;          // 次に押したら、すぐ調べる
+        }
+        else {
+            healTraceTimer -= dt;
+            if (healTraceTimer <= 0.0f) {
+                healTraceTimer = kHealTraceInterval;
+                const ShotHit hit = TraceShot(ctx, eyePos, rd, support->healRange);
+                const Entity* h = hit.entity;
+                const HPComponent* hhp = h ? h->GetComponent<HPComponent>() : nullptr;
+                healTargetId = (h && IsFriendly(self, *h) && hhp && hhp->hp > 0.0f) ? h->id : EntityId{};
+            }
+            // 調べ直すまでの間も、毎フレーム軽い確かめだけはする（消えた・戦闘不能になった、なら止める）
+            Entity* ht = ctx.world.Get(healTargetId);
+            HPComponent* hhp = ht ? ht->GetComponent<HPComponent>() : nullptr;
+            auto* htt = ht ? ht->GetComponent<TransformComponent>() : nullptr;
+            if (!ht || !hhp || !htt || hhp->hp <= 0.0f) {
+                healTargetId = EntityId{};
+            }
+            else {
+                hhp->hp = (std::min)(hhp->maxHp, hhp->hp + support->healPerSecond * dt);   // 満タンを超えない
+                healTo = HealPoint(*ht, *htt);
+            }
+        }
+
+        const bool shot = canAct && in.shootClicked && !healHeld;
         if (shot) {
-            XMFLOAT3 rd = { cp * sy, sp, cp * cy };
             const float baseDamage = 34.0f;
             // 弾の線が何に当たるか（UE の LineTrace）→ ダメージ（UE の ApplyPointDamage）。AI 仲間も同じ関数で撃つ（Game/WeaponTrace）
             const ShotHit hit = TraceShot(ctx, eyePos, rd);
@@ -145,6 +200,11 @@ namespace uel {
             an->params.SetIfExists(kAnimAimPitch, XMConvertToDegrees(pitch));        // 視点の上下（度）
             if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger：跳んだ
             if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger：撃った
+            const bool healingNow = healTargetId.IsValid();
+            if (healingNow != healAnim) {                                           // Bool：変わったときだけ書く
+                healAnim = healingNow;
+                an->params.SetIfExists(kAnimHeal, healingNow ? 1.0f : 0.0f);
+            }
         }
 
         // カメラ
