@@ -10,7 +10,9 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
 #include "Engine/Game/WeaponTrace.h"
+#include "Engine/Game/Weapon.h"
 #include "Engine/Game/Team.h"
+#include "Engine/Components/RoleComponent.h"
 #include "Engine/Components/SupportComponent.h"
 #include "Engine/Components/HitboxComponent.h"
 
@@ -130,7 +132,7 @@ namespace uel {
         t->position.y += velY * dt;
         if (t->position.y < ground) { t->position.y = ground; velY = 0.0f; }
 
-        // 射撃（前方レイ、当たったEntityを赤く）
+        // 照準（目の位置と向き。回復の線と射撃で使う）
         float cp = cosf(pitch), sp = sinf(pitch);
         XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
         const XMFLOAT3 rd = { cp * sy, sp, cp * cy };     // 照準の向き（長さ 1）
@@ -168,16 +170,33 @@ namespace uel {
             }
         }
 
-        const bool shot = canAct && in.shootClicked && !healHeld;
-        if (shot) {
-            const float baseDamage = 34.0f;
-            // 弾の線が何に当たるか（UE の LineTrace）→ ダメージ（UE の ApplyPointDamage）。AI 仲間も同じ関数で撃つ（Game/WeaponTrace）
-            const ShotHit hit = TraceShot(ctx, eyePos, rd);
-            if (ApplyShotDamage(ctx, hit, baseDamage)) {     // 味方・壁にはダメージが入らない（ヒットマーカーも出ない）
+        // 武器（3-3）：ロールがあればロールの武器、無ければ既定の武器（ロール選択を通らない Scene でも撃てるように）。
+        //   値（ダメージ・連射の間隔・装弾数・リロードなど）は Game/Weapon の表、弾の残りなどの状態はロールの Component が持つ。
+        //   撃ち方・リロードの処理は Game/Weapon の共通の関数（AI 仲間も 3-5 で同じ関数を使う）。
+        //   押している間撃ち続ける（automatic）か、1回押すと1発か、は武器の値で決まる。R でリロード、撃ち切ったら自動でリロード
+        RoleComponent* role = self.GetComponent<RoleComponent>();
+        const WeaponStats& weapon = role ? role->GetWeapon() : DefaultWeapon();
+        WeaponState& weaponState = role ? role->weaponState : fallbackWeapon;
+        UpdateWeapon(weapon, weaponState, dt);
+        if (canAct && in.reloadPressed) StartReload(weapon, weaponState);
+
+        const bool trigger = weapon.automatic ? in.shootHeld : in.shootClicked;
+        bool shot = false;
+        if (canAct && trigger && !healHeld) {
+            // 弾の線が何に当たるか（UE の LineTrace）→ ダメージ（UE の ApplyPointDamage）は FireWeapon の中（Game/WeaponTrace の関数）
+            const WeaponFireResult fire = FireWeapon(ctx, weapon, weaponState, eyePos, rd);
+            shot = fire.fired;
+            if (fire.damaged) {             // 味方・壁にはダメージが入らない（ヒットマーカーも出ない）
                 hitMarker = 0.15f;
-                lastHeadshot = hit.headshot;
+                lastHeadshot = fire.headshot;
             }
         }
+
+        // HUD に出す値（毎フレーム覚えておく。HUD がロールの Component を探さなくて済むように）
+        hudAmmo = weaponState.ammo;
+        hudMagazine = weapon.magazineSize;
+        hudReload = (weaponState.IsReloading() && weapon.reloadTime > 0.0f)
+            ? 1.0f - weaponState.reloadTimer / weapon.reloadTime : -1.0f;
 
         // ---- アニメーションへ：いまの状態を渡す（グラフに同じ名前のパラメータがあるときだけ書く）----
         if (AnimatorComponent* an = self.GetComponent<AnimatorComponent>()) {

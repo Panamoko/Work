@@ -63,7 +63,8 @@ namespace uel {
         float snapTranslate = 1.0f;
         float snapRotate = 15.0f;
         float snapScale = 0.25f;
-        bool  mouseCaptured = false;   
+        bool  mouseCaptured = false;      // Play 中、マウスを Viewport に固定している（3-1。カーソルを隠して真ん中へ戻す）
+        bool  captureClickHeld = false;   // マウスを固定したときの左クリックを、まだ押している（離すまで撃たない。3-3）
     };
 
 } // namespace uel

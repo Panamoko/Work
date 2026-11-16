@@ -106,7 +106,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　右クリック：回復（Support））");
+            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　R：リロード　右クリック：回復（Support））");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -149,6 +149,7 @@ namespace uel {
                 if (player && hwnd && ImGui::IsWindowHovered() && inImage && ImGui::IsMouseClicked(0)) {
                     mouseCaptured = true;
                     justCaptured = true;
+                    captureClickHeld = true;    // このクリックを離すまでは、押しっぱなしでも撃たない（3-3）
                 }
             }
             else if (!player || !hwnd || ImGui::IsKeyPressed(0x1B, false) || ::GetForegroundWindow() != hwnd) {   // 0x1B = VK_ESCAPE
@@ -177,7 +178,10 @@ namespace uel {
             in.keyW = ImGui::IsKeyDown('W'); in.keyS = ImGui::IsKeyDown('S');
             in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
             in.jumpPressed = ImGui::IsKeyPressed(' ', false);
+            if (!io.MouseDown[0]) captureClickHeld = false;     // 固定したときのクリックを離した
             in.shootClicked = mouseCaptured && !justCaptured && ImGui::IsMouseClicked(0);   // 固定したときのクリックでは撃たない
+            in.shootHeld = mouseCaptured && !captureClickHeld && io.MouseDown[0];           // 左クリックを押している間（連射。3-3）
+            in.reloadPressed = mouseCaptured && ImGui::IsKeyPressed('R', false);            // R でリロード（3-3）
             in.healHeld = mouseCaptured && io.MouseDown[1];                                 // 右クリックを押している間（Support の回復。3-2）
             in.lookActive = mouseCaptured;                  // 固定している間は、いつでも視点が回る
             in.mouseDX = lookDX; in.mouseDY = lookDY;
@@ -314,6 +318,29 @@ namespace uel {
                 char hpTxt[32]; snprintf(hpTxt, sizeof(hpTxt), "HP %.0f/%.0f", php->hp, php->maxHp);
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
                 if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
+            }
+            // 弾数（右下。3-3）：「残り / 装弾数」を大きく。残りが 1/4 以下で橙、0 で赤。
+            // リロード中は数字の上に「RELOADING」と、進み具合のバー
+            if (pc && pc->GetMagazineSize() > 0) {
+                ImFont* font = ImGui::GetFont();
+                const float size = 32.0f;
+                char ammoTxt[32]; snprintf(ammoTxt, sizeof(ammoTxt), "%d / %d", pc->GetAmmo(), pc->GetMagazineSize());
+                const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, ammoTxt);
+                const ImVec2 pos(imgPos.x + viewWidth - 24.0f - ts.x, imgPos.y + viewHeight - 24.0f - ts.y);
+                const int ammo = pc->GetAmmo(), mag = pc->GetMagazineSize();
+                const ImU32 col = (ammo <= 0) ? IM_COL32(255, 80, 80, 255)
+                    : (ammo * 4 <= mag) ? IM_COL32(255, 180, 60, 255) : IM_COL32(255, 255, 255, 255);
+                dl->AddText(font, size, ImVec2(pos.x + 2.0f, pos.y + 2.0f), IM_COL32(0, 0, 0, 200), ammoTxt);  // 影
+                dl->AddText(font, size, pos, col, ammoTxt);
+                const float reload = pc->GetReloadProgress();
+                if (reload >= 0.0f) {
+                    const float bw = 140.0f, bh = 6.0f;
+                    const float bx = imgPos.x + viewWidth - 24.0f - bw, by = pos.y - 10.0f;
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(40, 40, 40, 200));
+                    dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * reload, by + bh), IM_COL32(255, 220, 120, 240));
+                    const ImVec2 rs = ImGui::CalcTextSize("RELOADING");
+                    shadowText(ImVec2(bx + bw - rs.x, by - rs.y - 2.0f), IM_COL32(255, 220, 120, 255), "RELOADING");
+                }
             }
             // AI 仲間の HP（プレイヤーの HP バーの上に、1人ずつ小さく並べる）
             {

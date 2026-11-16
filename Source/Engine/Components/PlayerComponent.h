@@ -1,6 +1,7 @@
-#pragma once
+ï»¿#pragma once
 #include "Engine/Components/Component.h"
 #include "Engine/Scene/EntityId.h"
+#include "Engine/Game/Weapon.h"
 #include <DirectXMath.h>
 
 namespace uel {
@@ -10,14 +11,19 @@ namespace uel {
 
         void Update(GameContext& ctx) override;
         const DirectX::XMFLOAT4X4& GetView() const { return view; }
-        float GetHitMarker() const { return hitMarker; }   // š
+        float GetHitMarker() const { return hitMarker; }   // â˜…
         bool  GetHeadshot() const { return lastHeadshot; }
 
-        // ‰ñ•œiƒvƒŒƒCƒ„[‚ª Support ‚Ì‚Æ‚«‚¾‚¯B3-2jB‰EƒNƒŠƒbƒN‚ğ‰Ÿ‚µ‚Ä‚¢‚éŠÔAÆ€‚Ìüã‚Ì–¡•û‚Ö‰ñ•œ‚Ìü‚ğ‚Â‚È‚®B
-        // ‰ñ•œ‚µ‚Ä‚¢‚é‘Šèi–³Œø = ‰ñ•œ‚µ‚Ä‚¢‚È‚¢j‚ÆAü‚ÌI‚í‚èi‘Šè‚Ì“·‘Ì‚Ì^‚ñ’†BHUD ‚Å•`‚­‚½‚ßj
+        // å›å¾©ï¼ˆãƒ—ãƒ¬ã‚¤ãƒ¤ãƒ¼ãŒ Support ã®ã¨ãã ã‘ã€‚3-2ï¼‰ã€‚å³ã‚¯ãƒªãƒƒã‚¯ã‚’æŠ¼ã—ã¦ã„ã‚‹é–“ã€ç…§æº–ã®ç·šä¸Šã®å‘³æ–¹ã¸å›å¾©ã®ç·šã‚’ã¤ãªãã€‚
+        // å›å¾©ã—ã¦ã„ã‚‹ç›¸æ‰‹ï¼ˆç„¡åŠ¹ = å›å¾©ã—ã¦ã„ãªã„ï¼‰ã¨ã€ç·šã®çµ‚ã‚ã‚Šï¼ˆç›¸æ‰‹ã®èƒ´ä½“ã®çœŸã‚“ä¸­ã€‚HUD ã§æããŸã‚ï¼‰
         bool IsHealing() const { return healTargetId.IsValid(); }
         EntityId GetHealTarget() const { return healTargetId; }
         const DirectX::XMFLOAT3& GetHealTo() const { return healTo; }
+
+        // æ­¦å™¨ï¼ˆ3-3ï¼‰ã€‚HUD ã«å‡ºã™å€¤ï¼šãƒã‚¬ã‚¸ãƒ³ã®æ®‹ã‚Šã€è£…å¼¾æ•°ã€ãƒªãƒ­ãƒ¼ãƒ‰ã®é€²ã¿å…·åˆï¼ˆ0ã€œ1ã€‚ãƒªãƒ­ãƒ¼ãƒ‰ã—ã¦ã„ãªã‘ã‚Œã°ãƒã‚¤ãƒŠã‚¹ï¼‰
+        int   GetAmmo() const { return hudAmmo; }
+        int   GetMagazineSize() const { return hudMagazine; }
+        float GetReloadProgress() const { return hudReload; }
 
         float moveSpeed = 4.0f;
         float eyeHeight = 1.6f;
@@ -25,29 +31,35 @@ namespace uel {
         float groundY = 0.0f;
         float radius = 0.35f;
 
-        // ƒAƒjƒ[ƒVƒ‡ƒ“ƒOƒ‰ƒt‚É“n‚·ƒpƒ‰ƒ[ƒ^‚Ì–¼‘OB
-        // “¯‚¶ Entity ‚Ì AnimatorComponent ‚ÌƒOƒ‰ƒt‚ÉA‚±‚Ì–¼‘O‚Ìƒpƒ‰ƒ[ƒ^‚ª‚ ‚ê‚Î’l‚ğ‘‚­i–³‚¯‚ê‚Î‰½‚à‚µ‚È‚¢jB
-        // Speed / Attack / Dead ‚ÍA“GiOpponentComponentj‚Æ“¯‚¶–¼‘O‚É‚µ‚Ä‚ ‚éB
-        static constexpr const char* kAnimSpeed = "Speed";          // Float  F‚¢‚Ü‚ÌˆÚ“®‚Ì‘¬‚³im/sjB•Ç‚É~‚ß‚ç‚ê‚Ä‚¢‚ê‚Î 0
-        static constexpr const char* kAnimMoveX = "MoveX";          // Float  F‘Ì‚ÌŒü‚«‚©‚çŒ©‚½‰¡‚Ì“®‚«i‰E +1 / ¶ -1j
-        static constexpr const char* kAnimMoveY = "MoveY";          // Float  F‘Ì‚ÌŒü‚«‚©‚çŒ©‚½‘OŒã‚Ì“®‚«i‘O +1 / Œã‚ë -1j
-        static constexpr const char* kAnimGrounded = "Grounded";    // Bool   F’n–Ê‚É—§‚Á‚Ä‚¢‚é
-        static constexpr const char* kAnimJump = "Jump";            // TriggerF’µ‚ñ‚¾
-        static constexpr const char* kAnimAttack = "Attack";        // TriggerFŒ‚‚Á‚½
-        static constexpr const char* kAnimDead = "Dead";            // Bool   FHP ‚ª 0
-        static constexpr const char* kAnimAimPitch = "AimPitch";    // Float  F‹“_‚Ìã‰º‚ÌŠp“xi“xBã‚ª +jBƒGƒCƒ€ƒIƒtƒZƒbƒg‚ªg‚¤
-        static constexpr const char* kAnimHeal = "Heal";            // Bool   F‰ñ•œ‚Ìü‚ğ‚Â‚È‚¢‚Å‚¢‚éiAllyComponent ‚Æ“¯‚¶–¼‘Oj
+        // ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã‚°ãƒ©ãƒ•ã«æ¸¡ã™ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®åå‰ã€‚
+        // åŒã˜ Entity ã® AnimatorComponent ã®ã‚°ãƒ©ãƒ•ã«ã€ã“ã®åå‰ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãŒã‚ã‚Œã°å€¤ã‚’æ›¸ãï¼ˆç„¡ã‘ã‚Œã°ä½•ã‚‚ã—ãªã„ï¼‰ã€‚
+        // Speed / Attack / Dead ã¯ã€æ•µï¼ˆOpponentComponentï¼‰ã¨åŒã˜åå‰ã«ã—ã¦ã‚ã‚‹ã€‚
+        static constexpr const char* kAnimSpeed = "Speed";          // Float  ï¼šã„ã¾ã®ç§»å‹•ã®é€Ÿã•ï¼ˆm/sï¼‰ã€‚å£ã«æ­¢ã‚ã‚‰ã‚Œã¦ã„ã‚Œã° 0
+        static constexpr const char* kAnimMoveX = "MoveX";          // Float  ï¼šä½“ã®å‘ãã‹ã‚‰è¦‹ãŸæ¨ªã®å‹•ãï¼ˆå³ +1 / å·¦ -1ï¼‰
+        static constexpr const char* kAnimMoveY = "MoveY";          // Float  ï¼šä½“ã®å‘ãã‹ã‚‰è¦‹ãŸå‰å¾Œã®å‹•ãï¼ˆå‰ +1 / å¾Œã‚ -1ï¼‰
+        static constexpr const char* kAnimGrounded = "Grounded";    // Bool   ï¼šåœ°é¢ã«ç«‹ã£ã¦ã„ã‚‹
+        static constexpr const char* kAnimJump = "Jump";            // Triggerï¼šè·³ã‚“ã 
+        static constexpr const char* kAnimAttack = "Attack";        // Triggerï¼šæ’ƒã£ãŸ
+        static constexpr const char* kAnimDead = "Dead";            // Bool   ï¼šHP ãŒ 0
+        static constexpr const char* kAnimAimPitch = "AimPitch";    // Float  ï¼šè¦–ç‚¹ã®ä¸Šä¸‹ã®è§’åº¦ï¼ˆåº¦ã€‚ä¸ŠãŒ +ï¼‰ã€‚ã‚¨ã‚¤ãƒ ã‚ªãƒ•ã‚»ãƒƒãƒˆãŒä½¿ã†
+        static constexpr const char* kAnimHeal = "Heal";            // Bool   ï¼šå›å¾©ã®ç·šã‚’ã¤ãªã„ã§ã„ã‚‹ï¼ˆAllyComponent ã¨åŒã˜åå‰ï¼‰
     private:
         float pitch = 0.0f;
         float velY = 0.0f;
-        float hitMarker = 0.0f;   // š–½’†‰‰oƒ^ƒCƒ}[
+        float hitMarker = 0.0f;   // â˜…å‘½ä¸­æ¼”å‡ºã‚¿ã‚¤ãƒãƒ¼
         bool  lastHeadshot = false;
         DirectX::XMFLOAT4X4 view{};
 
-        // ‰ñ•œi3-2BÀs’†‚Ìó‘ÔB•Û‘¶‚µ‚È‚¢j
-        EntityId healTargetId;                          // ¡‰ñ•œ‚µ‚Ä‚¢‚é–¡•ûi–³Œø = ‰ñ•œ‚µ‚Ä‚¢‚È‚¢j
-        float    healTraceTimer = 0.0f;                 // Ÿ‚ÉÆ€‚Ìüã‚ğ’²‚×’¼‚·‚Ü‚Å‚Ìc‚èŠÔ
-        bool     healAnim = false;                      // ƒAƒjƒ‚É“n‚µ‚½ Heal ‚Ì’li•Ï‚í‚Á‚½‚Æ‚«‚¾‚¯‘‚­j
-        DirectX::XMFLOAT3 healTo{ 0.0f, 0.0f, 0.0f };   // ‰ñ•œ‚Ìü‚ÌI‚í‚èi‘Šè‚Ì“·‘Ì‚Ì^‚ñ’†j
+        // å›å¾©ï¼ˆ3-2ã€‚å®Ÿè¡Œä¸­ã®çŠ¶æ…‹ã€‚ä¿å­˜ã—ãªã„ï¼‰
+        EntityId healTargetId;                          // ä»Šå›å¾©ã—ã¦ã„ã‚‹å‘³æ–¹ï¼ˆç„¡åŠ¹ = å›å¾©ã—ã¦ã„ãªã„ï¼‰
+        float    healTraceTimer = 0.0f;                 // æ¬¡ã«ç…§æº–ã®ç·šä¸Šã‚’èª¿ã¹ç›´ã™ã¾ã§ã®æ®‹ã‚Šæ™‚é–“
+        bool     healAnim = false;                      // ã‚¢ãƒ‹ãƒ¡ã«æ¸¡ã—ãŸ Heal ã®å€¤ï¼ˆå¤‰ã‚ã£ãŸã¨ãã ã‘æ›¸ãï¼‰
+        DirectX::XMFLOAT3 healTo{ 0.0f, 0.0f, 0.0f };   // å›å¾©ã®ç·šã®çµ‚ã‚ã‚Šï¼ˆç›¸æ‰‹ã®èƒ´ä½“ã®çœŸã‚“ä¸­ï¼‰
+
+        // æ­¦å™¨ï¼ˆ3-3ã€‚å®Ÿè¡Œä¸­ã®çŠ¶æ…‹ã€‚ä¿å­˜ã—ãªã„ï¼‰
+        WeaponState fallbackWeapon;     // ãƒ­ãƒ¼ãƒ«ã®ç„¡ã„ã¨ãã«ä½¿ã†æ­¦å™¨ã®çŠ¶æ…‹ï¼ˆãƒ­ãƒ¼ãƒ«ãŒã‚ã‚Œã°ã€ãƒ­ãƒ¼ãƒ«ã® Component ã® weaponState ã‚’ä½¿ã†ï¼‰
+        int   hudAmmo = 0;              // HUD ã«å‡ºã™å€¤ï¼ˆæ¯ãƒ•ãƒ¬ãƒ¼ãƒ ã®æœ€å¾Œã«è¦šãˆã‚‹ï¼‰
+        int   hudMagazine = 0;
+        float hudReload = -1.0f;
     };
 }
