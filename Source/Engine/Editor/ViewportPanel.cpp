@@ -292,7 +292,7 @@ namespace uel {
                     }
                 }
             }
-            // 敵の追跡経路と、AI 仲間の弾の線・名札を3D投影で表示
+            // 敵の追跡経路と、AI 仲間の弾の線・回復の線・名札を3D投影で表示
             {
                 XMMATRIX vp = XMLoadFloat4x4(&view) * XMLoadFloat4x4(&proj);
                 auto project = [&](XMFLOAT3 wpos, ImVec2& out) -> bool {
@@ -339,17 +339,47 @@ namespace uel {
                     sb = toScreen(cb);
                     return true;
                     };
+                // 回復の線（2-3b）：Support の AI 仲間が回復している間ずっと、自分から相手の胴体まで緑の線を引く
+                // （AllyComponent の GetHealFrom / GetHealTo。位置は AllyComponent が毎フレーム更新している）。
+                // つながっていると分かるように、明るさを少し脈打たせる（ImGui の時刻から計算。1フレームに sin 1回だけ）。
+                // 自分を回復しているときは線にならないので、自分の胸の高さに緑の輪を出す
+                const float healPulse = 0.75f + 0.25f * sinf((float)ImGui::GetTime() * 10.0f);
+                const ImU32 healCol = IM_COL32(90, 255, 140, (int)(255.0f * healPulse));
+                bool playerHealed = false;      // プレイヤーが回復されている（HP バーの横に「+ HEAL」を出す）
                 for (const auto& slot : world.Slots()) {
                     if (!slot) continue;
                     auto* al = slot->GetComponent<AllyComponent>();
-                    if (!al || al->GetShotTime() <= 0.0f) continue;
-                    ImVec2 sa, sb;
-                    if (!projectSegment(al->GetShotFrom(), al->GetShotTo(), sa, sb)) continue;
-                    // 黒い縁の上に明るい線を重ねる（空の上でも白い床の上でも見え、敵の経路の黄色い線とも見分けられる）。
-                    // 名札より先に描くので、名札が上に出る
-                    dl->AddLine(sa, sb, IM_COL32(0, 0, 0, 140), 4.0f);
-                    dl->AddLine(sa, sb, IM_COL32(255, 245, 200, 255), 2.0f);
+                    if (!al) continue;
+                    if (al->IsHealing()) {
+                        if (al->GetHealTarget() == slot->id) {              // 自分を回復：自分の胸の高さ（線の始まり）に輪
+                            ImVec2 s;
+                            if (project(al->GetHealFrom(), s)) {
+                                dl->AddCircle(s, 14.0f, IM_COL32(0, 0, 0, 140), 24, 5.0f);
+                                dl->AddCircle(s, 14.0f, healCol, 24, 2.5f);
+                            }
+                        }
+                        else {
+                            if (p && al->GetHealTarget() == p->id) playerHealed = true;
+                            ImVec2 sa, sb;
+                            if (projectSegment(al->GetHealFrom(), al->GetHealTo(), sa, sb)) {
+                                dl->AddLine(sa, sb, IM_COL32(0, 0, 0, 140), 6.0f);  // 黒い縁（弾の線より太い）
+                                dl->AddLine(sa, sb, healCol, 3.0f);
+                            }
+                        }
+                    }
+                    if (al->GetShotTime() > 0.0f) {
+                        ImVec2 sa, sb;
+                        if (projectSegment(al->GetShotFrom(), al->GetShotTo(), sa, sb)) {
+                            // 黒い縁の上に明るい線を重ねる（空の上でも白い床の上でも見え、敵の経路の黄色い線とも見分けられる）。
+                            // 名札より先に描くので、名札が上に出る
+                            dl->AddLine(sa, sb, IM_COL32(0, 0, 0, 140), 4.0f);
+                            dl->AddLine(sa, sb, IM_COL32(255, 245, 200, 255), 2.0f);
+                        }
+                    }
                 }
+                // プレイヤーが回復されているとき：線はカメラの中へ入っていくので分かりにくい。HP バーの右に「+ HEAL」を出す
+                if (playerHealed)
+                    shadowText(ImVec2(imgPos.x + 20.0f + 220.0f + 10.0f, imgPos.y + viewHeight - 40.0f), IM_COL32(90, 255, 140, 255), "+ HEAL");   // 文字は脈打たせない（読みやすさ優先）
 
                 // AI 仲間の名札：頭の少し上に、ロールの名前をロールの色で出す（1-4d）。
                 // 壁の向こうでも見える（味方の位置が分かるように。FPS の味方の名前表示でよくある作り）。戦闘不能なら灰色
