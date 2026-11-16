@@ -105,6 +105,7 @@ namespace uel {
             bool  uiRoleSelect = false;
             bool  hasParty = false; std::string ptPrefab = "Data/Prefabs/Ally.prefab.json"; float ptBack = 2.0f, ptSide = 1.5f;
             // AI 仲間の攻撃（v23）。初期値は AllyComponent の初期値と同じにする（版 22 以前のファイルは、この値で読まれる）
+            // alAtkDamage は 3-5 から使っていない（ダメージはロールの武器の表）。版 23 の形を変えないため、項目だけ残して読み書きする
             float alAtkRange = 25.0f, alAtkDamage = 34.0f, alAtkInterval = 0.8f, alAimSpread = 2.0f, alAimHeight = 1.6f;
             float alSearch = 0.3f, alReaction = 0.3f;
             template<class A> void serialize(A& ar) {
@@ -175,7 +176,7 @@ namespace uel {
             if (auto* al = e.GetComponent<AllyComponent>()) {
                 ed.hasAlly = true; ed.alMoveSpeed = al->moveSpeed; ed.alFollowDist = al->followDistance;
                 ed.alResumeDist = al->resumeDistance; ed.alRepath = al->repathInterval;
-                ed.alAtkRange = al->attackRange; ed.alAtkDamage = al->attackDamage; ed.alAtkInterval = al->attackInterval;
+                ed.alAtkRange = al->attackRange; ed.alAtkInterval = al->attackInterval;     // alAtkDamage は初期値のまま書く（3-5 から使っていない）
                 ed.alAimSpread = al->aimSpread; ed.alAimHeight = al->aimHeight;
                 ed.alSearch = al->searchInterval; ed.alReaction = al->reactionTime;
             }
@@ -257,7 +258,7 @@ namespace uel {
                 auto* al = e.AddComponent<AllyComponent>();
                 al->moveSpeed = ed.alMoveSpeed; al->followDistance = ed.alFollowDist;
                 al->resumeDistance = ed.alResumeDist; al->repathInterval = ed.alRepath;
-                al->attackRange = ed.alAtkRange; al->attackDamage = ed.alAtkDamage; al->attackInterval = ed.alAtkInterval;
+                al->attackRange = ed.alAtkRange; al->attackInterval = ed.alAtkInterval;     // alAtkDamage は読むが使わない（3-5）
                 al->aimSpread = ed.alAimSpread; al->aimHeight = ed.alAimHeight;
                 al->searchInterval = ed.alSearch; al->reactionTime = ed.alReaction;
             }

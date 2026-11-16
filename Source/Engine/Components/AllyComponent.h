@@ -1,6 +1,7 @@
 #pragma once
 #include "Engine/Components/Component.h"
 #include "Engine/Scene/EntityId.h"
+#include "Engine/Game/Weapon.h"
 #include <DirectXMath.h>
 #include <cstdint>
 #include <vector>
@@ -8,14 +9,17 @@
 namespace uel {
 
     // AI 仲間の「頭」（UE の AIController に当たる）。どのロールでも共通の判断をここに書く。
-    // 「何ができるか」（武器・アビリティ）は、ロールの Component（Tank / DPS / Support）に持たせる予定。
+    // 「何ができるか」（武器・アビリティ）は、ロールの Component（Tank / DPS / Support）が持つ。
     //
     // 今できること：
     //   追従：プレイヤーを経路探索で追いかけ、近くまで来たら止まる（1-1）。
     //   戦闘不能：HP が 0 になったら、その場で止まって倒れる（1-2c）。段階 4 で「ダウン（蘇生を待つ）」に置き換える。
-    //   攻撃：射程の中のいちばん近い敵を選び、見えていれば一定の間隔で撃つ。追いかけながらでも撃つ（2-2）。
+    //   攻撃：射程の中のいちばん近い敵を選び、見えていれば撃つ。追いかけながらでも撃つ（2-2）。
+    //         武器はロールの武器（ダメージ・装弾数・リロード・弾の数）を、プレイヤーと同じ関数（Game/Weapon）で撃つ（3-5）。
+    //         AI の側では「撃つ間隔の下限」と「狙いのずれ」を足して、プレイヤーより少し弱くする。
+    //   リロード：弾が切れたら自動で。敵がいない間に弾が 1/4 以下なら、先に詰め替える（タクティカルリロード。3-5）。
     //   回復：SupportComponent が付いていれば、HP の割合が低い味方（自分も含む）を線でつないで回復する。回復中は撃たない（2-3）。
-    // まだ無いこと：蘇生、ロールごとの武器（段階 3）、撃ちやすい位置・回復しやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
+    // まだ無いこと：蘇生、撃ちやすい位置・回復しやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
     class AllyComponent : public Component {
     public:
         std::unique_ptr<Component> Clone() const override { return std::make_unique<AllyComponent>(*this); }
@@ -27,11 +31,10 @@ namespace uel {
         float resumeDistance = 4.5f;    // 止まっている間、ここより離れたら動き出す（止まる距離との差で、動く・止まるを繰り返さない）
         float repathInterval = 0.5f;    // 経路を計算し直す間隔（秒）
 
-        // ---- 攻撃の設定（2-2。段階 3 で、ロールの武器の値に置き換える）----
-        float attackRange = 25.0f;      // この距離（m。水平）より近い敵だけを狙う
-        float attackDamage = 34.0f;     // 1発のダメージ（プレイヤーと同じ。連射が遅く、弾がずれるので、プレイヤーより少し弱い）
-        float attackInterval = 0.8f;    // 撃つ間隔（秒）
-        float aimSpread = 2.0f;         // 弾のずれ（度）。狙った向きから、この角度の円の中にばらける
+        // ---- 攻撃の設定（AI の撃ち方。武器の値はロールの武器の表＝Game/Weapon から取る。3-5）----
+        float attackRange = 25.0f;      // この距離（m。水平）より近い敵だけを狙う（武器の射程とは別。AI が戦いを始める距離）
+        float attackInterval = 0.8f;    // 撃つ間隔の下限（秒）。武器の間隔とこれの、遅いほうで撃つ（AI がプレイヤーより速く撃たないように）
+        float aimSpread = 2.0f;         // 狙いのずれ（度）。武器のずれの前に、狙う向きをこの角度の円の中でずらす（AI の腕前）
         float aimHeight = 1.6f;         // 撃つ位置の高さ（足元から。プレイヤーの目の高さと同じ）
         float searchInterval = 0.3f;    // 狙う敵を選び直す間隔（秒）
         float reactionTime = 0.3f;      // 新しい敵を選んでから、最初に撃つまでの時間（秒。見つけた瞬間に撃たない）
@@ -59,6 +62,11 @@ namespace uel {
         const DirectX::XMFLOAT3& GetHealFrom() const { return healFrom; }
         const DirectX::XMFLOAT3& GetHealTo() const { return healTo; }
 
+        // 武器（3-5。HUD に出す値）：マガジンの残り、装弾数、リロード中か
+        int  GetAmmo() const { return hudAmmo; }
+        int  GetMagazineSize() const { return hudMagazine; }
+        bool IsReloading() const { return hudReloading; }
+
     private:
         // ---- 実行中の状態（保存しない）----
         EntityId leader;                            // 追いかける相手（プレイヤー）。毎フレーム World を探さないように覚えておく
@@ -76,11 +84,18 @@ namespace uel {
         EntityId blockedId;                         // 少し前に見えなかった敵（壁や味方の向こう）。blockedTimer の間は選ばない
         float    blockedTimer = 0.0f;               // blockedId を候補から外しておく残り時間
         float    searchTimer = 0.0f;                // 次に狙う敵を選び直すまでの残り時間
-        float    attackTimer = 0.0f;                // 次に撃てるまでの残り時間
-        std::uint32_t rng = 0;                      // 弾のずれに使う乱数の状態（0 = まだ種を決めていない）
+        float    attackTimer = 0.0f;                // AI の側で、次に撃てるまでの残り時間（撃つ間隔の下限・構える時間・持ち替え）
+        float    idleTime = 0.0f;                   // 狙う敵がいなくなってからの時間（タクティカルリロードの判断に使う）
+        std::uint32_t rng = 0;                      // 狙いのずれに使う乱数の状態（0 = まだ種を決めていない）
         DirectX::XMFLOAT3 shotFrom{ 0.0f, 0.0f, 0.0f };    // 最後に撃った弾の線の始まり
         DirectX::XMFLOAT3 shotTo{ 0.0f, 0.0f, 0.0f };      // 最後に撃った弾の線の終わり（当たった所。外れたら射程の先）
         float    shotTime = 0.0f;                   // 弾の線を出しておく残り時間
+
+        // 武器（3-5）
+        WeaponState fallbackWeapon;                 // ロールの無いときに使う武器の状態（ロールがあれば、ロールの Component の weaponState を使う）
+        int      hudAmmo = 0;                       // HUD に出す値（毎フレームの最後に覚える）
+        int      hudMagazine = 0;
+        bool     hudReloading = false;
 
         // 回復
         EntityId healTargetId;                      // 今回復している味方（無効 = 回復していない。自分のこともある）

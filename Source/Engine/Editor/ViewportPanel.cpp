@@ -347,7 +347,9 @@ namespace uel {
                 const float bx = imgPos.x + 20.0f, bw = 160.0f, bh = 12.0f;
                 float by = imgPos.y + viewHeight - 62.0f;
                 for (const auto& slot : world.Slots()) {
-                    if (!slot || !slot->GetComponent<AllyComponent>()) continue;
+                    if (!slot) continue;
+                    auto* al = slot->GetComponent<AllyComponent>();
+                    if (!al) continue;
                     auto* ahp = slot->GetComponent<HPComponent>();
                     if (!ahp) continue;
                     float frac = (ahp->maxHp > 0.0f) ? ahp->hp / ahp->maxHp : 0.0f;
@@ -355,7 +357,10 @@ namespace uel {
                     dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(40, 40, 40, 200));
                     dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * frac, by + bh), IM_COL32(80, 200, 120, 230));
                     dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 160));
-                    char aTxt[96]; snprintf(aTxt, sizeof(aTxt), "%s  %.0f", slot->name.c_str(), ahp->hp);
+                    // 名前と HP の後ろに、弾の残り（リロード中は RELOAD。3-5）
+                    char aTxt[128];
+                    if (al->IsReloading()) snprintf(aTxt, sizeof(aTxt), "%s  %.0f   RELOAD", slot->name.c_str(), ahp->hp);
+                    else                   snprintf(aTxt, sizeof(aTxt), "%s  %.0f   %d / %d", slot->name.c_str(), ahp->hp, al->GetAmmo(), al->GetMagazineSize());
                     shadowText(ImVec2(bx + bw + 8.0f, by - 3.0f), IM_COL32(255, 255, 255, 240), aTxt);
                     by -= 20.0f;
                 }

@@ -2,6 +2,7 @@
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/Team.h"
 #include "Engine/Game/WeaponTrace.h"
+#include "Engine/Game/Weapon.h"
 #include "Engine/Scene/World.h"
 #include "Engine/Components/TransformComponent.h"
 #include "Engine/Components/MeshRendererComponent.h"
@@ -10,6 +11,7 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/HitboxComponent.h"
 #include "Engine/Components/SupportComponent.h"
+#include "Engine/Components/RoleComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -28,6 +30,10 @@ namespace uel {
         constexpr float kBlockedMemory = 1.0f;
         // 回復している相手より、HP の割合がこれ以上低い味方がいるときだけ乗り換える（0.2 = 20%）
         constexpr float kHealSwitchMargin = 0.2f;
+        // タクティカルリロード（3-5）：狙う敵がいない状態がこの時間（秒）続き、弾の残りが装弾数のこの割合以下なら詰め替える。
+        // 少し待つのは、敵を倒して次の敵へ乗り換える一瞬にリロードを始めないため
+        constexpr float kTacticalReloadDelay = 1.0f;
+        constexpr float kTacticalReloadRatio = 0.25f;
 
         // XZ 平面での距離（高さの違いは見ない）
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
@@ -132,32 +138,6 @@ namespace uel {
         {
             if (&e != &self && !IsFriendly(self, e)) return false;
             return HpRatio(e) > 0.0f;
-        }
-
-        // 0 以上 1 未満の乱数（xorshift32。UE の FRandomStream のように、Component ごとに自分の乱数の状態を持つ）
-        float Rand01(std::uint32_t& s)
-        {
-            s ^= s << 13; s ^= s >> 17; s ^= s << 5;
-            return static_cast<float>(s >> 8) * (1.0f / 16777216.0f);
-        }
-
-        // 向き dir（長さ 1）を、半角 spreadDeg 度の円錐の中でずらす（UE の FMath::VRandCone に当たる）
-        XMFLOAT3 SpreadDir(const XMFLOAT3& dir, float spreadDeg, std::uint32_t& rng)
-        {
-            if (spreadDeg <= 0.0f) return dir;
-            const XMVECTOR d = XMLoadFloat3(&dir);
-            // dir に垂直な2本の軸（dir が真上・真下に近いときは、X 軸を元に作る）
-            const XMVECTOR base = (std::fabs(dir.y) < 0.99f) ? XMVectorSet(0, 1, 0, 0) : XMVectorSet(1, 0, 0, 0);
-            const XMVECTOR right = XMVector3Normalize(XMVector3Cross(base, d));
-            const XMVECTOR up = XMVector3Cross(d, right);
-            // 円の中に一様に散らす（半径は乱数の平方根。そうしないと真ん中に集まりすぎる）
-            const float radius = std::tan(XMConvertToRadians(spreadDeg)) * std::sqrt(Rand01(rng));
-            const float angle = XM_2PI * Rand01(rng);
-            XMVECTOR v = XMVectorAdd(d, XMVectorScale(right, radius * std::cos(angle)));
-            v = XMVectorAdd(v, XMVectorScale(up, radius * std::sin(angle)));
-            XMFLOAT3 out;
-            XMStoreFloat3(&out, XMVector3Normalize(v));
-            return out;
         }
 
     } // namespace
@@ -363,10 +343,26 @@ namespace uel {
         // 5) 回復と攻撃（同時には使わない。回復が先＝回復する相手がいれば撃たない）。
         //    攻撃：撃てる時間になったら、もう一度敵が見えるかを調べ（選んだ後に壁の陰へ入ったかもしれない）、見えていれば撃つ。
         //    見えなければ撃たず、その敵をしばらく候補から外して、次のフレームで選び直す（壁の向こうの敵にこだわらない）。
-        //    レイを飛ばすのは「撃つとき」と「乗り換えるとき」だけ（1発につき、見えるかの確認と本番の2本）
+        //    レイを飛ばすのは「撃つとき」と「乗り換えるとき」だけ（1発につき、見えるかの確認と本番の2本）。
+        //    撃てるのは、AI の側の時間（attackTimer）と武器の側（CanFire：リロード中でない・間隔が過ぎた・弾がある）の両方がそろったとき。
+        //    だから撃つ間隔は「武器の間隔」と「AI の撃つ間隔の下限」の遅いほうになる（3-5）
         if (shotTime > 0.0f) shotTime -= dt;
         attackTimer -= dt;
         bool fired = false;
+
+        // 武器（3-5）：ロールの Component があればロールの武器（値は表、状態はロールの Component）、無ければ既定の武器。
+        // プレイヤーと同じ関数（Game/Weapon）で、時間を進め・撃ち・リロードする
+        RoleComponent* role = self.GetComponent<RoleComponent>();
+        const WeaponStats& weapon = role ? role->GetWeapon() : DefaultWeapon();
+        WeaponState& weaponState = role ? role->weaponState : fallbackWeapon;
+        if (!incapacitated) UpdateWeapon(weapon, weaponState, dt);      // 戦闘不能の間は、リロードも進まない
+
+        // タクティカルリロード：狙う敵がいない状態が kTacticalReloadDelay 秒続き、弾が装弾数の 1/4 以下なら、次の戦いの前に詰め替える
+        if (target) idleTime = 0.0f;
+        else        idleTime += dt;
+        if (!incapacitated && idleTime >= kTacticalReloadDelay && weaponState.ammo >= 0
+            && weaponState.ammo <= static_cast<int>(weapon.magazineSize * kTacticalReloadRatio))
+            StartReload(weapon, weaponState);       // リロード中・満タンなら何もしない
 
         // 5a) 回復：線でつないでいる間、毎秒 healPerSecond ずつ回復する（満タンを超えない）。回復している間は撃たない
         if (healTarget && support) {
@@ -377,23 +373,23 @@ namespace uel {
             else    healTo = AimPoint(self, *t);                                                    // 自分を回復：自分の胴体
             if (attackTimer < reactionTime) attackTimer = reactionTime;     // 回復が終わってから撃つまでの、持ち替えの時間
         }
-        else if (tt && !incapacitated && attackTimer <= 0.0f) {
+        else if (tt && !incapacitated && attackTimer <= 0.0f && CanFire(weapon, weaponState)) {
             const XMFLOAT3 origin = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };    // 動いた後の位置から撃つ
             XMFLOAT3 dir; float len;
             if (CanSee(ctx, *target, origin, dir, len)) {
-                // 見えている：ずらした向きで撃つ（外れることもある）。当たり方・ダメージはプレイヤーと同じ関数
+                // 見えている：狙う向きを AI の腕前（aimSpread）でずらしてから、武器で撃つ（武器のずれ・弾の数・ダメージは FireWeapon の中）。
+                // 外れることもある。当たり方・ダメージはプレイヤーと同じ関数
                 if (rng == 0) rng = ((self.id.index + 1u) * 2654435761u) ^ (self.id.generation * 40503u) ^ 0x9E3779B9u;  // Entity ごとに違う種
                 if (rng == 0) rng = 1u;
-                const XMFLOAT3 shotDir = SpreadDir(dir, aimSpread, rng);
-                const float maxDist = attackRange * 1.5f;
-                const ShotHit hit = TraceShot(ctx, origin, shotDir, maxDist);
-                ApplyShotDamage(ctx, hit, attackDamage);       // 味方・壁にはダメージが入らない
-                const float d = hit.entity ? hit.distance : maxDist;
-                shotFrom = origin;
-                shotTo = { origin.x + shotDir.x * d, origin.y + shotDir.y * d, origin.z + shotDir.z * d };
-                shotTime = 0.08f;
-                attackTimer = attackInterval;
-                fired = true;
+                const XMFLOAT3 aimDir = SpreadDirection(dir, aimSpread, rng);
+                const WeaponFireResult fire = FireWeapon(ctx, weapon, weaponState, origin, aimDir);
+                if (fire.fired) {
+                    shotFrom = origin;
+                    shotTo = fire.end;              // 最初の弾が止まった所（外れたら武器の射程の先）
+                    shotTime = 0.08f;
+                    attackTimer = attackInterval;   // AI の撃つ間隔の下限
+                    fired = true;
+                }
             }
             else {
                 // 見えない：この敵はしばらく候補から外して、次のフレームで選び直す
@@ -403,6 +399,11 @@ namespace uel {
                 searchTimer = 0.0f;
             }
         }
+
+        // HUD に出す武器の値（HUD がロールの Component を探さなくて済むように、ここで覚えておく）
+        hudAmmo = weaponState.ammo;
+        hudMagazine = weapon.magazineSize;
+        hudReloading = weaponState.IsReloading();
 
         // 6) アニメーションへ：いまの移動の速さ、撃ったこと、回復しているか
         SetAnimValue(an, kAnimSpeed, movedSpeed);

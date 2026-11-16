@@ -533,13 +533,14 @@ namespace uel {
                 ImGui::DragFloat(u8"経路の計算間隔", &al->repathInterval, 0.05f, 0.1f, 5.0f, u8"%.2f 秒");
                 if (al->resumeDistance < al->followDistance) al->resumeDistance = al->followDistance;    // 動き出す距離は、止まる距離より短くしない
 
-                // 攻撃（2-2c。段階 3 で、ロールの武器の値に移す）
+                // 攻撃（AI の撃ち方。ダメージ・装弾数・リロードはロールの武器の表＝Game/Weapon.cpp。3-5）
                 ImGui::Separator();
-                ImGui::TextUnformatted(u8"攻撃");
+                ImGui::TextUnformatted(u8"攻撃（ダメージ・弾数はロールの武器）");
                 ImGui::DragFloat(u8"射程", &al->attackRange, 0.5f, 1.0f, 100.0f, u8"%.1f m");
-                ImGui::DragFloat(u8"ダメージ", &al->attackDamage, 1.0f, 0.0f, 1000.0f, "%.0f");
-                ImGui::DragFloat(u8"撃つ間隔", &al->attackInterval, 0.05f, 0.05f, 10.0f, u8"%.2f 秒");
-                ImGui::DragFloat(u8"弾のずれ", &al->aimSpread, 0.1f, 0.0f, 30.0f, u8"%.1f 度");
+                ImGui::DragFloat(u8"撃つ間隔の下限", &al->attackInterval, 0.05f, 0.0f, 10.0f, u8"%.2f 秒");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip(u8"武器の間隔とこの値の、遅いほうで撃つ");
+                ImGui::DragFloat(u8"狙いのずれ", &al->aimSpread, 0.1f, 0.0f, 30.0f, u8"%.1f 度");
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip(u8"武器のずれに足される、AI の狙いのずれ");
                 ImGui::DragFloat(u8"撃つ高さ", &al->aimHeight, 0.05f, 0.0f, 5.0f, u8"%.2f m");
                 ImGui::DragFloat(u8"敵を選び直す間隔", &al->searchInterval, 0.05f, 0.05f, 5.0f, u8"%.2f 秒");
                 ImGui::DragFloat(u8"構える時間", &al->reactionTime, 0.05f, 0.0f, 5.0f, u8"%.2f 秒");
