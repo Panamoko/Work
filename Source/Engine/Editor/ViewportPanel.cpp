@@ -31,6 +31,24 @@
 #include <string>
 #include <cstdio>
 namespace uel {
+    namespace {
+
+        // Play 中のマウスの固定（3-1）で使う、Win32 の補助（Windows の関数は d3d11.h が読み込む windows.h のもの）。
+        // このアプリのウィンドウ（ImGui のメインのビューポートが持っている HWND）
+        HWND MainWindowHandle()
+        {
+            return static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);
+        }
+
+        // ImGui の座標（ウィンドウの中の位置。マルチビューポートを使っていないので、クライアント座標と同じ）→ 画面の座標
+        POINT ClientToScreenPoint(HWND hwnd, float x, float y)
+        {
+            POINT p{ static_cast<LONG>(x), static_cast<LONG>(y) };
+            ::ClientToScreen(hwnd, &p);
+            return p;
+        }
+
+    } // namespace
 
     void ViewportPanel::Initialize(ID3D11Device* device)
     {
@@ -88,7 +106,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"プレイ中（右ドラッグ：視点　WASD：移動　Space：ジャンプ　左クリック：射撃）");
+            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃）");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -115,14 +133,53 @@ namespace uel {
 
             ImGuiIO& io = ImGui::GetIO();
             bool actv = ImGui::IsWindowHovered() || ImGui::IsWindowFocused();
+
+            // ---- マウスの固定（3-1。UE の Play 中の「マウスをゲームが持つ」＝Mouse Capture）----
+            // Viewport の画像をクリックすると、カーソルを隠して画像の中に閉じ込め、毎フレーム真ん中へ戻す。
+            // 真ん中から動いた量が、そのまま視点の回転になる（右ボタンを押さなくても視点が回る。右クリックは空く）。
+            // 離すのは：Esc を押した／プレイヤーがいない Scene（Title・Result など。ボタンを押せるように）／
+            //           ほかのアプリへ切り替えた（Alt+Tab）／Play をやめた（下の else の中）
+            const ImVec2 imgMin = ImGui::GetCursorScreenPos();     // このあと描く画像の左上（ここから画像までの間に部品は置かない）
+            const ImVec2 imgMax(imgMin.x + viewWidth, imgMin.y + viewHeight);
+            HWND hwnd = MainWindowHandle();
+            bool justCaptured = false;      // このフレームに固定した（固定したクリックでは撃たない）
+            if (!mouseCaptured) {
+                const bool inImage = io.MousePos.x >= imgMin.x && io.MousePos.x < imgMax.x
+                    && io.MousePos.y >= imgMin.y && io.MousePos.y < imgMax.y;
+                if (player && hwnd && ImGui::IsWindowHovered() && inImage && ImGui::IsMouseClicked(0)) {
+                    mouseCaptured = true;
+                    justCaptured = true;
+                }
+            }
+            else if (!player || !hwnd || ImGui::IsKeyPressed(0x1B, false) || ::GetForegroundWindow() != hwnd) {   // 0x1B = VK_ESCAPE
+                mouseCaptured = false;
+                ::ClipCursor(nullptr);
+            }
+            float lookDX = 0.0f, lookDY = 0.0f;
+            if (mouseCaptured) {
+                const POINT center = ClientToScreenPoint(hwnd, (imgMin.x + imgMax.x) * 0.5f, (imgMin.y + imgMax.y) * 0.5f);
+                POINT cur;
+                if (!justCaptured && ::GetCursorPos(&cur)) {        // 前のフレームの最後に真ん中へ戻したので、ずれた分が動いた量
+                    lookDX = static_cast<float>(cur.x - center.x);
+                    lookDY = static_cast<float>(cur.y - center.y);
+                }
+                // 画像の外へ出さない（ほかのパネルやメニューを押さない）。ウィンドウを動かしても合うように、毎フレーム設定し直す
+                const POINT a = ClientToScreenPoint(hwnd, imgMin.x, imgMin.y);
+                const POINT b = ClientToScreenPoint(hwnd, imgMax.x, imgMax.y);
+                const RECT clip{ a.x, a.y, b.x, b.y };
+                ::ClipCursor(&clip);
+                ::SetCursorPos(center.x, center.y);
+                ImGui::SetMouseCursor(ImGuiMouseCursor_None);      // カーソルを隠す（毎フレーム指定する。ImGui がフレームの頭で矢印に戻すため）
+            }
+
             InputState in;
             in.enabled = actv && !io.WantTextInput;
             in.keyW = ImGui::IsKeyDown('W'); in.keyS = ImGui::IsKeyDown('S');
             in.keyD = ImGui::IsKeyDown('D'); in.keyA = ImGui::IsKeyDown('A');
             in.jumpPressed = ImGui::IsKeyPressed(' ', false);
-            in.shootClicked = ImGui::IsMouseClicked(0);
-            in.lookActive = io.MouseDown[1];
-            in.mouseDX = io.MouseDelta.x; in.mouseDY = io.MouseDelta.y;
+            in.shootClicked = mouseCaptured && !justCaptured && ImGui::IsMouseClicked(0);   // 固定したときのクリックでは撃たない
+            in.lookActive = mouseCaptured;                  // 固定している間は、いつでも視点が回る
+            in.mouseDX = lookDX; in.mouseDY = lookDY;
             float dt = ClampDeltaTime(io.DeltaTime);     // 上限付き（EngineConfig.h）
 
             // 添字でループ（Spawnerが更新中にEntityを増やしても壊れないように）
@@ -137,6 +194,10 @@ namespace uel {
             else { view = camera.GetView(); }
         }
         else {
+            if (mouseCaptured) {            // Play をやめた：マウスの固定を外す（3-1）
+                mouseCaptured = false;
+                ::ClipCursor(nullptr);
+            }
             camera.Update(ImGui::IsWindowHovered());
             view = camera.GetView();
         }
@@ -226,6 +287,11 @@ namespace uel {
                 dl->AddText(ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 200), txt);
                 dl->AddText(pos, col, txt);
                 };
+            if (pc && !mouseCaptured) {     // マウスを固定していない：クリックで始められることを、照準の下に出す（3-1）
+                const char* hint = u8"クリックで操作を始める（Esc でマウスを離す）";
+                const ImVec2 ts = ImGui::CalcTextSize(hint);
+                shadowText(ImVec2(c.x - ts.x * 0.5f, c.y + 24.0f), IM_COL32(255, 255, 255, 240), hint);
+            }
             if (pc) {   // 選んだロール（左上。GameFlow に入っている値をそのまま出す）
                 char roleTxt[32]; snprintf(roleTxt, sizeof(roleTxt), "ROLE: %s", RoleName(flow.playerRole));
                 shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 240), roleTxt);
