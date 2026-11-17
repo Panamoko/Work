@@ -21,6 +21,7 @@
 #include "Engine/Components/AllyComponent.h"
 #include "Engine/Components/RoleComponent.h"
 #include "Engine/Components/PartySetupComponent.h"
+#include "Engine/Components/LifeStateComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -317,7 +318,22 @@ namespace uel {
                 dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 180));
                 char hpTxt[32]; snprintf(hpTxt, sizeof(hpTxt), "HP %.0f/%.0f", php->hp, php->maxHp);
                 dl->AddText(ImVec2(bx + 6, by + 1), IM_COL32(255, 255, 255, 255), hpTxt);
-                if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
+                // ダウン（段階 4）：画面の真ん中の上に、大きく「DOWNED」と残りの秒数。
+                // Dead・状態を持たないときの HP 0 は、今までどおり「YOU DIED」
+                const LifeStateComponent* pls = p->GetComponent<LifeStateComponent>();
+                if (pls && pls->IsDowned()) {
+                    ImFont* font = ImGui::GetFont();
+                    char dTxt[32]; snprintf(dTxt, sizeof(dTxt), "DOWNED  %d", (int)std::ceil(pls->GetDownTimeLeft()));
+                    const float size = 40.0f;
+                    const ImVec2 ds = font->CalcTextSizeA(size, FLT_MAX, 0.0f, dTxt);
+                    const ImVec2 dp(c.x - ds.x * 0.5f, c.y - 110.0f);
+                    dl->AddText(font, size, ImVec2(dp.x + 2.0f, dp.y + 2.0f), IM_COL32(0, 0, 0, 200), dTxt);   // 影
+                    dl->AddText(font, size, dp, IM_COL32(255, 90, 70, 255), dTxt);
+                    const char* wait = u8"仲間の助けを待っています";
+                    const ImVec2 ws = ImGui::CalcTextSize(wait);
+                    shadowText(ImVec2(c.x - ws.x * 0.5f, dp.y + ds.y + 4.0f), IM_COL32(255, 255, 255, 240), wait);
+                }
+                else if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
             // 弾数（右下。3-3）：「残り / 装弾数」を大きく。残りが 1/4 以下で橙、0 で赤。
             // リロード中は数字の上に「RELOADING」と、進み具合のバー
@@ -357,11 +373,22 @@ namespace uel {
                     dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(40, 40, 40, 200));
                     dl->AddRectFilled(ImVec2(bx, by), ImVec2(bx + bw * frac, by + bh), IM_COL32(80, 200, 120, 230));
                     dl->AddRect(ImVec2(bx, by), ImVec2(bx + bw, by + bh), IM_COL32(255, 255, 255, 160));
-                    // 名前と HP の後ろに、弾の残り（リロード中は RELOAD。3-5）
+                    // 名前と HP の後ろに、弾の残り（リロード中は RELOAD。3-5）。
+                    // ダウン中は「DOWNED 残りの秒数」（赤）、Dead は「DEAD」（灰色）（段階 4）
                     char aTxt[128];
-                    if (al->IsReloading()) snprintf(aTxt, sizeof(aTxt), "%s  %.0f   RELOAD", slot->name.c_str(), ahp->hp);
-                    else                   snprintf(aTxt, sizeof(aTxt), "%s  %.0f   %d / %d", slot->name.c_str(), ahp->hp, al->GetAmmo(), al->GetMagazineSize());
-                    shadowText(ImVec2(bx + bw + 8.0f, by - 3.0f), IM_COL32(255, 255, 255, 240), aTxt);
+                    ImU32 aCol = IM_COL32(255, 255, 255, 240);
+                    const LifeStateComponent* als = slot->GetComponent<LifeStateComponent>();
+                    if (als && als->IsDowned()) {
+                        snprintf(aTxt, sizeof(aTxt), "%s  DOWNED %d", slot->name.c_str(), (int)std::ceil(als->GetDownTimeLeft()));
+                        aCol = IM_COL32(255, 110, 90, 255);
+                    }
+                    else if (als && als->IsDead()) {
+                        snprintf(aTxt, sizeof(aTxt), "%s  DEAD", slot->name.c_str());
+                        aCol = IM_COL32(160, 160, 160, 230);
+                    }
+                    else if (al->IsReloading()) snprintf(aTxt, sizeof(aTxt), "%s  %.0f   RELOAD", slot->name.c_str(), ahp->hp);
+                    else                        snprintf(aTxt, sizeof(aTxt), "%s  %.0f   %d / %d", slot->name.c_str(), ahp->hp, al->GetAmmo(), al->GetMagazineSize());
+                    shadowText(ImVec2(bx + bw + 8.0f, by - 3.0f), aCol, aTxt);
                     by -= 20.0f;
                 }
             }

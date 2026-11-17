@@ -149,6 +149,7 @@
     <ClInclude Include="Source\Engine\Components\GameRuleComponent.h" />
     <ClInclude Include="Source\Engine\Components\HitboxComponent.h" />
     <ClInclude Include="Source\Engine\Components\HPComponent.h" />
+    <ClInclude Include="Source\Engine\Components\LifeStateComponent.h" />
     <ClInclude Include="Source\Engine\Components\MeshRendererComponent.h" />
     <ClInclude Include="Source\Engine\Components\NavObstacleComponent.h" />
     <ClInclude Include="Source\Engine\Components\OpponentComponent.h" />
@@ -233,6 +234,7 @@
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp" />
     <ClCompile Include="Source\Engine\Components\AllyComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\GameRuleComponent.cpp" />
+    <ClCompile Include="Source\Engine\Components\LifeStateComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\OpponentComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\PartySetupComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\PlayerComponent.cpp" />

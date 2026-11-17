@@ -15,6 +15,7 @@
 #include "Engine/Components/RoleComponent.h"
 #include "Engine/Components/SupportComponent.h"
 #include "Engine/Components/HitboxComponent.h"
+#include "Engine/Components/LifeStateComponent.h"
 
 #include <algorithm>
 #include <cmath>
@@ -50,8 +51,11 @@ namespace uel {
         float dt = ctx.dt;
         if (hitMarker > 0.0f) hitMarker -= dt;
         auto* myHp = self.GetComponent<HPComponent>();
-        const bool isDead = (myHp && myHp->hp <= 0.0f);
-        const bool canAct = in.enabled && !isDead;   // 死亡中は操作不可
+        const bool isDead = (myHp && myHp->hp <= 0.0f);     // HP 0（ダウン・Dead・状態を持たないときの死亡）
+        const bool canAct = in.enabled && !isDead;          // HP 0 の間は、動けない・撃てない・回復できない
+        // 見回しは、ダウンしている間もできる（仲間が助けに来るのを見られるように。段階 4）。Dead と、状態を持たないときの HP 0 はできない
+        const LifeStateComponent* life = self.GetComponent<LifeStateComponent>();
+        const bool canLook = in.enabled && (life ? !life->IsDead() : !isDead);
 
         // 対象メッシュ取得（assetId空は手続き立方体）
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
@@ -62,7 +66,7 @@ namespace uel {
             };
 
         // 見回し
-        if (canAct && in.lookActive) {
+        if (canLook && in.lookActive) {
             t->rotationEuler.y += in.mouseDX * 0.15f;
             pitch -= in.mouseDY * 0.004f;
             const float lim = 1.55f;

@@ -9,6 +9,7 @@
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Components/AllyComponent.h"
+#include "Engine/Components/LifeStateComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -21,11 +22,12 @@ using namespace DirectX;
 namespace uel {
     namespace {
 
-        // 弾が素通りする物：倒れている最中の敵と、戦闘不能の味方（倒れているのに、立った形の当たり判定で止まらないように）
+        // 弾が素通りする物：倒れている最中の敵と、ダウン・Dead・戦闘不能の味方（倒れているのに、立った形の当たり判定で止まらないように）
         bool IgnoredByShots(const Entity& e)
         {
             if (auto* oc = e.GetComponent<OpponentComponent>()) if (oc->IsDying()) return true;
-            if (auto* al = e.GetComponent<AllyComponent>()) if (al->IsIncapacitated()) return true;
+            if (auto* ls = e.GetComponent<LifeStateComponent>()) if (!ls->IsAlive()) return true;     // プレイヤーも AI 仲間も（段階 4）
+            if (auto* al = e.GetComponent<AllyComponent>()) if (al->IsIncapacitated()) return true;    // 状態を持たない AI 仲間（HP 0）
             return false;
         }
 

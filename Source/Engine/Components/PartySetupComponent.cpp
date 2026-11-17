@@ -9,6 +9,7 @@
 #include "Engine/Components/TankComponent.h"
 #include "Engine/Components/DPSComponent.h"
 #include "Engine/Components/SupportComponent.h"
+#include "Engine/Components/LifeStateComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
 #include <cmath>
 #include <string>
@@ -29,6 +30,12 @@ namespace uel {
             }
         }
 
+        // ダウン・蘇生の状態（段階 4）を付ける。もう付いていれば何もしない
+        void EnsureLifeState(Entity& e)
+        {
+            if (!e.GetComponent<LifeStateComponent>()) e.AddComponent<LifeStateComponent>();
+        }
+
     } // namespace
 
     void PartySetupComponent::Update(GameContext& ctx)
@@ -36,7 +43,7 @@ namespace uel {
         if (done) return;
         done = true;    // 成功しても失敗しても、1回だけ（毎フレーム Prefab を読みに行かない）
 
-        // 1) プレイヤーに、選んだロールを付ける
+        // 1) プレイヤーに、選んだロールと、ダウン・蘇生の状態を付ける
         Entity* player = nullptr;
         for (const auto& slot : ctx.world.Slots())
             if (slot && slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
@@ -46,8 +53,9 @@ namespace uel {
 
         const Role playerRole = ctx.flow ? ctx.flow->playerRole : kDefaultRole;
         SetRole(*player, playerRole);
+        EnsureLifeState(*player);
 
-        // 2) 残りの2つのロールの AI 仲間を、プレイヤーの左後ろ・右後ろに出す
+        // 2) 残りの2つのロールの AI 仲間を、プレイヤーの左後ろ・右後ろに出す（ロールと、ダウン・蘇生の状態も付ける）
         const float yaw = pt->rotationEuler.y * 0.01745329f;    // 度 → ラジアン
         const float fx = std::sin(yaw), fz = std::cos(yaw);     // プレイヤーの前
         const float rx = fz, rz = -fx;                          // プレイヤーの右（左手系・Y が上）
@@ -68,6 +76,7 @@ namespace uel {
             ally->name = std::string("Ally (") + RoleName(role) + ")";
             if (!ally->GetComponent<AllyComponent>()) ally->AddComponent<AllyComponent>();   // Prefab に付け忘れていても動くように
             SetRole(*ally, role);
+            EnsureLifeState(*ally);
             if (auto* at = ally->GetComponent<TransformComponent>()) {
                 at->position = { pt->position.x - fx * spawnBack + rx * spawnSide * side,
                                  pt->position.y,
