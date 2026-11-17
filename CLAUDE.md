@@ -28,9 +28,9 @@
 |---|---|---|---|
 | 0 現状確認 | Player / Opponent / HP / Spawner / GameRule / NavGrid のコードを確認 | 拡張する所と依存関係が分かる | **済み**（2026-11-09。下の「コードを調べて分かったこと」） |
 | 1 3人チーム | ロール選択、プレイヤー＋AI 2人、AI の追従 | どのロールでも3人そろう | **済み**（2026-11-13）。1-1 AI 仲間1体の追従 → 1-1b AllyComponent の保存（版 20）→ 1-2 陣営（a 味方撃ちを止める・b 敵が AI 仲間も狙う・c AI 仲間の戦闘不能）→ 1-3 ロール選択画面（版 21）→ 1-4 Stage 開始時に3人を配置（ロールの Component・PartySetup・名札。版 22） |
-| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | 作業中。2-1 射撃を共通の処理に（`Game/WeaponTrace`。**済み**）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ：**済み** → b 弾の線の表示：**済み** → c Inspector と保存：**済み**。版 23）→ 2-3 Support の回復（a 選んで回復する：**済み** → b 回復の線の表示：渡し済み） |
-| 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | |
-| 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | |
+| 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | **済み**（2026-11-16）。2-1 射撃を共通の処理に（`Game/WeaponTrace`）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ → b 弾の線の表示 → c Inspector と保存。版 23）→ 2-3 Support の回復（a 選んで回復する → b 回復の線の表示） |
+| 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | **仕組みは済み**（2026-11-16）。3-1 マウスを固定する視点操作 → 3-2 プレイヤーの Support の回復（右クリック）→ 3-3 武器の仕組み（`Game/Weapon`。連射・装弾数・リロード・HUD の弾数）→ 3-5 AI 仲間も同じ武器で撃つ。**各ロールの武器の種類と値は、キャラのモデルが決まってから**（ユーザーの希望。今は3ロールとも同じ仮の値） |
+| 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | **済み**（2026-11-17）。4-1 ダウンの状態（`LifeStateComponent`・ゲームオーバーの判定）→ 4-2 プレイヤーが E 長押しで起こす → 4-3 AI 仲間が起こしに行く（予約）→ 4-4 見た目（ダウンの印・画面の色・低い視点・アニメのパラメータ） |
 | 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | |
 | 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
@@ -48,23 +48,46 @@
   - **味方に当たった弾は、そこで止まる**（ダメージ・ヒットマーカーなし。奥の敵に届かない）。ユーザーが選んだ（2026-11-10）。戦闘不能の味方は弾を止めない。
   - HP 0 でその場で消えるのは陣営 `None` の物（的・箱）だけ。敵は自分で倒れてから消え、味方は消えない。
   - **敵の狙い**：HP が残っている敵対陣営の中で、いちばん近い相手。0.5 秒ごとに選び直し（`retargetInterval`）、今の相手より 1m 以上近いときだけ乗り換える（`retargetMargin`）。HPComponent の無い物は狙わない。
-  - **AI 仲間の HP 0 は、その場で戦闘不能**（ダウン・蘇生ができるまでの仮。ユーザーが選んだ）。止まって `Dead` をアニメに渡し、敵に狙われない。HP が戻れば動き出す。ゲームオーバーの判定はまだプレイヤーの HP 0 だけ（段階 4 で直す）。
+  - **AI 仲間の HP 0 は、その場で戦闘不能**（`AllyComponent::IsIncapacitated`）。止まって `Dead` をアニメに渡し、敵に狙われない。HP が戻れば（蘇生）動き出す。段階 4 から、ダウン・Dead の状態と時間は `LifeStateComponent` が持つ（下の「ダウン・蘇生」）。
 - **ロール**（1-3。`Game/Role.h`）：`enum class Role { Tank, DPS, Support }`（並び順を変えない）、`RoleName` / `RoleDescription`。選んだロールは `GameFlow::playerRole`（UE の GameInstance に当たる）。Play を始めるたびに既定の **DPS** に戻す（`Engine::StartPlay`）。
   - ロール選択の画面は `ScreenUIComponent` の `roleSelect`（オンでボタン1つの代わりに3つのロール。1 / 2 / 3 キー、Enter は今のロール）。
   - 流れ：Title →(START)→ **RoleSelect** →(ロールを選ぶ)→ Stage →… → Result →(RETRY)→ **RoleSelect**（RETRY でロール選択へ戻る。ユーザーが選んだ）。
 - **3人の配置**（1-4）：ロールの Component は `RoleComponent`（`GetRole()` だけの親）と `TankComponent` / `DPSComponent` / `SupportComponent`。今は中身が無く、保存もしない（Play 開始時に付ける）。`PartySetupComponent`（UE の GameMode に当たる）を Stage の GameRule の Entity に付けておくと、Play の最初のフレームに1回だけ、プレイヤーに選んだロールを付け、残り2ロールの AI 仲間を `allyPrefab`（既定 `Data/Prefabs/Ally.prefab.json`）から作ってプレイヤーの左後ろ・右後ろ（`spawnBack` 2m、`spawnSide` 1.5m）に置き、名前を「Ally (Tank)」のようにする。AI 仲間は Prefab から出す（Scene に置かない）。ユーザーが選んだ。
   - AI 仲間の頭の上に名札（ロールの名前をロールの色で。Tank 青・DPS 橙・Support 緑、戦闘不能は灰色）。ユーザーが選んだ。Prefab が読めないと HUD に `PartySetup: ally prefab not found`。
 - **射撃は共通の処理**（2-1。`Game/WeaponTrace.h/.cpp`）：`TraceShot(ctx, 位置, 向き)`（UE の `LineTraceSingleByChannel`。いちばん手前の当たり＝`ShotHit`。撃った本人・倒れている最中の敵・戦闘不能の味方は素通り）と `ApplyShotDamage(ctx, 当たり, ダメージ)`（UE の `ApplyPointDamage`。味方・HP の無い物には入らない。戻り値はダメージが入ったか）。プレイヤーも AI 仲間もこれで撃つ。
-- **AI 仲間の攻撃**（2-2a）：0.3 秒ごとに射程（25m）の中のいちばん近い敵を選ぶ（今の敵より 1m 以上近いときだけ乗り換え）。乗り換える前と撃つ直前に `TraceShot` で見えるか（間に壁・味方がいないか）を調べ、見えない敵は 1 秒候補から外す。新しい敵には 0.3 秒構えてから撃つ。34 ダメージを 0.8 秒ごと、2 度のずれ（10m でほぼ全部当たり、20m で約 6 割）。追いかけながらでも撃ち、止まっているときは敵を向く。強さはユーザーの答え「プレイヤーより少し弱い」に合わせた。武器の値は段階 3 でロールの Component へ移す。
+- **AI 仲間の攻撃**（2-2a）：0.3 秒ごとに射程（25m）の中のいちばん近い敵を選ぶ（今の敵より 1m 以上近いときだけ乗り換え）。乗り換える前と撃つ直前に `TraceShot` で見えるか（間に壁・味方がいないか）を調べ、見えない敵は 1 秒候補から外す。新しい敵には 0.3 秒構えてから撃つ。追いかけながらでも撃ち、止まっているときは敵を向く。強さはユーザーの答え「プレイヤーより少し弱い」に合わせた。3-5 から武器はロールの武器（下の「武器」）。
 - **Support の回復**（2-3a。ユーザーが選んだ 2026-11-13）：Overwatch のイラリーのように「左クリック＝攻撃、右クリック＝回復の線」の2つを持ち、**同時には使わない（回復が先）**。値は `SupportComponent`（`healPerSecond` 12、`healRange` 15m、`healStartRatio` 0.65、`healStopRatio` 1.0。Play の始めに付くので保存しない）、判断は `AllyComponent`。
   - HP の割合が 65% 以下の味方（**自分も含む**。戦闘不能は蘇生で扱うので除く）のうち、いちばん低い相手を 0.3 秒ごとに選び、満タンまで回復。今の相手より 20% 以上低い味方がいれば乗り換え。線が壁でさえぎられたら止める（`IsLineBlocked`。味方の体は線を止めない）。回復をやめてから撃つまで 0.3 秒（持ち替え）。止まっているときは回復の相手を向く。アニメへ `Heal`（Bool）。
-  - プレイヤーが Support のときの回復（右クリック）は段階 3・6。**今は右ドラッグが視点の操作なので、右クリックをどう割り当てるかを決める必要がある。** イラリーの「回復のエネルギー（使うと減り、休むとたまる）」はまだ無い。
+  - **プレイヤーが Support のとき**（3-2）：右クリックを押している間、**照準の線上**（`TraceShot`、`healRange` まで）のいちばん手前が HP の残っている味方なら回復する（0.1 秒ごとに調べ直す）。**自分は回復できない**（どちらもユーザーが選んだ）。押している間は撃たない。HUD に回復の線。イラリーの「回復のエネルギー（使うと減り、休むとたまる）」はまだ無い。満タンの味方にも線は出る。
+- **視点の操作**（3-1。ユーザーが選んだ）：Viewport をクリックするとマウスを固定（UE の PIE と同じ）。`ClipCursor` で Viewport の中に閉じ込め、毎フレーム `SetCursorPos` で真ん中に戻して、動いた量を視点に使う。カーソルは隠す。Esc・ウィンドウが手前でなくなる・Play を止める、で離す。固定したクリックでは撃たない（離すまで）。右クリックが空いたので回復に使う。マウスの加速（Windows のポインターの精度）がかかったまま（Raw Input ではない）。
+- **武器**（3-3・3-5。`Game/Weapon.h/.cpp`）：**値と状態を分ける**。
+  - 値 `WeaponStats`（UE の武器の Data Asset）：`damage, pellets`（1回に出る弾の数。ショットガン用）`, fireInterval, spreadDeg, magazineSize, reloadTime, range, automatic`。ロールごとの値は `Weapon.cpp` の表 `kRoleWeapons` の1か所だけ（UE の DataTable の考え方）。`WeaponForRole(role)`。**今は3ロールとも同じ仮の値**（34 ダメージ・0.25 秒の連射・12 発・リロード 1.5 秒・ずれ 0・射程 100m）。種類と値はモデルが決まってから入れる（ユーザーの希望）。
+  - 状態 `WeaponState`（弾の残り・次に撃てるまで・リロードの残り・乱数）は `RoleComponent::weaponState`（UE で弾数を武器のインスタンスが持つのと同じ）。ロールが無いときは操作する側が自分の予備を使う。
+  - 共通の関数：`UpdateWeapon`（毎フレーム。最初に満タンにする）、`CanFire`、`StartReload`、`FireWeapon`（弾の数だけ `SpreadDirection` → `TraceShot` → `ApplyShotDamage`。撃ち切ったら自動でリロード）、`SpreadDirection`（UE の `VRandCone`）。
+  - プレイヤー：左を押している間撃つ（`automatic`）、R でリロード。HUD の右下に「残り / 装弾数」（1/4 以下で橙、0 で赤）、リロード中はバーと `RELOADING`。
+  - **AI 仲間**（ユーザーが選んだ「同じ武器＋AI の下限」）：ダメージ・装弾数・リロード・弾の数は武器から。撃つ間隔は武器の間隔と `AllyComponent::attackInterval`（AI の下限 0.8 秒）の遅いほう。ずれは、狙う向きを `aimSpread`（AI の腕前 2 度）でずらしてから武器のずれ。弾が切れたら自動でリロード、**敵のいない状態が 1 秒続き、弾が 1/4 以下なら先に詰め替える**（タクティカルリロード。ユーザーが選んだ）。左下の HP の横に弾数（リロード中は `RELOAD`）。保存の版 23 の `alAtkDamage` は形を変えないために残しているが使っていない。
+- **ダウン・蘇生**（段階 4。`Components/LifeStateComponent.h/.cpp`。値はユーザーが選んだ 2026-11-16）：
+  - 状態は `Alive → Downed →（30 秒）→ Dead`、Downed から蘇生 3 秒で Alive（HP は最大の **50%**）。Dead は**ステージの終わりまで戻らない**。**蘇生している人が攻撃されても続ける**。値は `downDuration` / `reviveTime` / `reviveHpRatio`。`HPComponent` は敵も使うので変えず、状態は別の部品にした（UE の Lyra の Health Component の死亡状態、GAS の `State.Downed` タグに当たる）。`PartySetup` が Play の始めに3人へ付ける。保存しない。無い Entity は今までどおり。
+  - **約束：Alive 以外の間は HP を 0 に保つ。** だから「HP が残っている ＝ Alive」がいつも成り立ち、敵の狙い・Support の回復・AI 仲間の戦闘不能は「HP が残っているか」で見るだけで正しく動く。
+  - 蘇生は長押しのインタラクション：起こす側が続けている間、毎フレーム `AddReviveProgress(自分, dt)` を呼ぶ。0.1 秒呼ばれないと進み具合は 0 に戻る。**起こされている間はダウンの制限時間が止まる**（私が決めた。変えるなら `LifeStateComponent.cpp` の1行）。2人で起こしても速くならない。
+  - 負け（`GameRuleComponent`）：プレイヤーが Dead、または3人とも戦えない（ダウンか Dead）。プレイヤーがダウンしただけでは終わらない。ダウン・Dead の味方は弾が素通りする。ダウン中のプレイヤーは見回しだけできる。
+  - プレイヤー（4-2）：2m 以内でいちばん近いダウンした味方を、**E を押し続けて**起こす（その間は動けない・撃てない・回復できない・リロードできない）。ほかの人が起こしている相手には手を足さない。
+  - AI 仲間（4-3。AI の Phase 2）：ダウンした味方（プレイヤーも）がいれば、**追従・回復より先に**駆け寄って起こす（L4D2 のボットと同じ）。向かう前に `ReserveRevive` で**予約**し、予約のある相手はもう1人の AI は選ばない（2人とも行かない。UE の Smart Object の予約・AI の Token の考え方）。予約は毎フレーム更新し、0.5 秒更新が無いと外れる。プレイヤーが先に起こし始めたら AI はあきらめる。走っている間は撃つ、起こしている間は撃たない・回復しない。**危険は避けない**（段階 9）。
+  - 見た目（4-4）：プレイヤーのダウン中は画面を暗い赤で覆い、`DOWNED 秒数` と「仲間の助けを待っています」、目の高さを 3 割下げる。起こされている間は照準の下に `REVIVING` のバー。ダウンした仲間には赤く脈打つ丸と「+」、`DOWNED 秒数 距離`（壁越しでも見え、画面の外なら方向の画面の端に出す）。Dead の名札の下に `DEAD`。アニメへ `Downed`（Bool。Dead も同時に true）と `Revive`（Bool）を渡す（グラフにはまだ無い）。
+- **ウェーブの進め方**（段階 5。ユーザーが選んだ 2026-11-17。作るのはこれから）：**通常 3 ウェーブ＋ボス**。**案内役の小さいロボット**が道を進み、「止まる場所」に着いたらその場所のウェーブが始まる（ウェーブの間の時間は、ステージの大きさ＝ロボットが進む距離で決まる）。
+  - ロボットは、ウェーブを倒した後、**プレイヤーが近くでキーを押して合図すると**次へ進む（L4D のセーフルームの扉に近い）。
+  - 敵はロボットを**攻撃しない**（案内だけ。守る要素は後で足せる）。
+  - 道は Scene に置く**経由点の Entity**（順番と「ここで止まる」）。UE の Target Point / スプラインに当たる。
+  - 敵は**止まる場所ごとの Spawner** から出す（ロボットが着いたら、その場所の Spawner だけが始まる。UE でトリガーが Spawner を起動する作り）。
+  - ウェーブを倒したときのごほうびは**無し**（回復は Support、起こすのは仲間の仕事のまま）。
+  - ボスは段階 7 まで**大きくて硬い敵を仮に置く**（今の敵の Prefab を大きく・HP を多くした Boss の Prefab を最後に1体。画面の上にボスの HP バー）。
+- **画面に出すゲームの文字**：「**蘇**」は ImGui の日本語の範囲（`GetGlyphRangesJapanese`）に入っていない（「?」になる。`imgui_draw.cpp` の表で確かめた）。HUD では「起こす」と書く。ほかの漢字も、HUD に新しく使うときは範囲に入っているか確かめる（仲・間・助・待・長・押は入っている）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
 - **「プレイヤー＝`PlayerComponent` を持つ最初の Entity」という前提が5か所**：カメラ（`ViewportPanel::DrawUI`）、HUD（同 オーバーレイ）、敵が狙う相手（`OpponentComponent`）、負けの判定（`GameRuleComponent`）、Play 開始時の一人称の設定（`Engine.cpp`）。**AI 仲間には `PlayerComponent` を付けない**。
 - **敵はプレイヤーしか狙わない**（追跡も攻撃も）。AI 仲間も狙わせるには陣営（味方／敵）の考え方が要る。
 - **プレイヤーの射撃は「Hitbox を持つ物すべて」に当たる**（味方撃ちが起きる）。また、**敵以外で HP が 0 になった物はその場で `DestroyEntity` される**（`PlayerComponent.cpp` の射撃の処理）。AI 仲間に HP・Hitbox を付ける前に、ここを直す（ダウンの仕組みとぶつかる）。
-- **プレイヤーの HP が 0 で即ゲームオーバー**（`GameRuleComponent`）。ダウンを入れるときに変える。
+- **プレイヤーの HP が 0 で即ゲームオーバー**（`GameRuleComponent`）。→ 段階 4 で直した（`LifeStateComponent` を持つときは、プレイヤーが Dead か3人とも戦えないとき）。
 - **射撃の処理は `PlayerComponent::Update` に直接書いてある**。AI も同じ撃ち方をするなら、先に共通の処理として外に出す。→ 2-1 で `Game/WeaponTrace` に出した。
 - **`SpawnerComponent` は「全滅で次のウェーブ」までできている**（資料の「追加が必要」は誤り）。足りないのは、ウェーブごとに違う敵を出すこと（今は1つの Spawner に Prefab 1種類）と、最後のボス。
 - `HPComponent` は `hp` と `maxHp` だけで、敵も使う。ダウン・死亡・蘇生の状態は別の部品に分けるのが安全。
@@ -72,7 +95,7 @@
 - 経路探索のグリッドは Play 中に毎フレーム作り直している（原点中心の 60m 四方で固定）。AI の追従には使えるが、ステージを広くするなら直す。
 
 ### 決まっていないこと（資料の 12章）
-キャラの見た目、各ロールの武器・能力の中身、通常の敵の種類と数、蘇生時間・ダウンの制限時間・復帰時の HP、蘇生中に攻撃されたときの扱い、Dead からの復帰（ステージ終了まで戻らない案）、装弾数・リロード時間、ULT のゲージの量と増え方、ウェーブ数・敵の数・休憩時間、ボスの攻撃の中身、集合の指示（将来）、TPS（必要になったら）。**決まっていないことは勝手に決めず、案を出してユーザーに選んでもらう。**
+キャラの見た目、各ロールの武器・能力の中身（武器の種類・装弾数・リロード時間はモデルが決まってから）、通常の敵の種類と数、ULT のゲージの量と増え方、ウェーブごとの敵の数（ウェーブ数は 3＋ボスに決まった）、ボスの攻撃の中身、集合の指示（将来）、TPS（必要になったら）。**決まっていないことは勝手に決めず、案を出してユーザーに選んでもらう。**
 
 ---
 
@@ -246,10 +269,11 @@ Source/Engine/
   Components/    Component（基底）と、すべての Component（フォルダの中は分けない）
                  Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Ally / Opponent /
                  Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance /
-                 Role（ロールの親）/ Tank / DPS / Support / PartySetup
+                 Role（ロールの親）/ Tank / DPS / Support / PartySetup / LifeState（ダウン・蘇生）
   Scene/         EntityId, Entity, World
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）,
-                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ、壁でさえぎられているか。プレイヤーと AI 仲間で共用）
+                 Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ、壁でさえぎられているか。プレイヤーと AI 仲間で共用）,
+                 Weapon（武器の値の表・状態・撃つ／リロードの共通の関数。3-3）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
                  AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
@@ -319,9 +343,10 @@ Source/Engine/
 | Animator | アニメの制御（UE の AnimInstance）。グラフが空ならクリップ1つをクロスフェード再生、グラフがあればグラフが姿勢を決める（6章） | `clipIndex, speed, loop, playing, blendTime, params, graph, graphPath, montages`。`Play()`, `PlayMontage("名前")`, `StopMontage()`, `WasFired("通知名")` |
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
 | HP | 体力 | `hp, maxHp` |
-| Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch` を渡す |
-| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を撃つ。止まっている間は敵（いなければプレイヤー）を向く（2-2a。0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackDamage, attackInterval, aimSpread, aimHeight, searchInterval, reactionTime`（7つとも保存する。版 23。Inspector の「攻撃」欄）。アニメへ `Speed / Dead / Attack` を渡す（`Dead` は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()` |
-| Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`。Support だけ回復の値を持つ（2-3a）。ほかは中身なし（段階 3・6 で武器・アビリティ）。保存しない（PartySetup が付ける） | Support：`healPerSecond, healRange, healStartRatio, healStopRatio` |
+| Player | 操作キャラ。**これを持つEntityがプレイヤー**（AI 仲間には付けない。0章） | `moveSpeed, eyeHeight, eyeForward, groundY, radius`。アニメへ `Speed / MoveX / MoveY / Grounded / Jump / Attack / Dead / AimPitch / Heal / Downed / Revive` を渡す。武器（3-3）・Support の回復（3-2）・E で起こす（4-2）。HUD 用に `GetAmmo / GetMagazineSize / GetReloadProgress`、`IsHealing / GetHealTo`、`CanRevive / IsReviving / GetReviveProgress` |
+| Ally | AI 仲間の「頭」（UE の AIController。全ロール共通の判断）。追従：PlayerComponent を持つ Entity を A* の経路で追い、`followDistance` まで近づいたら止まる。`resumeDistance` より離れたら動き出す（ヒステリシス）。経路は `repathInterval` ごと、しかも相手が 0.5m 以上動いたときだけ計算し直す。地面の判定は動いたとき・空中にいるときだけ（1-1）。HP 0 で戦闘不能（止まる。`IsIncapacitated()`。1-2c）。攻撃：射程の中のいちばん近い見える敵を、ロールの武器で撃つ（2-2a・3-5）。Support なら回復（2-3）。ダウンした味方を予約して起こしに行く（4-3）。止まっている間は 起こす相手 → 回復の相手 → 敵 → プレイヤー の順に向く（0章） | `moveSpeed, followDistance, resumeDistance, repathInterval`（4つとも保存する）。攻撃の `attackRange, attackInterval`（AI の撃つ間隔の下限）`, aimSpread`（AI の狙いのずれ）`, aimHeight, searchInterval, reactionTime`（保存する。版 23。Inspector の「攻撃」欄。`attackDamage` は 3-5 で消した）。アニメへ `Speed / Dead / Attack / Heal / Revive / Downed` を渡す（Bool は変わったときだけ書く）。HUD 用に `GetTarget()`、最後の弾の線 `GetShotFrom/To/Time()`、`GetAmmo / GetMagazineSize / IsReloading`、`GetReviveTarget / IsReviving` |
+| Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`、`GetWeapon()`（`Game/Weapon` の表から）、`weaponState`（弾の残りなど。3-3）。Support だけ回復の値を持つ（2-3a）。アビリティは段階 6。保存しない（PartySetup が付ける） | Support：`healPerSecond, healRange, healStartRatio, healStopRatio` |
+| LifeState | ダウン・蘇生（段階 4。0章「ダウン・蘇生」）。Alive → Downed → Dead。Alive 以外の間は HP を 0 に保つ。保存しない（PartySetup が3人に付ける） | `downDuration`（30）`, reviveTime`（3）`, reviveHpRatio`（0.5）。`AddReviveProgress, GetReviveProgress, IsBeingRevived, GetReviver, ReserveRevive, IsTakenByOther, GetDownTimeLeft` |
 | PartySetup | Stage の開始時に3人をそろえる（UE の GameMode）。0章「3人の配置」 | `allyPrefab, spawnBack, spawnSide`（保存する）。`HasError()` |
 | Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
@@ -333,12 +358,12 @@ Source/Engine/
 
 ### 今のゲームの仕様（実装済みの部分。新しい方針は0章）
 今の実装は「1人のプレイヤーが、1種類の敵のウェーブを倒す」形。0章の協力型 PvE へ、ロードマップに沿って作り変えていく。
-- 操作：右ドラッグで視点、WASD 移動、Space ジャンプ、左クリックで射撃
-- 射撃：基本ダメージ 34。ヒットボックスの頭は倍率（既定2倍）。壁の向こうには当たらない。ヒットボックスが無くHPを持つ物はメッシュで判定。倒れている最中の敵には当たらない。
+- 操作：Viewport をクリックしてマウスを固定（Esc で離す）、マウスで視点、WASD 移動、Space ジャンプ、左クリック（押している間）で射撃、R でリロード、右クリックで回復（Support）、E 長押しでダウンした味方を起こす
+- 射撃：ダメージ・連射・装弾数はロールの武器（0章「武器」。今は3ロールとも 34 ダメージの仮の値）。ヒットボックスの頭は倍率（既定2倍）。壁の向こうには当たらない。ヒットボックスが無くHPを持つ物はメッシュで判定。倒れている最中の敵には当たらない。
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
 - NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
 - 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
-- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）、Support の回復の線（黒い縁＋脈打つ緑。回復している間ずっと。自分を回復しているときは胸に緑の輪。プレイヤーが回復されているときは HP バーの右に「+ HEAL」。2-3b）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
+- HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）、Support の回復の線（黒い縁＋脈打つ緑。回復している間ずっと。自分を回復しているときは胸に緑の輪。プレイヤーが回復されているときは HP バーの右に「+ HEAL」。2-3b）、右下に弾数（3-3）、AI 仲間の HP の横に弾数・DOWNED・REVIVING・DEAD、ダウンの表示と印（段階 4。0章「ダウン・蘇生」）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
 - 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
@@ -465,7 +490,7 @@ Source/Engine/
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
 - Prefab のインスタンスが個別に持つのは **名前と Transform だけ**。それ以外は Scene を読むたびに Prefab の内容で作り直す（Prefab が見つからない場合だけ、Scene に保存した内容で復元）。インスタンスに付けた Component も、「Prefab に反映」をしないと残らない。
-- 保存されない項目（今のところ）：Opponent の攻撃・死亡まわりの値（`attackRange` 〜 `deathDelay`）、Player の各値、SkinnedMesh の再生位置と `playing`、Animator の `playing`。
+- 保存されない項目（今のところ）：Opponent の攻撃・死亡まわりの値（`attackRange` 〜 `deathDelay`）、Player の各値、SkinnedMesh の再生位置と `playing`、Animator の `playing`。ロールの Component（Tank / DPS / Support）と `LifeStateComponent` は Play の始めに PartySetup が付けるので保存しない（武器の値は `Game/Weapon.cpp` の表）。
 
 ---
 
@@ -604,7 +629,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」は済み。今は段階 2「基本の AI 戦闘」の途中（2-1 射撃の共通化は済み。2-2a AI 仲間の攻撃は済み。2-2b 弾の線の表示は済み。2-2 AI 仲間の攻撃は済み。2-3a Support の回復は済み。2-3b 回復の線の表示を渡し済み。これで段階 2 が終わる。次は段階 3 武器）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。次は段階 5「ウェーブ・勝敗」（2026-11-17）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 
