@@ -10,8 +10,19 @@ namespace uel {
         // 1フレームより少し長くしてあるのは、蘇生する側とされる側の Update の順番（どちらが先か）で、
         // 1フレーム呼ばれなかったように見えても途切れないようにするため
         constexpr float kReviveGrace = 0.1f;
+        // 予約が更新されない時間がこれ（秒）を超えたら、予約を外す（予約した AI が倒れた・消えた・あきらめたとき）
+        constexpr float kReserveGrace = 0.5f;
 
     } // namespace
+
+    bool LifeStateComponent::ReserveRevive(EntityId who)
+    {
+        if (state != LifeState::Downed) return false;
+        if (reservedId.IsValid() && reservedId != who) return false;    // ほかの人の予約が生きている
+        reservedId = who;
+        reserveIdle = 0.0f;
+        return true;
+    }
 
     bool LifeStateComponent::AddReviveProgress(EntityId reviver, float dt)
     {
@@ -34,12 +45,17 @@ namespace uel {
                 downTimer = downDuration;
                 reviveProgress = 0.0f;
                 reviverId = EntityId{};
+                reservedId = EntityId{};
                 hp->hp = 0.0f;                      // マイナスまで減っていても 0 にそろえる
             }
             break;
 
         case LifeState::Downed:
             hp->hp = 0.0f;                          // ダウンの間は HP を 0 に保つ（攻撃の出かかりでマイナスになっても戻す）
+
+            // 予約（4-3）：更新されなくなったら外す
+            reserveIdle += ctx.dt;
+            if (reserveIdle > kReserveGrace) reservedId = EntityId{};
 
             // 蘇生：だれかが続けている間は進む。途切れたら 0 に戻る
             reviveIdle += ctx.dt;
@@ -52,6 +68,7 @@ namespace uel {
                 hp->hp = hp->maxHp * reviveHpRatio;
                 reviveProgress = 0.0f;
                 reviverId = EntityId{};
+                reservedId = EntityId{};
                 break;
             }
 
@@ -60,6 +77,7 @@ namespace uel {
             if (downTimer <= 0.0f) {                // 制限時間が過ぎた：Dead（ステージの終わりまで戻らない）
                 downTimer = 0.0f;
                 state = LifeState::Dead;
+                reservedId = EntityId{};
             }
             break;
 

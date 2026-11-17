@@ -12,6 +12,7 @@
 #include "Engine/Components/HitboxComponent.h"
 #include "Engine/Components/SupportComponent.h"
 #include "Engine/Components/RoleComponent.h"
+#include "Engine/Components/LifeStateComponent.h"
 #include "Engine/Assets/MeshCache.h"
 #include "Engine/Graphics/Mesh.h"
 #include "Engine/Physics/GroundQuery.h"
@@ -34,6 +35,10 @@ namespace uel {
         // 少し待つのは、敵を倒して次の敵へ乗り換える一瞬にリロードを始めないため
         constexpr float kTacticalReloadDelay = 1.0f;
         constexpr float kTacticalReloadRatio = 0.25f;
+        // 蘇生（4-3）：起こしに行く相手を探す距離（m。水平）、止まる距離、起こせる距離（プレイヤーと同じ 2m）
+        constexpr float kReviveSearchRange = 40.0f;
+        constexpr float kReviveReach = 1.2f;
+        constexpr float kReviveRange = 2.0f;
 
         // XZ 平面での距離（高さの違いは見ない）
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
@@ -140,6 +145,23 @@ namespace uel {
             return HpRatio(e) > 0.0f;
         }
 
+        // 起こしに行く相手（4-3）：range の中で、ダウンしている味方（プレイヤーも）のうち、いちばん近い1人。
+        // ほかの人が起こしている・起こしに向かっている（予約している）相手は選ばない
+        Entity* FindDownedToRevive(GameContext& ctx, const Entity& self, const XMFLOAT3& from, float range)
+        {
+            Entity* best = nullptr;
+            float bestDist = range;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot || slot.get() == &self || !IsFriendly(self, *slot)) continue;
+                auto* ls = slot->GetComponent<LifeStateComponent>();
+                auto* st = slot->GetComponent<TransformComponent>();
+                if (!ls || !ls->IsDowned() || ls->IsTakenByOther(self.id) || !st) continue;
+                const float d = DistXZ(st->position, from);
+                if (d <= bestDist) { bestDist = d; best = slot.get(); }
+            }
+            return best;
+        }
+
     } // namespace
 
     void AllyComponent::Update(GameContext& ctx)
@@ -151,7 +173,7 @@ namespace uel {
         AnimatorComponent* an = self.GetComponent<AnimatorComponent>();     // 無くても動く（アニメが変わらないだけ）
 
         // 0) 戦闘不能：HP が 0 になったら、その場で止まる（追いかけない・向きも変えない・撃たない）。
-        //    HP が戻ったら（回復・蘇生）、また動き出す。段階 4 で「ダウン（蘇生を待つ・時間切れで Dead）」に置き換える
+        //    HP が戻ったら（蘇生）、また動き出す。ダウン・Dead の状態と時間は LifeStateComponent が持つ（段階 4）
         auto* myHp = self.GetComponent<HPComponent>();
         const bool down = (myHp && myHp->hp <= 0.0f);
         if (down != incapacitated) {
@@ -160,6 +182,7 @@ namespace uel {
             path.clear();
             targetId = EntityId{};
             healTargetId = EntityId{};
+            reviveTargetId = EntityId{};
             SetAnimValue(an, kAnimDead, down ? 1.0f : 0.0f);    // Bool なので、変わったときだけ書けば値が残る（毎フレーム名前で探さない）
         }
 
@@ -175,6 +198,41 @@ namespace uel {
             }
         }
         TransformComponent* lt = lead ? lead->GetComponent<TransformComponent>() : nullptr;
+
+        // 1a) 起こしに行く相手（4-3。AI の Phase 2）。ダウンした味方（プレイヤーも）がいれば、プレイヤーへの追従と回復より先に、
+        //     駆け寄って起こす（L4D2 のボットと同じ。ユーザーと決めた）。
+        //     向かう前に、相手の LifeStateComponent に予約する（ReserveRevive）。予約が生きている相手は、もう1人の AI は選ばない
+        //     （2人とも駆け寄らず、1人は戦い続ける。UE の AI でよく使う「予約」）。予約は向かっている間、毎フレーム更新する。
+        //     探すのは searchInterval ごと。起こしている相手を、ほかの人（プレイヤー）が先に起こし始めたら、あきらめる
+        Entity* reviveE = ctx.world.Get(reviveTargetId);
+        LifeStateComponent* reviveLife = reviveE ? reviveE->GetComponent<LifeStateComponent>() : nullptr;
+        if (reviveTargetId.IsValid()) {
+            const bool keep = !incapacitated && reviveLife && reviveLife->IsDowned()
+                && !reviveLife->IsTakenByOther(self.id) && reviveLife->ReserveRevive(self.id);
+            if (!keep) {
+                reviveE = nullptr;
+                reviveLife = nullptr;
+                reviveTargetId = EntityId{};
+                reviveSearchTimer = 0.0f;       // すぐ次の相手を探す（もう1人ダウンしているかもしれない）
+                following = false;              // 追従を、今の位置から決め直す
+                path.clear();
+            }
+        }
+        reviveSearchTimer -= dt;
+        if (!incapacitated && !reviveLife && reviveSearchTimer <= 0.0f) {
+            reviveSearchTimer = searchInterval;
+            Entity* found = FindDownedToRevive(ctx, self, t->position, kReviveSearchRange);
+            LifeStateComponent* fl = found ? found->GetComponent<LifeStateComponent>() : nullptr;
+            if (fl && fl->ReserveRevive(self.id)) {
+                reviveE = found;
+                reviveLife = fl;
+                reviveTargetId = found->id;
+                following = true;               // すぐ向かう（経路もすぐ作り直す）
+                repathTimer = 0.0f;
+                path.clear();
+            }
+        }
+        TransformComponent* rt = reviveE ? reviveE->GetComponent<TransformComponent>() : nullptr;
 
         // 1b) 狙う敵。searchInterval ごとに、射程の中のいちばん近い敵を選び直す（毎フレームは探さない）。
         //     今の敵が倒れた・消えたときは、次のフレームですぐ選び直す。
@@ -223,8 +281,8 @@ namespace uel {
         const SupportComponent* support = self.GetComponent<SupportComponent>();
         Entity* healTarget = ctx.world.Get(healTargetId);
         if (healTargetId.IsValid()) {
-            // 毎フレームの確かめ（軽い物だけ）：いなくなった・戦闘不能・満タン・届かない、なら止める
-            bool keep = support && !incapacitated && healTarget && IsHealable(self, *healTarget)
+            // 毎フレームの確かめ（軽い物だけ）：いなくなった・戦闘不能・満タン・届かない・起こしに行く、なら止める
+            bool keep = support && !incapacitated && !reviveLife && healTarget && IsHealable(self, *healTarget)
                 && HpRatio(*healTarget) < support->healStopRatio;
             if (keep && healTarget != &self) {
                 auto* ht = healTarget->GetComponent<TransformComponent>();
@@ -238,7 +296,7 @@ namespace uel {
             }
         }
         healSearchTimer -= dt;
-        if (support && !incapacitated && healSearchTimer <= 0.0f) {
+        if (support && !incapacitated && !reviveLife && healSearchTimer <= 0.0f) {     // 起こしに行く間は回復しない（蘇生が先）
             healSearchTimer = searchInterval;
             // 今の相手との間に壁が入ったら止める
             if (healTarget && healTarget != &self) {
@@ -276,26 +334,31 @@ namespace uel {
 
         const XMFLOAT3 before = t->position;
         float movedSpeed = 0.0f;
-        if (lt && !incapacitated) {
+        // 向かう相手：起こす相手がいればその人（kReviveReach まで近づく）、いなければプレイヤー（followDistance まで）
+        TransformComponent* goalT = rt ? rt : lt;
+        const float stopDist = rt ? kReviveReach : followDistance;
+        const float goDist = rt ? kReviveReach : resumeDistance;
+        if (goalT && !incapacitated) {
             // 2) 動くか止まるか。止まる距離と動き出す距離を分けて、境目で動く・止まるを繰り返さないようにする
-            const float dist = DistXZ(t->position, lt->position);
-            if (following && dist <= followDistance) { following = false; path.clear(); }
-            else if (!following && dist > resumeDistance) { following = true; repathTimer = 0.0f; }
+            //    （起こす相手は動かないので、同じ距離でよい）
+            const float dist = DistXZ(t->position, goalT->position);
+            if (following && dist <= stopDist) { following = false; path.clear(); }
+            else if (!following && dist > goDist) { following = true; repathTimer = 0.0f; }
 
             if (following) {
                 // 3) 経路：一定の間隔で、しかも相手が少し動いていたときだけ計算し直す（A* を毎フレーム回さない）
                 repathTimer -= dt;
                 if (ctx.nav && repathTimer <= 0.0f) {
                     repathTimer = repathInterval;
-                    if (path.empty() || DistXZ(pathGoal, lt->position) > 0.5f) {
-                        ctx.nav->FindPath(t->position, lt->position, path);
-                        pathGoal = lt->position;
+                    if (path.empty() || DistXZ(pathGoal, goalT->position) > 0.5f) {
+                        ctx.nav->FindPath(t->position, goalT->position, path);
+                        pathGoal = goalT->position;
                         wpIndex = (path.size() > 1) ? 1 : 0;    // 最初の点は自分のいるマスなので飛ばす
                     }
                 }
 
                 // 次に向かう点。経路が無い（グリッドの外など）ときは、相手へまっすぐ向かう
-                XMFLOAT3 goal = lt->position;
+                XMFLOAT3 goal = goalT->position;
                 if (!path.empty()) {
                     if (wpIndex >= path.size()) wpIndex = path.size() - 1;
                     if (DistXZ(path[wpIndex], t->position) < 0.5f && wpIndex + 1 < path.size()) ++wpIndex;
@@ -314,8 +377,8 @@ namespace uel {
                 }
             }
             else {
-                // 止まっている間は、回復している味方 → 狙っている敵 → プレイヤー、の順に、いる相手のほうを向く
-                const XMFLOAT3& face = ht ? ht->position : (tt ? tt->position : lt->position);
+                // 止まっている間は、起こしている味方 → 回復している味方 → 狙っている敵 → 向かう相手、の順に、いる相手のほうを向く
+                const XMFLOAT3& face = rt ? rt->position : (ht ? ht->position : (tt ? tt->position : goalT->position));
                 const float fx = face.x - t->position.x;
                 const float fz = face.z - t->position.z;
                 if (fx * fx + fz * fz > 0.01f) t->rotationEuler.y = std::atan2(fx, fz) * 57.2958f;
@@ -364,8 +427,20 @@ namespace uel {
             && weaponState.ammo <= static_cast<int>(weapon.magazineSize * kTacticalReloadRatio))
             StartReload(weapon, weaponState);       // リロード中・満タンなら何もしない
 
+        // 5-0) 蘇生（4-3）：起こす相手に kReviveRange まで近づいたら、起こす（続けている間、毎フレーム進める）。
+        //      起こしている間は撃たない・回復しない（手がふさがる）。攻撃されても続ける（ユーザーが選んだ）
+        bool revivingNow = false;
+        if (reviveLife && rt && !incapacitated && !following && DistXZ(rt->position, t->position) <= kReviveRange) {   // 着いて止まってから
+            reviveLife->AddReviveProgress(self.id, dt);
+            revivingNow = true;
+            if (attackTimer < reactionTime) attackTimer = reactionTime;     // 起こし終わってから撃つまでの、持ち替えの時間
+        }
+
         // 5a) 回復：線でつないでいる間、毎秒 healPerSecond ずつ回復する（満タンを超えない）。回復している間は撃たない
-        if (healTarget && support) {
+        if (revivingNow) {
+            // 起こしている：撃たない・回復しない
+        }
+        else if (healTarget && support) {
             if (auto* hhp = healTarget->GetComponent<HPComponent>())
                 hhp->hp = (std::min)(hhp->maxHp, hhp->hp + support->healPerSecond * dt);
             healFrom = { t->position.x, t->position.y + aimHeight * t->scale.y, t->position.z };     // 動いた後の位置
@@ -412,6 +487,11 @@ namespace uel {
         if (healingNow != healAnim) {                        // Bool：変わったときだけ書く
             healAnim = healingNow;
             SetAnimValue(an, kAnimHeal, healingNow ? 1.0f : 0.0f);
+        }
+        reviving = revivingNow;
+        if (revivingNow != reviveAnim) {                     // Bool：変わったときだけ書く（グラフに Revive が無ければ何もしない）
+            reviveAnim = revivingNow;
+            SetAnimValue(an, kAnimRevive, revivingNow ? 1.0f : 0.0f);
         }
     }
 

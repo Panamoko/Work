@@ -19,7 +19,9 @@ namespace uel {
     //         AI の側では「撃つ間隔の下限」と「狙いのずれ」を足して、プレイヤーより少し弱くする。
     //   リロード：弾が切れたら自動で。敵がいない間に弾が 1/4 以下なら、先に詰め替える（タクティカルリロード。3-5）。
     //   回復：SupportComponent が付いていれば、HP の割合が低い味方（自分も含む）を線でつないで回復する。回復中は撃たない（2-3）。
-    // まだ無いこと：蘇生、撃ちやすい位置・回復しやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
+    //   蘇生：ダウンした味方（プレイヤーも）がいれば、追従・回復より先に駆け寄って起こす。2人の AI が同じ相手へ行かないよう、
+    //         相手の LifeStateComponent に予約してから向かう（4-3）。起こしている間は撃たない・回復しない。
+    // まだ無いこと：危険を避けること（敵のそばでも起こしに行く）、撃ちやすい位置・回復しやすい位置へ動くこと、壁との当たり判定（経路だけで避ける）。
     class AllyComponent : public Component {
     public:
         std::unique_ptr<Component> Clone() const override { return std::make_unique<AllyComponent>(*this); }
@@ -44,6 +46,7 @@ namespace uel {
         static constexpr const char* kAnimDead = "Dead";        // Bool   ：戦闘不能（HP 0）。HP が戻るまで true のまま
         static constexpr const char* kAnimAttack = "Attack";    // Trigger：撃った
         static constexpr const char* kAnimHeal = "Heal";        // Bool   ：回復の線をつないでいる（グラフに無ければ何もしない）
+        static constexpr const char* kAnimRevive = "Revive";    // Bool   ：ダウンした味方を起こしている（グラフに無ければ何もしない。4-3）
 
         // HP が 0 で、戦闘不能か（動かない。撃たない。敵に狙われない。プレイヤーの弾を止めない）
         bool IsIncapacitated() const { return incapacitated; }
@@ -57,6 +60,10 @@ namespace uel {
         float GetShotTime() const { return shotTime; }
 
         // 回復（Support のときだけ。2-3）。回復している間、線の両端（HUD で描くため。2-3b）
+        // 蘇生（4-3）：起こしに向かっている・起こしている相手（無効 = いない）と、今その場で起こしているか
+        EntityId GetReviveTarget() const { return reviveTargetId; }
+        bool IsReviving() const { return reviving; }
+
         bool IsHealing() const { return healTargetId.IsValid(); }
         EntityId GetHealTarget() const { return healTargetId; }
         const DirectX::XMFLOAT3& GetHealFrom() const { return healFrom; }
@@ -99,6 +106,12 @@ namespace uel {
 
         // 回復
         EntityId healTargetId;                      // 今回復している味方（無効 = 回復していない。自分のこともある）
+
+        // 蘇生（4-3）
+        EntityId reviveTargetId;                    // 起こしに向かっている・起こしている味方（予約している相手）
+        float    reviveSearchTimer = 0.0f;          // 次に起こしに行く相手を探すまでの残り時間（searchInterval ごと）
+        bool     reviving = false;                  // 今その場で起こしている（HUD 用）
+        bool     reviveAnim = false;                // アニメに渡した Revive の値（変わったときだけ書く）
         float    healSearchTimer = 0.0f;            // 次に回復する相手を選び直すまでの残り時間（searchInterval ごと）
         bool     healAnim = false;                  // アニメに渡した Heal の値（変わったときだけ書く）
         DirectX::XMFLOAT3 healFrom{ 0.0f, 0.0f, 0.0f };    // 回復の線の始まり（自分）

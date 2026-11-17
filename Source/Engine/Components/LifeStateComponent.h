@@ -19,6 +19,7 @@ namespace uel {
     // 蘇生（4-2）：蘇生する側（プレイヤー・AI 仲間）が、続けている間は毎フレーム AddReviveProgress を呼ぶ。
     // 呼ばれなくなったら（離れた・やめた・蘇生する側が倒れた）、進み具合は 0 に戻る（UE の「長押しのインタラクション」）。
     // 蘇生されている間は、ダウンの制限時間が止まる（蘇生の途中で時間切れにならない）。
+    // AI 仲間は、起こしに向かう前に ReserveRevive で予約する（4-3）。
     enum class LifeState { Alive, Downed, Dead };
 
     class LifeStateComponent : public Component {
@@ -49,12 +50,25 @@ namespace uel {
         bool IsBeingRevived() const { return state == LifeState::Downed && reviverId.IsValid(); }
         EntityId GetReviver() const { return reviverId; }
 
+        // 蘇生の予約（4-3。AI 仲間が使う）。起こしに向かっている間は毎フレーム呼ぶ（呼ばれなくなったら少しして切れる）。
+        // ほかの人の予約が生きている間は取れない（false）。2人の AI が同じ相手へ走らないようにする（UE の AI でよく使う「予約」）。
+        // プレイヤーは予約を見ない（プレイヤーが先に起こし始めたら、予約していた AI のほうがあきらめる）
+        bool ReserveRevive(EntityId who);
+
+        // ほかの人が起こしている、または起こしに向かっている（who 自身なら false）
+        bool IsTakenByOther(EntityId who) const
+        {
+            return (reviverId.IsValid() && reviverId != who) || (reservedId.IsValid() && reservedId != who);
+        }
+
     private:
         LifeState state = LifeState::Alive;
         float     downTimer = 0.0f;         // ダウンの残り時間
         float     reviveProgress = 0.0f;    // 蘇生が進んだ時間（秒）
         float     reviveIdle = 0.0f;        // 最後に蘇生が進んでからの時間。少し空いたら、蘇生をやめたとみなす
         EntityId  reviverId;                // 今蘇生している人（無効 = 誰も蘇生していない）
+        EntityId  reservedId;               // 起こしに向かっている人（予約。無効 = だれも向かっていない）
+        float     reserveIdle = 0.0f;       // 最後に予約が更新されてからの時間。少し空いたら、予約を外す
     };
 
 } // namespace uel
