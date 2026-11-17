@@ -294,6 +294,17 @@ namespace uel {
                 dl->AddText(ImVec2(pos.x + 1.0f, pos.y + 1.0f), IM_COL32(0, 0, 0, 200), txt);
                 dl->AddText(pos, col, txt);
                 };
+            // プレイヤーがダウンしている間（4-4）：画面を暗い赤で覆い、四辺をさらに暗くする（ほかの HUD より先に描いて、文字は上に出す）
+            if (p) if (const LifeStateComponent* pls = p->GetComponent<LifeStateComponent>()) if (pls->IsDowned()) {
+                const ImVec2 a = imgPos, b(imgPos.x + viewWidth, imgPos.y + viewHeight);
+                const ImU32 dark = IM_COL32(40, 0, 0, 200), clear = IM_COL32(40, 0, 0, 0);
+                const float band = (std::min)(viewWidth, viewHeight) * 0.25f;
+                dl->AddRectFilled(a, b, IM_COL32(70, 0, 0, 80));
+                dl->AddRectFilledMultiColor(a, ImVec2(b.x, a.y + band), dark, dark, clear, clear);    // 上
+                dl->AddRectFilledMultiColor(ImVec2(a.x, b.y - band), b, clear, clear, dark, dark);    // 下
+                dl->AddRectFilledMultiColor(a, ImVec2(a.x + band, b.y), dark, clear, clear, dark);    // 左
+                dl->AddRectFilledMultiColor(ImVec2(b.x - band, a.y), b, clear, dark, dark, clear);    // 右
+            }
             if (pc && !mouseCaptured) {     // マウスを固定していない：クリックで始められることを、照準の下に出す（3-1）
                 const char* hint = u8"クリックで操作を始める（Esc でマウスを離す）";
                 const ImVec2 ts = ImGui::CalcTextSize(hint);
@@ -315,7 +326,7 @@ namespace uel {
                 };
             // プレイヤーが蘇生している：照準の下にバー。近くにダウンした味方がいる：照準の下に「E 長押し：仲間を起こす」
             if (pc && mouseCaptured) {
-                if (pc->IsReviving()) reviveBar(c.y + 60.0f, pc->GetReviveProgress());
+                if (pc->IsReviving()) reviveBar(c.y + 90.0f, pc->GetReviveProgress());
                 else if (pc->CanRevive()) {
                     const char* hint = u8"E 長押し：仲間を起こす";
                     const ImVec2 ts = ImGui::CalcTextSize(hint);
@@ -353,7 +364,7 @@ namespace uel {
                     const ImVec2 ws = ImGui::CalcTextSize(wait);
                     shadowText(ImVec2(c.x - ws.x * 0.5f, dp.y + ds.y + 4.0f), IM_COL32(255, 255, 255, 240), wait);
                     // 仲間に起こしてもらっている間は、照準の下に進み具合のバー（4-2。ダウンの時間はその間止まる）
-                    if (pls->IsBeingRevived()) reviveBar(c.y + 60.0f, pls->GetReviveProgress());
+                    if (pls->IsBeingRevived()) reviveBar(c.y + 90.0f, pls->GetReviveProgress());
                 }
                 else if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
@@ -567,6 +578,59 @@ namespace uel {
                     const char* name = RoleName(rc->GetRole());
                     const ImVec2 ts = ImGui::CalcTextSize(name);
                     shadowText(ImVec2(s.x - ts.x * 0.5f, s.y - ts.y), col, name);
+                    if (const LifeStateComponent* ls = slot->GetComponent<LifeStateComponent>()) if (ls->IsDead()) {   // Dead：名前の下に DEAD（4-4）
+                        const ImVec2 ds = ImGui::CalcTextSize("DEAD");
+                        shadowText(ImVec2(s.x - ds.x * 0.5f, s.y + 2.0f), IM_COL32(160, 160, 160, 220), "DEAD");
+                    }
+                }
+
+                // ダウンした味方の印（4-4）：脈打つ赤い丸と「+」、その下に残りの秒数と距離。起こしてもらっている間は緑で進み具合。
+                // 壁の向こうでも見える。画面の外・カメラの後ろにいるときは、その方向の画面の端に出す（どこへ助けに行けばよいか分かるように。
+                // L4D2 の「倒れた仲間の輪郭が壁越しに見える」に当たる）。プレイヤー自身には出さない
+                if (pc) {
+                    const XMMATRIX viewM = XMLoadFloat4x4(&view);
+                    const float inset = 48.0f;
+                    const ImVec2 rectMin(imgPos.x + inset, imgPos.y + inset);
+                    const ImVec2 rectMax(imgPos.x + viewWidth - inset, imgPos.y + viewHeight - 130.0f);    // 下は HP・弾数の欄に重ならないように
+                    const float pulse = 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 6.0f);
+                    const TransformComponent* myT = p->GetComponent<TransformComponent>();
+                    for (const auto& slot : world.Slots()) {
+                        if (!slot || slot.get() == p) continue;
+                        const LifeStateComponent* ls = slot->GetComponent<LifeStateComponent>();
+                        const TransformComponent* t = slot->GetComponent<TransformComponent>();
+                        if (!ls || !ls->IsDowned() || !t) continue;
+                        const XMFLOAT3 wp{ t->position.x, t->position.y + 0.6f * t->scale.y, t->position.z };     // 倒れた体のあたり
+                        // 画面の中に写るならそこ。写らなければ、カメラから見た向き（左右・上下）の画面の端
+                        ImVec2 s;
+                        XMFLOAT3 vp3;
+                        XMStoreFloat3(&vp3, XMVector3TransformCoord(XMLoadFloat3(&wp), viewM));
+                        const bool onScreen = vp3.z > 0.1f && project(wp, s)
+                            && s.x >= rectMin.x && s.x <= rectMax.x && s.y >= rectMin.y && s.y <= rectMax.y;
+                        if (!onScreen) {
+                            float dx = vp3.x, dy = -vp3.y;                          // 画面は下が +
+                            if (dx * dx + dy * dy < 1e-6f) { dx = 0.0f; dy = 1.0f; }
+                            const float hw = (rectMax.x - rectMin.x) * 0.5f, hh = (rectMax.y - rectMin.y) * 0.5f;
+                            const float k = (std::min)(std::fabs(dx) > 1e-6f ? hw / std::fabs(dx) : 1e9f,
+                                std::fabs(dy) > 1e-6f ? hh / std::fabs(dy) : 1e9f);
+                            s = ImVec2((rectMin.x + rectMax.x) * 0.5f + dx * k, (rectMin.y + rectMax.y) * 0.5f + dy * k);   // 枠の真ん中から
+                        }
+                        const bool reviving = ls->IsBeingRevived();
+                        const ImU32 ring = reviving ? IM_COL32(120, 230, 140, 255) : IM_COL32(255, 70, 60, (int)(150 + 105 * pulse));
+                        const float r = reviving ? 14.0f : 12.0f + 4.0f * pulse;
+                        dl->AddCircleFilled(s, r + 2.0f, IM_COL32(0, 0, 0, 160), 24);
+                        dl->AddCircleFilled(s, r, ring, 24);
+                        dl->AddLine(ImVec2(s.x - 6.0f, s.y), ImVec2(s.x + 6.0f, s.y), IM_COL32(255, 255, 255, 255), 3.0f);    // 「+」
+                        dl->AddLine(ImVec2(s.x, s.y - 6.0f), ImVec2(s.x, s.y + 6.0f), IM_COL32(255, 255, 255, 255), 3.0f);
+                        char mTxt[48];
+                        const float dist = myT ? std::sqrt((t->position.x - myT->position.x) * (t->position.x - myT->position.x)
+                            + (t->position.z - myT->position.z) * (t->position.z - myT->position.z)) : 0.0f;
+                        if (reviving) snprintf(mTxt, sizeof(mTxt), "REVIVING %d%%", (int)(ls->GetReviveProgress() * 100.0f));
+                        else          snprintf(mTxt, sizeof(mTxt), "DOWNED %d  %.0fm", (int)std::ceil(ls->GetDownTimeLeft()), dist);
+                        const ImVec2 ms = ImGui::CalcTextSize(mTxt);
+                        float mx = s.x - ms.x * 0.5f;                                           // 文字が画面の端で切れないように
+                        mx = (std::max)(imgPos.x + 6.0f, (std::min)(mx, imgPos.x + viewWidth - ms.x - 6.0f));
+                        shadowText(ImVec2(mx, s.y + r + 4.0f), reviving ? IM_COL32(120, 230, 140, 255) : IM_COL32(255, 110, 90, 255), mTxt);
+                    }
                 }
                 if (partyError)     // AI 仲間の Prefab が読めなかった（PartySetup）
                     shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 34.0f), IM_COL32(255, 120, 120, 255), "PartySetup: ally prefab not found");

@@ -493,6 +493,12 @@ namespace uel {
             reviveAnim = revivingNow;
             SetAnimValue(an, kAnimRevive, revivingNow ? 1.0f : 0.0f);
         }
+        const LifeStateComponent* myLife = self.GetComponent<LifeStateComponent>();
+        const bool downedNow = myLife && myLife->IsDowned();
+        if (downedNow != downedAnim) {                       // Bool：ダウン中（Dead とは別。4-4）。変わったときだけ書く
+            downedAnim = downedNow;
+            SetAnimValue(an, kAnimDowned, downedNow ? 1.0f : 0.0f);
+        }
     }
 
 } // namespace uel

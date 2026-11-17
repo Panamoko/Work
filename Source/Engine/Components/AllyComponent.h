@@ -47,6 +47,7 @@ namespace uel {
         static constexpr const char* kAnimAttack = "Attack";    // Trigger：撃った
         static constexpr const char* kAnimHeal = "Heal";        // Bool   ：回復の線をつないでいる（グラフに無ければ何もしない）
         static constexpr const char* kAnimRevive = "Revive";    // Bool   ：ダウンした味方を起こしている（グラフに無ければ何もしない。4-3）
+        static constexpr const char* kAnimDowned = "Downed";    // Bool   ：ダウン中（蘇生を待っている。Dead も同時に true。4-4）
 
         // HP が 0 で、戦闘不能か（動かない。撃たない。敵に狙われない。プレイヤーの弾を止めない）
         bool IsIncapacitated() const { return incapacitated; }
@@ -112,6 +113,7 @@ namespace uel {
         float    reviveSearchTimer = 0.0f;          // 次に起こしに行く相手を探すまでの残り時間（searchInterval ごと）
         bool     reviving = false;                  // 今その場で起こしている（HUD 用）
         bool     reviveAnim = false;                // アニメに渡した Revive の値（変わったときだけ書く）
+        bool     downedAnim = false;                // アニメに渡した Downed の値（変わったときだけ書く。4-4）
         float    healSearchTimer = 0.0f;            // 次に回復する相手を選び直すまでの残り時間（searchInterval ごと）
         bool     healAnim = false;                  // アニメに渡した Heal の値（変わったときだけ書く）
         DirectX::XMFLOAT3 healFrom{ 0.0f, 0.0f, 0.0f };    // 回復の線の始まり（自分）

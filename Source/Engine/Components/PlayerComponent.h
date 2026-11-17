@@ -48,6 +48,8 @@ namespace uel {
         static constexpr const char* kAnimDead = "Dead";            // Bool   ：HP が 0
         static constexpr const char* kAnimAimPitch = "AimPitch";    // Float  ：視点の上下の角度（度。上が +）。エイムオフセットが使う
         static constexpr const char* kAnimHeal = "Heal";            // Bool   ：回復の線をつないでいる（AllyComponent と同じ名前）
+        static constexpr const char* kAnimDowned = "Downed";        // Bool   ：ダウン中（蘇生を待っている。Dead も同時に true。4-4）
+        static constexpr const char* kAnimRevive = "Revive";        // Bool   ：仲間を起こしている（AllyComponent と同じ名前。4-4）
     private:
         float pitch = 0.0f;
         float velY = 0.0f;
@@ -72,5 +74,6 @@ namespace uel {
         EntityId reviveTargetId;        // 今蘇生している味方（無効 = 蘇生していない）
         float    reviveScanTimer = 0.0f;    // 次に近くのダウンした味方を探し直すまでの残り時間
         float    hudReviveProgress = 0.0f;  // HUD に出す蘇生の進み具合（0〜1）
+        float    downedCamBlend = 0.0f;     // ダウン中の低い視点への寄り具合（0 = 立っている、1 = 倒れている。4-4）
     };
 }

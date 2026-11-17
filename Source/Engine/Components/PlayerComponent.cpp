@@ -44,6 +44,10 @@ namespace uel {
         constexpr float kReviveRange = 2.0f;
         constexpr float kReviveScanInterval = 0.1f;
 
+        // ダウン中の視点（4-4）：目の高さを eyeHeight のこの割合だけ下げる（0.3 なら 1.6m → 約 1.1m）。下げる・戻す速さ（1 秒あたり）
+        constexpr float kDownedEyeDrop = 0.3f;
+        constexpr float kDownedCamSpeed = 3.0f;
+
         // XZ 平面での距離（高さの違いは見ない）
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
         {
@@ -187,9 +191,16 @@ namespace uel {
         t->position.y += velY * dt;
         if (t->position.y < ground) { t->position.y = ground; velY = 0.0f; }
 
+        // ダウンしている間は、目の高さを下げる（倒れた視点。4-4）。急に変わらないよう、kDownedCamSpeed で少しずつ動かす
+        const bool downedNow = life && life->IsDowned();
+        downedCamBlend += (downedNow ? dt : -dt) * kDownedCamSpeed;
+        if (downedCamBlend < 0.0f) downedCamBlend = 0.0f;
+        if (downedCamBlend > 1.0f) downedCamBlend = 1.0f;
+        const float eyeY = eyeHeight * (1.0f - kDownedEyeDrop * downedCamBlend);
+
         // 照準（目の位置と向き。回復の線と射撃で使う）
         float cp = cosf(pitch), sp = sinf(pitch);
-        XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeHeight, t->position.z + cy * eyeForward };
+        XMFLOAT3 eyePos = { t->position.x + sy * eyeForward, t->position.y + eyeY, t->position.z + cy * eyeForward };
         const XMFLOAT3 rd = { cp * sy, sp, cp * cy };     // 照準の向き（長さ 1）
 
         // 回復（3-2）：Support のときだけ。右クリックを押している間、照準の線上（healRange まで）にいる味方へ回復の線をつなぐ。
@@ -271,6 +282,8 @@ namespace uel {
             an->params.SetIfExists(kAnimMoveY, localY);
             an->params.SetIfExists(kAnimGrounded, (t->position.y <= ground + 0.001f) ? 1.0f : 0.0f);
             an->params.SetIfExists(kAnimDead, isDead ? 1.0f : 0.0f);
+            an->params.SetIfExists(kAnimDowned, downedNow ? 1.0f : 0.0f);           // ダウン中（Dead とは別。4-4）
+            an->params.SetIfExists(kAnimRevive, reviving ? 1.0f : 0.0f);            // 仲間を起こしている（4-4）
             an->params.SetIfExists(kAnimAimPitch, XMConvertToDegrees(pitch));        // 視点の上下（度）
             if (jumped) an->params.SetIfExists(kAnimJump, 1.0f);                    // Trigger：跳んだ
             if (shot)   an->params.SetIfExists(kAnimAttack, 1.0f);                  // Trigger：撃った
