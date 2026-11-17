@@ -147,6 +147,8 @@
     <ClInclude Include="Source\Engine\Components\Component.h" />
     <ClInclude Include="Source\Engine\Components\DPSComponent.h" />
     <ClInclude Include="Source\Engine\Components\GameRuleComponent.h" />
+    <ClInclude Include="Source\Engine\Components\GuideComponent.h" />
+    <ClInclude Include="Source\Engine\Components\GuidePointComponent.h" />
     <ClInclude Include="Source\Engine\Components\HitboxComponent.h" />
     <ClInclude Include="Source\Engine\Components\HPComponent.h" />
     <ClInclude Include="Source\Engine\Components\LifeStateComponent.h" />
@@ -172,6 +174,7 @@
     <ClInclude Include="Source\Engine\Editor\EditorCamera.h" />
     <ClInclude Include="Source\Engine\Editor\EditorPanels.h" />
     <ClInclude Include="Source\Engine\Editor\EntityCommands.h" />
+    <ClInclude Include="Source\Engine\Editor\GuideOverlay.h" />
     <ClInclude Include="Source\Engine\Editor\ImGuiLayer.h" />
     <ClInclude Include="Source\Engine\Editor\TransformEdit.h" />
     <ClInclude Include="Source\Engine\Editor\ViewportPanel.h" />
@@ -234,6 +237,7 @@
     <ClCompile Include="Source\Engine\Assets\TinyGltfImpl.cpp" />
     <ClCompile Include="Source\Engine\Components\AllyComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\GameRuleComponent.cpp" />
+    <ClCompile Include="Source\Engine\Components\GuideComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\LifeStateComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\OpponentComponent.cpp" />
     <ClCompile Include="Source\Engine\Components\PartySetupComponent.cpp" />
@@ -249,6 +253,7 @@
     <ClCompile Include="Source\Engine\Editor\EditorCamera.cpp" />
     <ClCompile Include="Source\Engine\Editor\EditorPanels.cpp" />
     <ClCompile Include="Source\Engine\Editor\EntityCommands.cpp" />
+    <ClCompile Include="Source\Engine\Editor\GuideOverlay.cpp" />
     <ClCompile Include="Source\Engine\Editor\ImGuiLayer.cpp" />
     <ClCompile Include="Source\Engine\Editor\InspectorPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\ViewportPanel.cpp" />

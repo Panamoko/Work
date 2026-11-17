@@ -22,6 +22,7 @@
 #include "Engine/Components/RoleComponent.h"
 #include "Engine/Components/PartySetupComponent.h"
 #include "Engine/Components/LifeStateComponent.h"
+#include "Engine/Editor/GuideOverlay.h"
 
 #include <cfloat>
 #include <cmath>
@@ -107,7 +108,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　R：リロード　右クリック：回復（Support）　E 長押し：仲間を起こす）");
+            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　R：リロード　右クリック：回復（Support）　E 長押し：仲間を起こす　F：ロボットに合図）");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -185,6 +186,7 @@ namespace uel {
             in.reloadPressed = mouseCaptured && ImGui::IsKeyPressed('R', false);            // R でリロード（3-3）
             in.healHeld = mouseCaptured && io.MouseDown[1];                                 // 右クリックを押している間（Support の回復。3-2）
             in.interactHeld = mouseCaptured && ImGui::IsKeyDown('E');                       // E を押している間（ダウンした味方の蘇生。4-2）
+            in.signalPressed = mouseCaptured && ImGui::IsKeyPressed('F', false);            // F（案内ロボットへの合図。5-1）
             in.lookActive = mouseCaptured;                  // 固定している間は、いつでも視点が回る
             in.mouseDX = lookDX; in.mouseDY = lookDY;
             float dt = ClampDeltaTime(io.DeltaTime);     // 上限付き（EngineConfig.h）
@@ -275,6 +277,9 @@ namespace uel {
                 }
             }
         }
+        // 案内ロボットの道（編集中だけ。経由点を順番の線でつなぎ、番号を出す。5-1。中身は GuideOverlay.cpp）
+        OverlayView overlayView{ view, proj, imgPos, (float)viewWidth, (float)viewHeight };
+        if (!playMode) DrawGuideRoute(ImGui::GetWindowDrawList(), world, overlayView, selected);
         // Play中のオーバーレイ（照準・ヒットマーカー・HP・敵経路・Title/Result画面）
         if (playMode) {
             ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -635,6 +640,8 @@ namespace uel {
                 if (partyError)     // AI 仲間の Prefab が読めなかった（PartySetup）
                     shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 34.0f), IM_COL32(255, 120, 120, 255), "PartySetup: ally prefab not found");
             }
+            // 案内ロボットの印と「F：ロボットを進める」（5-1。中身は GuideOverlay.cpp）
+            if (p) DrawGuideHud(dl, world, *p, overlayView, mouseCaptured);
 
             // Title / Result 画面（ScreenUIComponent）
             for (const auto& slot : world.Slots()) {

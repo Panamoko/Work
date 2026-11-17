@@ -25,6 +25,8 @@
 #include "Engine/Serialization/AnimGraphSerializer.h"
 #include "Engine/Config/EngineConfig.h"
 #include "Engine/Components/PartySetupComponent.h"
+#include "Engine/Components/GuideComponent.h"
+#include "Engine/Components/GuidePointComponent.h"
 
 #include <imgui.h>
 #include <cctype>
@@ -654,6 +656,30 @@ namespace uel {
             }
             ImGui::PopID();
         }
+        // GuideComponent（案内ロボット。経由点を順に進み、止まる場所でプレイヤーの合図を待つ。5-1）
+        if (auto* gd = e->GetComponent<GuideComponent>()) {
+            ImGui::PushID("cmp_guide");
+            ImGui::BulletText(u8"Guide（案内ロボット）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GuideComponent>();
+            else {
+                ImGui::DragFloat(u8"進む速さ", &gd->moveSpeed, 0.05f, 0.1f, 20.0f, "%.2f m/s");
+                ImGui::DragFloat(u8"合図できる距離", &gd->signalRange, 0.05f, 0.5f, 20.0f, "%.1f m");
+                ImGui::DragFloat(u8"印の高さ", &gd->markerHeight, 0.05f, 0.0f, 10.0f, "%.2f m");
+                ImGui::TextDisabled(u8"経由点（GuidePoint）を番号の順に進む");
+            }
+            ImGui::PopID();
+        }
+        // GuidePointComponent（案内ロボットの道の経由点。5-1）
+        if (auto* gp = e->GetComponent<GuidePointComponent>()) {
+            ImGui::PushID("cmp_guidepoint");
+            ImGui::BulletText(u8"GuidePoint（道の経由点）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GuidePointComponent>();
+            else {
+                ImGui::DragInt(u8"順番", &gp->order, 0.1f, 0, 999);
+                ImGui::Checkbox(u8"ここで止まる", &gp->stopHere);
+            }
+            ImGui::PopID();
+        }
 
         // + コンポーネントを追加（UEのドロップダウン）
         // ※ Inspector の一番下に置く。新しい Component の編集欄は、これより上（ScreenUI の後ろ）に足す
@@ -675,6 +701,8 @@ namespace uel {
             if (!e->GetComponent<GameRuleComponent>() && ImGui::MenuItem(u8"GameRuleComponent（勝敗判定）")) e->AddComponent<GameRuleComponent>();
             if (!e->GetComponent<ScreenUIComponent>() && ImGui::MenuItem(u8"ScreenUIComponent（タイトル・リザルト画面）")) e->AddComponent<ScreenUIComponent>();
             if (!e->GetComponent<PartySetupComponent>() && ImGui::MenuItem(u8"PartySetupComponent（3人のチーム）")) e->AddComponent<PartySetupComponent>();
+            if (!e->GetComponent<GuideComponent>() && ImGui::MenuItem(u8"GuideComponent（案内ロボット）")) e->AddComponent<GuideComponent>();
+            if (!e->GetComponent<GuidePointComponent>() && ImGui::MenuItem(u8"GuidePointComponent（道の経由点）")) e->AddComponent<GuidePointComponent>();
             ImGui::EndPopup();
         }
         ImGui::End();

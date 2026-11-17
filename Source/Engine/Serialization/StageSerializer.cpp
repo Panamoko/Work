@@ -6,6 +6,8 @@
 #include "Engine/Components/OpponentComponent.h"
 #include "Engine/Components/AllyComponent.h"
 #include "Engine/Components/PartySetupComponent.h"
+#include "Engine/Components/GuideComponent.h"
+#include "Engine/Components/GuidePointComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Components/NavObstacleComponent.h"
@@ -57,7 +59,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 23;
+        constexpr int kSchemaLatest = 24;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -108,6 +110,9 @@ namespace uel {
             // alAtkDamage は 3-5 から使っていない（ダメージはロールの武器の表）。版 23 の形を変えないため、項目だけ残して読み書きする
             float alAtkRange = 25.0f, alAtkDamage = 34.0f, alAtkInterval = 0.8f, alAimSpread = 2.0f, alAimHeight = 1.6f;
             float alSearch = 0.3f, alReaction = 0.3f;
+            // 案内ロボットと道の経由点（v24。5-1）。初期値は Component の初期値と同じ
+            bool  hasGuide = false; float gdSpeed = 2.0f, gdSignal = 4.0f, gdMarker = 2.2f;
+            bool  hasGuidePt = false; int gpOrder = 0; bool gpStop = false;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -151,6 +156,9 @@ namespace uel {
                 if (g_loadSchema >= 23)
                     ar(CEREAL_NVP(alAtkRange), CEREAL_NVP(alAtkDamage), CEREAL_NVP(alAtkInterval), CEREAL_NVP(alAimSpread),
                         CEREAL_NVP(alAimHeight), CEREAL_NVP(alSearch), CEREAL_NVP(alReaction));                 // v23
+                if (g_loadSchema >= 24)
+                    ar(CEREAL_NVP(hasGuide), CEREAL_NVP(gdSpeed), CEREAL_NVP(gdSignal), CEREAL_NVP(gdMarker),
+                        CEREAL_NVP(hasGuidePt), CEREAL_NVP(gpOrder), CEREAL_NVP(gpStop));                      // v24
             }
         };
 
@@ -225,6 +233,12 @@ namespace uel {
             }
             if (auto* ps = e.GetComponent<PartySetupComponent>()) {
                 ed.hasParty = true; ed.ptPrefab = ps->allyPrefab; ed.ptBack = ps->spawnBack; ed.ptSide = ps->spawnSide;
+            }
+            if (auto* gd = e.GetComponent<GuideComponent>()) {
+                ed.hasGuide = true; ed.gdSpeed = gd->moveSpeed; ed.gdSignal = gd->signalRange; ed.gdMarker = gd->markerHeight;
+            }
+            if (auto* gp = e.GetComponent<GuidePointComponent>()) {
+                ed.hasGuidePt = true; ed.gpOrder = gp->order; ed.gpStop = gp->stopHere;
             }
             if (auto* pi = e.GetComponent<PrefabInstanceComponent>()) ed.prefabPath = pi->path;
             if (auto* an = e.GetComponent<AnimatorComponent>()) {
@@ -312,6 +326,14 @@ namespace uel {
             if (ed.hasParty) {
                 auto* ps = e.AddComponent<PartySetupComponent>();
                 ps->allyPrefab = ed.ptPrefab; ps->spawnBack = ed.ptBack; ps->spawnSide = ed.ptSide;
+            }
+            if (ed.hasGuide) {
+                auto* gd = e.AddComponent<GuideComponent>();
+                gd->moveSpeed = ed.gdSpeed; gd->signalRange = ed.gdSignal; gd->markerHeight = ed.gdMarker;
+            }
+            if (ed.hasGuidePt) {
+                auto* gp = e.AddComponent<GuidePointComponent>();
+                gp->order = ed.gpOrder; gp->stopHere = ed.gpStop;
             }
             if (!ed.prefabPath.empty()) e.AddComponent<PrefabInstanceComponent>()->path = ed.prefabPath;
             if (ed.hasAnimator) {
