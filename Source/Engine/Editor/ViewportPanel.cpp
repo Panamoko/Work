@@ -107,7 +107,7 @@ namespace uel {
             ImGui::SameLine(); ImGui::Checkbox(u8"当たり判定", &showHitboxes);
         }
         else {
-            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　R：リロード　右クリック：回復（Support））");
+            ImGui::TextUnformatted(u8"プレイ中（クリック：操作を始める　Esc：マウスを離す　マウス：視点　WASD：移動　Space：ジャンプ　左クリック：射撃　R：リロード　右クリック：回復（Support）　E 長押し：仲間を起こす）");
         }
 
         ImVec2 avail = ImGui::GetContentRegionAvail();
@@ -184,6 +184,7 @@ namespace uel {
             in.shootHeld = mouseCaptured && !captureClickHeld && io.MouseDown[0];           // 左クリックを押している間（連射。3-3）
             in.reloadPressed = mouseCaptured && ImGui::IsKeyPressed('R', false);            // R でリロード（3-3）
             in.healHeld = mouseCaptured && io.MouseDown[1];                                 // 右クリックを押している間（Support の回復。3-2）
+            in.interactHeld = mouseCaptured && ImGui::IsKeyDown('E');                       // E を押している間（ダウンした味方の蘇生。4-2）
             in.lookActive = mouseCaptured;                  // 固定している間は、いつでも視点が回る
             in.mouseDX = lookDX; in.mouseDY = lookDY;
             float dt = ClampDeltaTime(io.DeltaTime);     // 上限付き（EngineConfig.h）
@@ -302,6 +303,25 @@ namespace uel {
                 char roleTxt[32]; snprintf(roleTxt, sizeof(roleTxt), "ROLE: %s", RoleName(flow.playerRole));
                 shadowText(ImVec2(imgPos.x + 20.0f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 240), roleTxt);
             }
+            // 蘇生の進み具合のバー（4-2）：真ん中に横長のバーと「REVIVING」。y はバーの上端
+            auto reviveBar = [&](float y, float progress) {
+                const float bw = 220.0f, bh = 10.0f, bx = c.x - bw * 0.5f;
+                if (progress < 0.0f) progress = 0.0f; if (progress > 1.0f) progress = 1.0f;
+                dl->AddRectFilled(ImVec2(bx, y), ImVec2(bx + bw, y + bh), IM_COL32(40, 40, 40, 210));
+                dl->AddRectFilled(ImVec2(bx, y), ImVec2(bx + bw * progress, y + bh), IM_COL32(120, 230, 140, 240));
+                dl->AddRect(ImVec2(bx, y), ImVec2(bx + bw, y + bh), IM_COL32(255, 255, 255, 180));
+                const ImVec2 rs = ImGui::CalcTextSize("REVIVING");
+                shadowText(ImVec2(c.x - rs.x * 0.5f, y - rs.y - 2.0f), IM_COL32(120, 230, 140, 255), "REVIVING");
+                };
+            // プレイヤーが蘇生している：照準の下にバー。近くにダウンした味方がいる：照準の下に「E 長押し：仲間を起こす」
+            if (pc && mouseCaptured) {
+                if (pc->IsReviving()) reviveBar(c.y + 60.0f, pc->GetReviveProgress());
+                else if (pc->CanRevive()) {
+                    const char* hint = u8"E 長押し：仲間を起こす";
+                    const ImVec2 ts = ImGui::CalcTextSize(hint);
+                    shadowText(ImVec2(c.x - ts.x * 0.5f, c.y + 40.0f), IM_COL32(120, 230, 140, 255), hint);
+                }
+            }
             if (pc && pc->GetHitMarker() > 0.0f) {
                 ImU32 col = pc->GetHeadshot() ? IM_COL32(255, 60, 60, 255) : IM_COL32(255, 255, 255, 255);   // 頭=赤／胴体=白
                 dl->AddLine(ImVec2(c.x - 12, c.y - 12), ImVec2(c.x - 4, c.y - 4), col, 2.0f);
@@ -332,6 +352,8 @@ namespace uel {
                     const char* wait = u8"仲間の助けを待っています";
                     const ImVec2 ws = ImGui::CalcTextSize(wait);
                     shadowText(ImVec2(c.x - ws.x * 0.5f, dp.y + ds.y + 4.0f), IM_COL32(255, 255, 255, 240), wait);
+                    // 仲間に起こしてもらっている間は、照準の下に進み具合のバー（4-2。ダウンの時間はその間止まる）
+                    if (pls->IsBeingRevived()) reviveBar(c.y + 60.0f, pls->GetReviveProgress());
                 }
                 else if (php->hp <= 0.0f) dl->AddText(ImVec2(c.x - 45, c.y - 40), IM_COL32(255, 80, 80, 255), "YOU DIED");
             }
@@ -378,7 +400,11 @@ namespace uel {
                     char aTxt[128];
                     ImU32 aCol = IM_COL32(255, 255, 255, 240);
                     const LifeStateComponent* als = slot->GetComponent<LifeStateComponent>();
-                    if (als && als->IsDowned()) {
+                    if (als && als->IsBeingRevived()) {     // 起こしてもらっている（4-2）：進み具合（緑）
+                        snprintf(aTxt, sizeof(aTxt), "%s  REVIVING %d%%", slot->name.c_str(), (int)(als->GetReviveProgress() * 100.0f));
+                        aCol = IM_COL32(120, 230, 140, 255);
+                    }
+                    else if (als && als->IsDowned()) {
                         snprintf(aTxt, sizeof(aTxt), "%s  DOWNED %d", slot->name.c_str(), (int)std::ceil(als->GetDownTimeLeft()));
                         aCol = IM_COL32(255, 110, 90, 255);
                     }

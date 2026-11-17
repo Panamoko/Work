@@ -25,6 +25,11 @@ namespace uel {
         int   GetMagazineSize() const { return hudMagazine; }
         float GetReloadProgress() const { return hudReload; }
 
+        // 蘇生（4-2）。HUD に出す値：近くに蘇生できる味方がいるか、今蘇生しているか、その進み具合（0〜1）
+        bool  CanRevive() const { return reviveCandidateId.IsValid(); }
+        bool  IsReviving() const { return reviveTargetId.IsValid(); }
+        float GetReviveProgress() const { return hudReviveProgress; }
+
         float moveSpeed = 4.0f;
         float eyeHeight = 1.6f;
         float eyeForward = 0.5f;
@@ -61,5 +66,11 @@ namespace uel {
         int   hudAmmo = 0;              // HUD に出す値（毎フレームの最後に覚える）
         int   hudMagazine = 0;
         float hudReload = -1.0f;
+
+        // 蘇生（4-2。実行中の状態。保存しない）
+        EntityId reviveCandidateId;     // 近くにいる、蘇生できるダウンした味方（無効 = いない）
+        EntityId reviveTargetId;        // 今蘇生している味方（無効 = 蘇生していない）
+        float    reviveScanTimer = 0.0f;    // 次に近くのダウンした味方を探し直すまでの残り時間
+        float    hudReviveProgress = 0.0f;  // HUD に出す蘇生の進み具合（0〜1）
     };
 }

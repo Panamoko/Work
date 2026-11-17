@@ -40,6 +40,33 @@ namespace uel {
             return { et.position.x, et.position.y + 1.0f, et.position.z };
         }
 
+        // 蘇生できる距離（m。水平）と、近くのダウンした味方を探し直す間隔（秒）
+        constexpr float kReviveRange = 2.0f;
+        constexpr float kReviveScanInterval = 0.1f;
+
+        // XZ 平面での距離（高さの違いは見ない）
+        float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
+        {
+            const float dx = a.x - b.x, dz = a.z - b.z;
+            return std::sqrt(dx * dx + dz * dz);
+        }
+
+        // from から range の中にいる、ダウンしている味方のうち、いちばん近い1人（いなければ無効）
+        EntityId FindDownedAlly(GameContext& ctx, const Entity& self, const XMFLOAT3& from, float range)
+        {
+            EntityId best;
+            float bestDist = range;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot || slot.get() == &self || !IsFriendly(self, *slot)) continue;
+                auto* ls = slot->GetComponent<LifeStateComponent>();
+                auto* st = slot->GetComponent<TransformComponent>();
+                if (!ls || !ls->IsDowned() || !st) continue;
+                const float d = DistXZ(st->position, from);
+                if (d <= bestDist) { bestDist = d; best = slot->id; }
+            }
+            return best;
+        }
+
     } // namespace
 
     void PlayerComponent::Update(GameContext& ctx)
@@ -56,6 +83,30 @@ namespace uel {
         // 見回しは、ダウンしている間もできる（仲間が助けに来るのを見られるように。段階 4）。Dead と、状態を持たないときの HP 0 はできない
         const LifeStateComponent* life = self.GetComponent<LifeStateComponent>();
         const bool canLook = in.enabled && (life ? !life->IsDead() : !isDead);
+
+        // 蘇生（4-2）：ダウンしている味方の近く（kReviveRange）で E を押し続けると、蘇生が進む（LifeStateComponent の reviveTime 秒で立ち上がる）。
+        //   相手は、近くにいるダウンした味方のうち、いちばん近い1人。探すのは kReviveScanInterval ごと（毎フレーム World を全部見ない）。
+        //   蘇生している間は、動けない・撃てない・回復できない・リロードできない（見回しはできる）。攻撃されても続ける（ユーザーが選んだ）。
+        //   ほかの人（AI 仲間）がもう蘇生している相手には、手を足さない（2人で蘇生しても速くならない）
+        reviveScanTimer -= dt;
+        if (!canAct) reviveCandidateId = EntityId{};
+        else if (reviveScanTimer <= 0.0f) {
+            reviveScanTimer = kReviveScanInterval;
+            reviveCandidateId = FindDownedAlly(ctx, self, t->position, kReviveRange);
+        }
+        Entity* reviveE = ctx.world.Get(reviveCandidateId);
+        LifeStateComponent* reviveLife = reviveE ? reviveE->GetComponent<LifeStateComponent>() : nullptr;
+        const TransformComponent* reviveT = reviveE ? reviveE->GetComponent<TransformComponent>() : nullptr;
+        if (!reviveLife || !reviveLife->IsDowned() || !reviveT || DistXZ(reviveT->position, t->position) > kReviveRange) {
+            reviveCandidateId = EntityId{};     // 立ち上がった・Dead になった・離れた（毎フレームの軽い確かめ）
+            reviveLife = nullptr;
+        }
+        const bool othersReviving = reviveLife && reviveLife->IsBeingRevived() && reviveLife->GetReviver() != self.id;
+        const bool reviving = canAct && in.interactHeld && reviveLife && !othersReviving;
+        if (reviving) reviveLife->AddReviveProgress(self.id, dt);
+        reviveTargetId = reviving ? reviveCandidateId : EntityId{};
+        hudReviveProgress = reviving ? reviveLife->GetReviveProgress() : 0.0f;
+        const bool canMove = canAct && !reviving;           // 蘇生している間は、手がふさがる
 
         // 対象メッシュ取得（assetId空は手続き立方体）
         auto meshOf = [&](Entity* ge) -> std::shared_ptr<Mesh> {
@@ -80,7 +131,7 @@ namespace uel {
         // 移動量
         float dx = 0.0f, dz = 0.0f;
         float speed = moveSpeed * dt;
-        if (canAct) {
+        if (canMove) {
             if (in.keyW) { dx += sy * speed; dz += cy * speed; }
             if (in.keyS) { dx -= sy * speed; dz -= cy * speed; }
             if (in.keyD) { dx += cy * speed; dz -= sy * speed; }
@@ -130,7 +181,7 @@ namespace uel {
 
         // 重力・接地・ジャンプ
         bool grounded = (t->position.y <= ground + 0.001f);
-        const bool jumped = grounded && canAct && in.jumpPressed;
+        const bool jumped = grounded && canMove && in.jumpPressed;
         if (jumped) velY = 6.0f;
         velY -= 15.0f * dt;
         t->position.y += velY * dt;
@@ -147,7 +198,7 @@ namespace uel {
         //   自分は回復しない（イラリーと同じ。ユーザーが選んだ）。調べ直すのは kHealTraceInterval ごと（その間は同じ相手を回復する）。
         //   右クリックを押している間は撃たない（攻撃と回復は同時に使わない。AI 仲間と同じ決まり）
         const SupportComponent* support = self.GetComponent<SupportComponent>();
-        const bool healHeld = support && canAct && in.healHeld;
+        const bool healHeld = support && canMove && in.healHeld;
         if (!healHeld) {
             healTargetId = EntityId{};
             healTraceTimer = 0.0f;          // 次に押したら、すぐ調べる
@@ -182,11 +233,11 @@ namespace uel {
         const WeaponStats& weapon = role ? role->GetWeapon() : DefaultWeapon();
         WeaponState& weaponState = role ? role->weaponState : fallbackWeapon;
         UpdateWeapon(weapon, weaponState, dt);
-        if (canAct && in.reloadPressed) StartReload(weapon, weaponState);
+        if (canMove && in.reloadPressed) StartReload(weapon, weaponState);
 
         const bool trigger = weapon.automatic ? in.shootHeld : in.shootClicked;
         bool shot = false;
-        if (canAct && trigger && !healHeld) {
+        if (canMove && trigger && !healHeld) {
             // 弾の線が何に当たるか（UE の LineTrace）→ ダメージ（UE の ApplyPointDamage）は FireWeapon の中（Game/WeaponTrace の関数）
             const WeaponFireResult fire = FireWeapon(ctx, weapon, weaponState, eyePos, rd);
             shot = fire.fired;
