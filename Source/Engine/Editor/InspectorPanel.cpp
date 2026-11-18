@@ -27,6 +27,7 @@
 #include "Engine/Components/PartySetupComponent.h"
 #include "Engine/Components/GuideComponent.h"
 #include "Engine/Components/GuidePointComponent.h"
+#include "Engine/Components/BossComponent.h"
 
 #include <imgui.h>
 #include <cctype>
@@ -519,6 +520,12 @@ namespace uel {
             else {
                 ImGui::DragFloat(u8"移動速度##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
                 ImGui::DragFloat(u8"止まる距離", &ec->stopRange, 0.1f, 0.0f, 20.0f);
+                // 攻撃（5-3 から保存する。版 26）。届く距離は止まる距離より長くする（短いと、届かない所で止まって攻撃しない）
+                ImGui::DragFloat(u8"攻撃の届く距離", &ec->attackRange, 0.05f, 0.1f, 20.0f, "%.2f m");
+                ImGui::DragFloat(u8"攻撃のダメージ", &ec->attackDamage, 0.5f, 0.0f, 1000.0f, "%.1f");
+                ImGui::DragFloat(u8"攻撃の間隔", &ec->attackInterval, 0.05f, 0.1f, 10.0f, u8"%.2f 秒");
+                if (ec->attackRange < ec->stopRange)
+                    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), u8"届く距離が止まる距離より短いので、攻撃が届きません");
             }
             ImGui::PopID();
         }
@@ -672,6 +679,17 @@ namespace uel {
             }
             ImGui::PopID();
         }
+        // BossComponent（ボスの目印。画面の上に HP バーを出す。5-3）
+        if (auto* bs = e->GetComponent<BossComponent>()) {
+            ImGui::PushID("cmp_boss");
+            ImGui::BulletText(u8"Boss（ボスの目印）"); ImGui::SameLine();
+            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<BossComponent>();
+            else {
+                editStr(u8"表示する名前", bs->displayName);
+                ImGui::TextDisabled(u8"OpponentComponent と HPComponent も付ける");
+            }
+            ImGui::PopID();
+        }
         // GuidePointComponent（案内ロボットの道の経由点。5-1）
         if (auto* gp = e->GetComponent<GuidePointComponent>()) {
             ImGui::PushID("cmp_guidepoint");
@@ -706,6 +724,7 @@ namespace uel {
             if (!e->GetComponent<PartySetupComponent>() && ImGui::MenuItem(u8"PartySetupComponent（3人のチーム）")) e->AddComponent<PartySetupComponent>();
             if (!e->GetComponent<GuideComponent>() && ImGui::MenuItem(u8"GuideComponent（案内ロボット）")) e->AddComponent<GuideComponent>();
             if (!e->GetComponent<GuidePointComponent>() && ImGui::MenuItem(u8"GuidePointComponent（道の経由点）")) e->AddComponent<GuidePointComponent>();
+            if (!e->GetComponent<BossComponent>() && ImGui::MenuItem(u8"BossComponent（ボスの目印）")) e->AddComponent<BossComponent>();
             ImGui::EndPopup();
         }
         ImGui::End();

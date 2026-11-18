@@ -31,7 +31,7 @@
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | **済み**（2026-11-16）。2-1 射撃を共通の処理に（`Game/WeaponTrace`）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ → b 弾の線の表示 → c Inspector と保存。版 23）→ 2-3 Support の回復（a 選んで回復する → b 回復の線の表示） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | **仕組みは済み**（2026-11-16）。3-1 マウスを固定する視点操作 → 3-2 プレイヤーの Support の回復（右クリック）→ 3-3 武器の仕組み（`Game/Weapon`。連射・装弾数・リロード・HUD の弾数）→ 3-5 AI 仲間も同じ武器で撃つ。**各ロールの武器の種類と値は、キャラのモデルが決まってから**（ユーザーの希望。今は3ロールとも同じ仮の値） |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | **済み**（2026-11-17）。4-1 ダウンの状態（`LifeStateComponent`・ゲームオーバーの判定）→ 4-2 プレイヤーが E 長押しで起こす → 4-3 AI 仲間が起こしに行く（予約）→ 4-4 見た目（ダウンの印・画面の色・低い視点・アニメのパラメータ） |
-| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める → 5-3 仮のボス → 5-4 Stage を作る・NavGrid の範囲 → 5-5 Result の画面 |
+| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める（**済み** 2026-11-18。版 25）→ 5-3 仮のボス → 5-4 Stage を作る・NavGrid の範囲 → 5-5 Result の画面 |
 | 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
 | 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
@@ -74,7 +74,7 @@
   - プレイヤー（4-2）：2m 以内でいちばん近いダウンした味方を、**E を押し続けて**起こす（その間は動けない・撃てない・回復できない・リロードできない）。ほかの人が起こしている相手には手を足さない。
   - AI 仲間（4-3。AI の Phase 2）：ダウンした味方（プレイヤーも）がいれば、**追従・回復より先に**駆け寄って起こす（L4D2 のボットと同じ）。向かう前に `ReserveRevive` で**予約**し、予約のある相手はもう1人の AI は選ばない（2人とも行かない。UE の Smart Object の予約・AI の Token の考え方）。予約は毎フレーム更新し、0.5 秒更新が無いと外れる。プレイヤーが先に起こし始めたら AI はあきらめる。走っている間は撃つ、起こしている間は撃たない・回復しない。**危険は避けない**（段階 9）。
   - 見た目（4-4）：プレイヤーのダウン中は画面を暗い赤で覆い、`DOWNED 秒数` と「仲間の助けを待っています」、目の高さを 3 割下げる。起こされている間は照準の下に `REVIVING` のバー。ダウンした仲間には赤く脈打つ丸と「+」、`DOWNED 秒数 距離`（壁越しでも見え、画面の外なら方向の画面の端に出す）。Dead の名札の下に `DEAD`。アニメへ `Downed`（Bool。Dead も同時に true）と `Revive`（Bool）を渡す（グラフにはまだ無い）。
-- **ウェーブの進め方**（段階 5。ユーザーが選んだ 2026-11-17。5-1 は済み）：**通常 3 ウェーブ＋ボス**。**案内役の小さいロボット**が道を進み、「止まる場所」に着いたらその場所のウェーブが始まる（ウェーブの間の時間は、ステージの大きさ＝ロボットが進む距離で決まる）。
+- **ウェーブの進め方**（段階 5。ユーザーが選んだ 2026-11-17。5-1・5-2 は済み）：**通常 3 ウェーブ＋ボス**。**案内役の小さいロボット**が道を進み、「止まる場所」に着いたらその場所のウェーブが始まる（ウェーブの間の時間は、ステージの大きさ＝ロボットが進む距離で決まる）。
   - ロボットは、ウェーブを倒した後、**プレイヤーが近くでキーを押して合図すると**次へ進む（L4D のセーフルームの扉に近い）。
   - 敵はロボットを**攻撃しない**（案内だけ。守る要素は後で足せる）。
   - 道は Scene に置く**経由点の Entity**（順番と「ここで止まる」）。UE の Target Point / スプラインに当たる。
@@ -90,6 +90,13 @@
     - アニメへ `Speed`（Float）と `Waiting`（Bool）。ロボットのモデルは `Data/Model/Direction Robot/friendly_sci-fi_robot_with_animations.glb`（高さ約 2m。アニメは Free_Fall・Look_Wave・Sitting だけで、歩きが無い）。
     - **ロボットと経由点の Entity は、「+ 作成」で付く MeshRenderer（灰色の立方体）を外す**（残すと壁として弾を止め、地面にもなる）。
     - 制限：ロボットはプレイヤーを待たずに進む、プレイヤーはすり抜ける、ロボットが2体あると同じ道を使い印は1体目だけ。
+  - **5-2 止まる場所でウェーブを始める**（済み。コミット `b38dca4`）：
+    - `SpawnerComponent::activateAtStop`（保存する。版 25 の `spStop`）：0 = Play の始めから（今までどおり。版 24 以前のファイルもこれ）、1 以上 = ロボットの `GetStopsReached()` がその番号に届いたら始まる（`CheckActivation`）。それまでは眠っている（`IsDormant()`）。**眠っている Spawner は「終わっていない」**ので、GameRule のクリア判定は変えずに使える。止まる場所の Spawner はウェーブ数 1 で使う想定（2 以上ならその場所で小さい波が続く）。
+    - Spawner はロボットの ID を覚え、見つからないときだけ 0.5 秒ごとに探す。エラーの文は `ErrorText()`：`Spawner: prefab not found` / `no guide robot` / `stop not on route`（番号が止まる場所の数より大きい）。HUD の上の真ん中に赤で出す。
+    - ロボット：止まっている間、今の番号の Spawner が1つでも終わっていなければ `IsFighting()`（0.2 秒ごとに調べる。着いた瞬間にも調べる。眠っている Spawner も「終わっていない」に入るので、更新の順番に左右されない）。その間は F を受け付けない。終わった瞬間に 3 秒「WAVE CLEAR」と「ロボットのところで F を押すと、次へ進みます」（最後の点では出さない）。Spawner の無い止まる場所は、すぐ合図を待つ。
+    - 作り：Spawner がロボットを見て始まり、ロボットが Spawner を見て合図を受け付ける（直接見合う形）。部品が増えたら、ウェーブを管理する部品（UE の GameMode / GameState）にまとめる案。
+    - HUD：ロボットがいて止まる場所が1つ以上あれば、上の真ん中は `WAVE 着いた止まる場所の数 / 止まる場所の数`（N は Spawner の無い止まる場所も数える）。大きな「WAVE n」は、いちばん新しく始まった Spawner の `activateAtStop`。ロボットの印の下は「戦闘中 / 合図待ち / 移動中 距離」。
+    - 制限：止まる場所の番号は「ここで止まる」の点を順に数えたものなので、経由点を足し引きするとずれる。止まる場所に着くまで、そこの敵は出ない。
 - **画面に出すゲームの文字**：「**蘇**」は ImGui の日本語の範囲（`GetGlyphRangesJapanese`）に入っていない（「?」になる。`imgui_draw.cpp` の表で確かめた）。HUD では「起こす」と書く。ほかの漢字も、HUD に新しく使うときは範囲に入っているか確かめる（仲・間・助・待・長・押は入っている）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
@@ -359,12 +366,12 @@ Source/Engine/
 | Role / Tank / DPS / Support | ロール（「何ができるか」。UE の GAS の Ability）。`RoleComponent::GetRole()`、`GetWeapon()`（`Game/Weapon` の表から）、`weaponState`（弾の残りなど。3-3）。Support だけ回復の値を持つ（2-3a）。アビリティは段階 6。保存しない（PartySetup が付ける） | Support：`healPerSecond, healRange, healStartRatio, healStopRatio` |
 | LifeState | ダウン・蘇生（段階 4。0章「ダウン・蘇生」）。Alive → Downed → Dead。Alive 以外の間は HP を 0 に保つ。保存しない（PartySetup が3人に付ける） | `downDuration`（30）`, reviveTime`（3）`, reviveHpRatio`（0.5）。`AddReviveProgress, GetReviveProgress, IsBeingRevived, GetReviver, ReserveRevive, IsTakenByOther, GetDownTimeLeft` |
 | PartySetup | Stage の開始時に3人をそろえる（UE の GameMode）。0章「3人の配置」 | `allyPrefab, spawnBack, spawnSide`（保存する）。`HasError()` |
-| Guide | 案内ロボット（段階 5。0章「ウェーブの進め方」）。経由点を `order` の順にまっすぐ進み、止まる場所で F の合図を待つ | `moveSpeed, signalRange, markerHeight`（保存する。版 24）。`GetState, CanSignal, GetStopsReached, GetStopCount, HasError`。アニメへ `Speed / Waiting` |
+| Guide | 案内ロボット（段階 5。0章「ウェーブの進め方」）。経由点を `order` の順にまっすぐ進み、止まる場所で F の合図を待つ | `moveSpeed, signalRange, markerHeight`（保存する。版 24）。`GetState, CanSignal, GetStopsReached, GetStopCount, HasError, IsFighting, ClearBannerTime`（5-2）。アニメへ `Speed / Waiting` |
 | GuidePoint | 案内ロボットの道の経由点（ヘッダだけ。Update なし） | `order, stopHere`（保存する。版 24） |
 | Opponent | 敵。NavGrid の経路で、HP の残っている敵対陣営（プレイヤー・AI 仲間）のいちばん近い相手を追い、近づいたら攻撃（1-2b）。HP 0 で倒れてから消える。撃たれるとモンタージュ `HitReact` でひるむ（定義が無ければひるまない） | `moveSpeed, stopRange, attackRange, attackDamage, attackInterval, attackHitDelay, attackMoveLock, deathDelay`。アニメへ `Speed / Attack / Dead` を渡し、通知 `Hit` でダメージ |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
-| Spawner | Prefab から敵をウェーブで湧かせる | `prefabPath, waveCount, baseCount, countIncrease, spawnInterval, firstDelay, waveDelay, spawnRadius` |
+| Spawner | Prefab から敵をウェーブで湧かせる。`activateAtStop` が 1 以上なら、案内ロボットがその止まる場所に着いたら始まる（5-2） | `prefabPath, waveCount, baseCount, countIncrease, spawnInterval, firstDelay, waveDelay, spawnRadius, activateAtStop`（版 25）。`IsFinished, IsDormant, HasError, ErrorText, CurrentWave, BannerTime` |
 | GameRule | 勝敗判定 → Scene遷移 | `winScene, loseScene, endDelay` |
 | ScreenUI | Title / Result / ロール選択の画面 | `title, subtitle, buttonText, nextScene, showResult, roleSelect`（オンで3つのロールのボタン。1-3b） |
 | PrefabInstance | どの Prefab から作ったか | `path` |
@@ -377,7 +384,7 @@ Source/Engine/
 - NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
 - 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
 - HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブ、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）、Support の回復の線（黒い縁＋脈打つ緑。回復している間ずっと。自分を回復しているときは胸に緑の輪。プレイヤーが回復されているときは HP バーの右に「+ HEAL」。2-3b）、右下に弾数（3-3）、AI 仲間の HP の横に弾数・DOWNED・REVIVING・DEAD、ダウンの表示と印（段階 4。0章「ダウン・蘇生」）、案内ロボットの印と「F：ロボットを進める」（5-1。`GuideOverlay.cpp`）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
-  - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体
+  - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体（眠っている Spawner は終わっていない扱い。5-2）
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
 - 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
 - 一人称：プレイヤーの `SkinnedMesh::fpHideBone`（頭など）のスケールをほぼ 0 にして、カメラの前に自分の頭が映らないようにする。
@@ -474,7 +481,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 24。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 25。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -500,6 +507,7 @@ Source/Engine/
 | 22 | PartySetup（`hasParty, ptPrefab, ptBack, ptSide`） |
 | 23 | Ally の攻撃（`alAtkRange, alAtkDamage, alAtkInterval, alAimSpread, alAimHeight, alSearch, alReaction`） |
 | 24 | 案内ロボットと経由点（`hasGuide, gdSpeed, gdSignal, gdMarker, hasGuidePt, gpOrder, gpStop`） |
+| 25 | Spawner の始める止まる場所（`spStop`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -644,7 +652,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1 道と案内ロボットは済み。次は 5-2。2026-11-17）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1 道と案内ロボット・5-2 止まる場所でウェーブは済み。次は 5-3 仮のボス。2026-11-18）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 

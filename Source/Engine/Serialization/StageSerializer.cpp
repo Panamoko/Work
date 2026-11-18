@@ -8,6 +8,7 @@
 #include "Engine/Components/PartySetupComponent.h"
 #include "Engine/Components/GuideComponent.h"
 #include "Engine/Components/GuidePointComponent.h"
+#include "Engine/Components/BossComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Components/NavObstacleComponent.h"
@@ -59,7 +60,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 25;
+        constexpr int kSchemaLatest = 26;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -114,6 +115,9 @@ namespace uel {
             bool  hasGuide = false; float gdSpeed = 2.0f, gdSignal = 4.0f, gdMarker = 2.2f;
             bool  hasGuidePt = false; int gpOrder = 0; bool gpStop = false;
             int   spStop = 0;   // Spawner の「始める止まる場所」（v25。5-2）。0 = 最初から（版 24 以前のファイルはこの値で読まれ、今までどおり動く）
+            // 敵の攻撃の値（v26。5-3）。初期値は OpponentComponent の初期値と同じ（版 25 以前のファイルはこの値で読まれ、今までどおり動く）
+            float oppAtkRange = 1.5f, oppAtkDamage = 10.0f, oppAtkInterval = 1.0f;
+            bool  hasBoss = false; std::string bsName = "BOSS";   // ボスの目印（v26。5-3）
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -161,6 +165,9 @@ namespace uel {
                     ar(CEREAL_NVP(hasGuide), CEREAL_NVP(gdSpeed), CEREAL_NVP(gdSignal), CEREAL_NVP(gdMarker),
                         CEREAL_NVP(hasGuidePt), CEREAL_NVP(gpOrder), CEREAL_NVP(gpStop));                      // v24
                 if (g_loadSchema >= 25) ar(CEREAL_NVP(spStop));                                                 // v25
+                if (g_loadSchema >= 26)
+                    ar(CEREAL_NVP(oppAtkRange), CEREAL_NVP(oppAtkDamage), CEREAL_NVP(oppAtkInterval),
+                        CEREAL_NVP(hasBoss), CEREAL_NVP(bsName));                                               // v26
             }
         };
 
@@ -182,7 +189,11 @@ namespace uel {
                 ed.mesh.submeshRole.assign(m->submeshRole.begin(), m->submeshRole.end());
             }
             if (auto* hpc = e.GetComponent<HPComponent>()) { ed.hasHP = true; ed.hp = hpc->hp; ed.maxHp = hpc->maxHp; }
-            if (auto* op = e.GetComponent<OpponentComponent>()) { ed.hasOpponent = true; ed.oppMoveSpeed = op->moveSpeed; ed.oppStopRange = op->stopRange; }
+            if (auto* op = e.GetComponent<OpponentComponent>()) {
+                ed.hasOpponent = true; ed.oppMoveSpeed = op->moveSpeed; ed.oppStopRange = op->stopRange;
+                ed.oppAtkRange = op->attackRange; ed.oppAtkDamage = op->attackDamage; ed.oppAtkInterval = op->attackInterval;
+            }
+            if (auto* bs = e.GetComponent<BossComponent>()) { ed.hasBoss = true; ed.bsName = bs->displayName; }
             if (auto* al = e.GetComponent<AllyComponent>()) {
                 ed.hasAlly = true; ed.alMoveSpeed = al->moveSpeed; ed.alFollowDist = al->followDistance;
                 ed.alResumeDist = al->resumeDistance; ed.alRepath = al->repathInterval;
@@ -270,7 +281,11 @@ namespace uel {
                 m->submeshRole.assign(ed.mesh.submeshRole.begin(), ed.mesh.submeshRole.end());
             }
             if (ed.hasHP) { auto* hpc = e.AddComponent<HPComponent>(); hpc->hp = ed.hp; hpc->maxHp = ed.maxHp; }
-            if (ed.hasOpponent) { auto* op = e.AddComponent<OpponentComponent>(); op->moveSpeed = ed.oppMoveSpeed; op->stopRange = ed.oppStopRange; }
+            if (ed.hasOpponent) {
+                auto* op = e.AddComponent<OpponentComponent>(); op->moveSpeed = ed.oppMoveSpeed; op->stopRange = ed.oppStopRange;
+                op->attackRange = ed.oppAtkRange; op->attackDamage = ed.oppAtkDamage; op->attackInterval = ed.oppAtkInterval;
+            }
+            if (ed.hasBoss) e.AddComponent<BossComponent>()->displayName = ed.bsName;
             if (ed.hasAlly) {
                 auto* al = e.AddComponent<AllyComponent>();
                 al->moveSpeed = ed.alMoveSpeed; al->followDistance = ed.alFollowDist;

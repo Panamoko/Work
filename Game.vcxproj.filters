@@ -371,6 +371,12 @@
     <ClInclude Include="Source\Engine\Editor\GuideOverlay.h">
       <Filter>Source\Engine\Editor</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Components\BossComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Editor\WaveOverlay.h">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -569,6 +575,9 @@
       <Filter>Source\Engine\Components</Filter>
     </ClCompile>
     <ClCompile Include="Source\Engine\Editor\GuideOverlay.cpp">
+      <Filter>Source\Engine\Editor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Editor\WaveOverlay.cpp">
       <Filter>Source\Engine\Editor</Filter>
     </ClCompile>
   </ItemGroup>
