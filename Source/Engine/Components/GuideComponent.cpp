@@ -5,6 +5,7 @@
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/HPComponent.h"
 #include "Engine/Components/AnimatorComponent.h"
+#include "Engine/Components/SpawnerComponent.h"
 #include "Engine/Game/GameContext.h"
 #include "Engine/Game/InputState.h"
 #include "Engine/Scene/World.h"
@@ -23,6 +24,8 @@ namespace uel {
         constexpr float kTurnSpeed = 360.0f;        // 向きを変える速さ（度/秒）。急に向きが変わらないように
         constexpr float kGroundInterval = 0.1f;     // 進んでいる間、地面の高さを調べる間隔（秒）。毎フレームは調べない
         constexpr float kGroundFollow = 12.0f;      // 地面の高さへ寄せる速さ（大きいほどすぐ合わせる）
+        constexpr float kWaveCheckInterval = 0.2f;  // 止まっている間、ウェーブが終わったかを調べる間隔（秒。5-2）
+        constexpr float kClearBannerTime = 3.0f;    // 「WAVE CLEAR」を出す時間（秒。5-2）
 
         float DistXZ(const XMFLOAT3& a, const XMFLOAT3& b)
         {
@@ -93,6 +96,18 @@ namespace uel {
         state = routeEmpty ? State::Finished : State::Waiting;
     }
 
+    // 今止まっている場所（stopsReached 番目）の Spawner が、1つでもまだ終わっていなければ true。
+    // まだ始まっていない（眠っている）Spawner も「終わっていない」に入る（着いたフレームの順番に左右されない）
+    bool GuideComponent::StopWaveRemaining(World& world) const
+    {
+        for (const auto& slot : world.Slots()) {
+            if (!slot) continue;
+            const auto* sp = slot->GetComponent<SpawnerComponent>();
+            if (sp && sp->activateAtStop == stopsReached && !sp->IsFinished()) return true;
+        }
+        return false;
+    }
+
     void GuideComponent::Update(GameContext& ctx)
     {
         Entity& self = ctx.self;
@@ -118,7 +133,23 @@ namespace uel {
         canSignal = false;
         float speedNow = 0.0f;
 
-        if (state == State::Waiting) {
+        // 止まる場所のウェーブ（5-2）：止まっている間、その場所の Spawner が全部終わったかを 0.2 秒ごとに調べる。
+        // 終わるまでは合図を受け付けない。終わった瞬間に「WAVE CLEAR」を出す（最後の点では出さない。ステージクリアになるため）
+        if (clearBanner > 0.0f) clearBanner -= dt;
+        if (state != State::Moving && stopsReached > 0) {
+            waveCheckTimer -= dt;
+            if (waveCheckTimer <= 0.0f) {
+                waveCheckTimer = kWaveCheckInterval;
+                const bool wasFighting = fighting;
+                fighting = StopWaveRemaining(ctx.world);
+                if (wasFighting && !fighting && next < route.size()) clearBanner = kClearBannerTime;
+            }
+        }
+        else {
+            fighting = false;
+        }
+
+        if (state == State::Waiting && !fighting) {
             // 合図を待つ：プレイヤーが近く（水平に signalRange 以内）にいて、戦える（HP が残っている。ダウン中は合図できない）なら、
             // F で出発する。近くにいる間は、プレイヤーのほうを向く（話しかけられる相手だと分かるように）
             const TransformComponent* pt = player ? player->GetComponent<TransformComponent>() : nullptr;
@@ -152,6 +183,8 @@ namespace uel {
                 if (goal.stop) {
                     ++stopsReached;
                     state = (next < route.size()) ? State::Waiting : State::Finished;
+                    fighting = StopWaveRemaining(ctx.world);    // 着いたらすぐ調べる（ウェーブがあれば、その間は合図を受け付けない）
+                    waveCheckTimer = kWaveCheckInterval;
                 }
                 else if (next >= route.size()) {
                     state = State::Finished;

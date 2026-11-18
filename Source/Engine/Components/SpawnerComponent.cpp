@@ -3,6 +3,7 @@
 #include "Engine/Scene/World.h"
 #include "Engine/Components/TransformComponent.h"
 #include "Engine/Serialization/StageSerializer.h"
+#include "Engine/Components/GuideComponent.h"
 #include <cmath>
 #include <algorithm>
 
@@ -14,11 +15,40 @@ namespace uel {
         return (rng & 0xFFFFFF) / 16777216.0f;
     }
 
+    // 始めてよいか（5-2）。activateAtStop が 0 なら、すぐ始める（今までどおり）。
+    // 1 以上なら、案内ロボットが「着いた止まる場所の数」がその番号に届いたら始める（UE で、トリガーが Spawner を起動する作り）。
+    // ロボットの ID は覚えておき、見つからないときだけ 0.5 秒ごとに探し直す（毎フレーム Scene を探さない）
+    bool SpawnerComponent::CheckActivation(GameContext& ctx)
+    {
+        if (activateAtStop <= 0) return true;
+
+        const GuideComponent* guide = nullptr;
+        if (Entity* g = ctx.world.Get(guideId)) guide = g->GetComponent<GuideComponent>();
+        if (!guide) {
+            guideSearchTimer -= ctx.dt;
+            if (guideSearchTimer > 0.0f) return false;
+            guideSearchTimer = 0.5f;
+            for (const auto& slot : ctx.world.Slots()) {
+                if (!slot) continue;
+                if (const auto* gc = slot->GetComponent<GuideComponent>()) { guide = gc; guideId = slot->id; break; }
+            }
+            if (!guide) { errorText = "Spawner: no guide robot"; return false; }
+        }
+        // 道の止まる場所が足りない（その番号に着くことが無い）。道を集めるのはロボットの最初の Update なので、
+        // 集める前（止まる場所の数が 0 で、エラーでもない）は判断しない
+        if (guide->GetStopCount() > 0 && activateAtStop > guide->GetStopCount()) { errorText = "Spawner: stop not on route"; return false; }
+        errorText = nullptr;
+        return guide->GetStopsReached() >= activateAtStop;
+    }
+
     void SpawnerComponent::Update(GameContext& ctx)
     {
         if (finished) return;
         float dt = ctx.dt;
-        if (!started) { started = true; state = State::Waiting; timer = firstDelay; }
+        if (!started) {
+            if (!CheckActivation(ctx)) return;      // ロボットを待っている（眠っている）
+            started = true; state = State::Waiting; timer = firstDelay;
+        }
         if (banner > 0.0f) banner -= dt;
 
         // 倒された（Destroyされた）敵をリストから外す

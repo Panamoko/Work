@@ -59,7 +59,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 24;
+        constexpr int kSchemaLatest = 25;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -113,6 +113,7 @@ namespace uel {
             // 案内ロボットと道の経由点（v24。5-1）。初期値は Component の初期値と同じ
             bool  hasGuide = false; float gdSpeed = 2.0f, gdSignal = 4.0f, gdMarker = 2.2f;
             bool  hasGuidePt = false; int gpOrder = 0; bool gpStop = false;
+            int   spStop = 0;   // Spawner の「始める止まる場所」（v25。5-2）。0 = 最初から（版 24 以前のファイルはこの値で読まれ、今までどおり動く）
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -159,6 +160,7 @@ namespace uel {
                 if (g_loadSchema >= 24)
                     ar(CEREAL_NVP(hasGuide), CEREAL_NVP(gdSpeed), CEREAL_NVP(gdSignal), CEREAL_NVP(gdMarker),
                         CEREAL_NVP(hasGuidePt), CEREAL_NVP(gpOrder), CEREAL_NVP(gpStop));                      // v24
+                if (g_loadSchema >= 25) ar(CEREAL_NVP(spStop));                                                 // v25
             }
         };
 
@@ -216,6 +218,7 @@ namespace uel {
                 ed.spWaves = sp->waveCount; ed.spBase = sp->baseCount; ed.spInc = sp->countIncrease;
                 ed.spInterval = sp->spawnInterval; ed.spFirstDelay = sp->firstDelay;
                 ed.spWaveDelay = sp->waveDelay; ed.spRadius = sp->spawnRadius;
+                ed.spStop = sp->activateAtStop;
             }
             if (auto* shc = e.GetComponent<ShaderComponent>()) {
                 ed.hasShader = true;
@@ -307,6 +310,7 @@ namespace uel {
                 sp->waveCount = ed.spWaves; sp->baseCount = ed.spBase; sp->countIncrease = ed.spInc;
                 sp->spawnInterval = ed.spInterval; sp->firstDelay = ed.spFirstDelay;
                 sp->waveDelay = ed.spWaveDelay; sp->spawnRadius = ed.spRadius;
+                sp->activateAtStop = ed.spStop;
             }
             if (ed.hasShader) {
                 auto* shc = e.AddComponent<ShaderComponent>();

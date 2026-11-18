@@ -23,6 +23,7 @@
 #include "Engine/Components/PartySetupComponent.h"
 #include "Engine/Components/LifeStateComponent.h"
 #include "Engine/Editor/GuideOverlay.h"
+#include "Engine/Components/GuideComponent.h"
 
 #include <cfloat>
 #include <cmath>
@@ -434,26 +435,39 @@ namespace uel {
                     by -= 20.0f;
                 }
             }
-            // ウェーブ表示（Spawnerがある時）
+            // ウェーブ表示（Spawnerがある時）。
+            // 案内ロボット（止まる場所が1つ以上）がいれば、ウェーブは「止まる場所」で数える（5-2）：WAVE 着いた止まる場所の数 / 止まる場所の数。
+            // いなければ今までどおり、最初の Spawner のウェーブ。大きな「WAVE n」は、今いちばん新しく始まった Spawner のもの
             {
-                SpawnerComponent* sp = nullptr;
+                SpawnerComponent* sp = nullptr;          // 最初の Spawner
+                SpawnerComponent* errSp = nullptr;       // エラーのある Spawner
+                SpawnerComponent* bannerSp = nullptr;    // 「WAVE n」を出している Spawner（残り時間がいちばん長い＝いちばん新しい）
+                const GuideComponent* guide = nullptr;
                 int enemies = 0;
                 for (const auto& slot : world.Slots()) {
                     if (!slot) continue;
-                    if (!sp) sp = slot->GetComponent<SpawnerComponent>();
+                    if (auto* s = slot->GetComponent<SpawnerComponent>()) {
+                        if (!sp) sp = s;
+                        if (!errSp && s->HasError()) errSp = s;
+                        if (s->BannerTime() > 0.0f && (!bannerSp || s->BannerTime() > bannerSp->BannerTime())) bannerSp = s;
+                    }
+                    if (!guide) guide = slot->GetComponent<GuideComponent>();
                     if (slot->GetComponent<OpponentComponent>()) ++enemies;
                 }
+                const bool byStops = guide && guide->GetStopCount() > 0;
                 if (sp) {
                     char wbuf[96];
-                    if (sp->HasError()) snprintf(wbuf, sizeof(wbuf), "Spawner: prefab not found");
+                    if (errSp) snprintf(wbuf, sizeof(wbuf), "%s", errSp->ErrorText());
+                    else if (byStops) snprintf(wbuf, sizeof(wbuf), "WAVE %d / %d    ENEMIES %d", guide->GetStopsReached(), guide->GetStopCount(), enemies);
                     else snprintf(wbuf, sizeof(wbuf), "WAVE %d / %d    ENEMIES %d", sp->CurrentWave(), sp->waveCount, enemies);
                     ImVec2 ts = ImGui::CalcTextSize(wbuf);
-                    dl->AddText(ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, imgPos.y + 12.0f), IM_COL32(255, 255, 255, 230), wbuf);
+                    dl->AddText(ImVec2(imgPos.x + (viewWidth - ts.x) * 0.5f, imgPos.y + 12.0f), errSp ? IM_COL32(255, 120, 120, 255) : IM_COL32(255, 255, 255, 230), wbuf);
 
-                    if (sp->BannerTime() > 0.0f) {                     // ウェーブ開始の大きな表示
-                        char bbuf[32]; snprintf(bbuf, sizeof(bbuf), "WAVE %d", sp->CurrentWave());
+                    if (bannerSp) {                                    // ウェーブ開始の大きな表示
+                        const int n = (byStops && bannerSp->activateAtStop > 0) ? bannerSp->activateAtStop : bannerSp->CurrentWave();
+                        char bbuf[32]; snprintf(bbuf, sizeof(bbuf), "WAVE %d", n);
                         ImFont* font = ImGui::GetFont();
-                        float a = (sp->BannerTime() > 1.0f) ? 1.0f : sp->BannerTime();   // 最後の1秒でフェードアウト
+                        float a = (bannerSp->BannerTime() > 1.0f) ? 1.0f : bannerSp->BannerTime();   // 最後の1秒でフェードアウト
                         ImVec2 bs = font->CalcTextSizeA(48.0f, FLT_MAX, 0.0f, bbuf);
                         dl->AddText(font, 48.0f, ImVec2(imgPos.x + (viewWidth - bs.x) * 0.5f, imgPos.y + viewHeight * 0.25f),
                             IM_COL32(255, 220, 80, (int)(255 * a)), bbuf);

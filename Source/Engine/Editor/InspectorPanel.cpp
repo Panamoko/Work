@@ -607,6 +607,9 @@ namespace uel {
                 ImGui::DragFloat(u8"開始までの待ち", &sp->firstDelay, 0.05f, 0.0f, 30.0f);
                 ImGui::DragFloat(u8"ウェーブ間の休憩", &sp->waveDelay, 0.05f, 0.0f, 30.0f);
                 ImGui::DragFloat(u8"出現の半径", &sp->spawnRadius, 0.05f, 0.0f, 50.0f);
+                ImGui::DragInt(u8"始める止まる場所", &sp->activateAtStop, 0.1f, 0, 99);
+                ImGui::TextDisabled(sp->activateAtStop <= 0 ? u8"0：Play の始めから動く"
+                    : u8"案内ロボットがこの番号の止まる場所に着いたら始まる");
             }
             ImGui::PopID();
         }

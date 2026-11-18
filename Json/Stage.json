@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 24,
+    "schemaVersion": 25,
     "entities": [
         {
             "name": "Camera",
@@ -142,7 +142,8 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "ExampleStage.glb",
@@ -289,7 +290,8 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "Player",
@@ -432,15 +434,16 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "GameRule",
             "transform": {
                 "position": {
-                    "x": 2.4254539012908937,
-                    "y": 2.992614507675171,
-                    "z": 6.7085747718811039
+                    "x": 0.3888339400291443,
+                    "y": 1.279571533203125,
+                    "z": 15.235830307006836
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -453,13 +456,13 @@
                     "z": 1.0
                 }
             },
-            "hasMesh": true,
+            "hasMesh": false,
             "mesh": {
                 "assetId": "",
                 "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
                     "w": 1.0
                 },
                 "visible": true,
@@ -575,7 +578,8 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 1
         },
         {
             "name": "Enemy",
@@ -718,7 +722,8 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "GuideRobot",
@@ -861,7 +866,8 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": false,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "Entity",
@@ -1004,15 +1010,16 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": true,
             "gpOrder": 0,
-            "gpStop": false
+            "gpStop": false,
+            "spStop": 0
         },
         {
             "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 4.788693904876709,
+                    "x": -0.12134528160095215,
                     "y": 0.0,
-                    "z": 5.691514015197754
+                    "z": 15.374455451965332
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -1147,15 +1154,16 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": true,
             "gpOrder": 1,
-            "gpStop": false
+            "gpStop": true,
+            "spStop": 0
         },
         {
             "name": "Entity",
             "transform": {
                 "position": {
-                    "x": 0.0,
+                    "x": 4.780959606170654,
                     "y": 0.0,
-                    "z": 10.935022354125977
+                    "z": 35.16311264038086
                 },
                 "rotationEuler": {
                     "x": 0.0,
@@ -1168,13 +1176,13 @@
                     "z": 1.0
                 }
             },
-            "hasMesh": true,
+            "hasMesh": false,
             "mesh": {
                 "assetId": "",
                 "color": {
-                    "x": 1.0,
-                    "y": 1.0,
-                    "z": 1.0,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
                     "w": 1.0
                 },
                 "visible": true,
@@ -1290,7 +1298,152 @@
             "gdMarker": 2.200000047683716,
             "hasGuidePt": true,
             "gpOrder": 2,
-            "gpStop": false
+            "gpStop": true,
+            "spStop": 0
+        },
+        {
+            "name": "GameRule2",
+            "transform": {
+                "position": {
+                    "x": 4.615757942199707,
+                    "y": 0.8416115641593933,
+                    "z": 35.3546257019043
+                },
+                "rotationEuler": {
+                    "x": 0.0,
+                    "y": -0.0,
+                    "z": 0.0
+                },
+                "scale": {
+                    "x": 1.0,
+                    "y": 1.0,
+                    "z": 1.0
+                }
+            },
+            "hasMesh": false,
+            "mesh": {
+                "assetId": "",
+                "color": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "w": 1.0
+                },
+                "visible": true,
+                "firstPerson": false,
+                "hiddenSubmesh": [],
+                "submeshRole": []
+            },
+            "hasHP": false,
+            "hp": 100.0,
+            "maxHp": 100.0,
+            "hasOpponent": false,
+            "oppMoveSpeed": 2.0,
+            "oppStopRange": 1.2000000476837159,
+            "hasPlayer": false,
+            "hasSkinned": false,
+            "skAsset": "",
+            "skClip": 0,
+            "skSpeed": 1.0,
+            "skLoop": true,
+            "skVisible": true,
+            "skColor": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 1.0
+            },
+            "skAnim": "",
+            "hasNavObs": false,
+            "navHalfX": 1.0,
+            "navHalfZ": 1.0,
+            "hasUI": false,
+            "uiTitle": "",
+            "uiSub": "",
+            "uiButton": "",
+            "uiNext": "",
+            "uiShowResult": false,
+            "hasRule": false,
+            "ruleWin": "",
+            "ruleLose": "",
+            "ruleDelay": 2.0,
+            "prefabPath": "",
+            "hasHitbox": false,
+            "hbBodyBottom": 0.30000001192092898,
+            "hbBodyTop": 1.2999999523162842,
+            "hbBodyRadius": 0.3499999940395355,
+            "hbHeadHeight": 1.600000023841858,
+            "hbHeadRadius": 0.2199999988079071,
+            "hbHeadMul": 2.0,
+            "hasSpawner": true,
+            "spPrefab": "Data/Prefabs/Enemy.prefab.json",
+            "spWaves": 3,
+            "spBase": 3,
+            "spInc": 2,
+            "spInterval": 0.800000011920929,
+            "spFirstDelay": 1.0,
+            "spWaveDelay": 3.0,
+            "spRadius": 2.0,
+            "hasShader": false,
+            "shMode": 0,
+            "shReceiveShadow": true,
+            "shSpecStrength": 0.0,
+            "shRimStrength": 0.0,
+            "shRimPower": 3.0,
+            "shRimColor": {
+                "x": 1.0,
+                "y": 1.0,
+                "z": 1.0
+            },
+            "shToonThreshold": 0.5,
+            "shToonSoftness": 0.019999999552965165,
+            "shToonShade": {
+                "x": 0.6000000238418579,
+                "y": 0.6000000238418579,
+                "z": 0.699999988079071
+            },
+            "shOutlineWidth": 0.0,
+            "shOutlineColor": {
+                "x": 0.05000000074505806,
+                "y": 0.05000000074505806,
+                "z": 0.05000000074505806
+            },
+            "shToonTexSteps": 0.0,
+            "shToonTexSmooth": 0.0,
+            "shMetallic": 0.0,
+            "shRoughness": -1.0,
+            "hasAnimator": false,
+            "anClip": 0,
+            "anSpeed": 1.0,
+            "anLoop": true,
+            "anBlendTime": 0.20000000298023225,
+            "anGraph": "",
+            "skFpHide": "",
+            "hasAlly": false,
+            "alMoveSpeed": 4.5,
+            "alFollowDist": 3.0,
+            "alResumeDist": 4.5,
+            "alRepath": 0.5,
+            "uiRoleSelect": false,
+            "hasParty": false,
+            "ptPrefab": "Data/Prefabs/Ally.prefab.json",
+            "ptBack": 2.0,
+            "ptSide": 1.5,
+            "alAtkRange": 25.0,
+            "alAtkDamage": 34.0,
+            "alAtkInterval": 0.800000011920929,
+            "alAimSpread": 2.0,
+            "alAimHeight": 1.600000023841858,
+            "alSearch": 0.30000001192092898,
+            "alReaction": 0.30000001192092898,
+            "hasGuide": false,
+            "gdSpeed": 2.0,
+            "gdSignal": 4.0,
+            "gdMarker": 2.200000047683716,
+            "hasGuidePt": false,
+            "gpOrder": 0,
+            "gpStop": false,
+            "spStop": 2
         }
     ]
 }

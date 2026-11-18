@@ -5,6 +5,7 @@
 #include "Engine/Components/GuidePointComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -160,8 +161,10 @@ namespace uel {
             s = ImVec2((rectMin.x + rectMax.x) * 0.5f + dx * k, (rectMin.y + rectMax.y) * 0.5f + dy * k);
         }
 
-        // 合図を待っている間は、ひし形を脈打たせる（「こちらの番」だと分かるように）
-        const float pulse = (state == GuideComponent::State::Waiting) ? 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f) : 1.0f;
+        // 合図を待っている間は、ひし形を脈打たせる（「こちらの番」だと分かるように）。ウェーブと戦っている間は脈打たない
+        const bool fighting = guide->IsFighting();
+        const bool waitingSignal = (state == GuideComponent::State::Waiting) && !fighting;
+        const float pulse = waitingSignal ? 0.5f + 0.5f * std::sin((float)ImGui::GetTime() * 5.0f) : 1.0f;
         const float r = 9.0f + 2.0f * pulse;
         const ImU32 fill = IM_COL32(80, 220, 255, (int)(170 + 85 * pulse));
         dl->AddQuadFilled(ImVec2(s.x, s.y - r - 2.0f), ImVec2(s.x + r + 2.0f, s.y), ImVec2(s.x, s.y + r + 2.0f), ImVec2(s.x - r - 2.0f, s.y), IM_COL32(0, 0, 0, 170));
@@ -171,7 +174,8 @@ namespace uel {
         const float dist = myT ? std::sqrt((gt->position.x - myT->position.x) * (gt->position.x - myT->position.x)
             + (gt->position.z - myT->position.z) * (gt->position.z - myT->position.z)) : 0.0f;
         char txt[64];
-        if (state == GuideComponent::State::Waiting)     snprintf(txt, sizeof(txt), u8"合図待ち  %.0fm", dist);
+        if (fighting)                                    snprintf(txt, sizeof(txt), u8"戦闘中  %.0fm", dist);     // 止まる場所のウェーブ（5-2）
+        else if (waitingSignal)                          snprintf(txt, sizeof(txt), u8"合図待ち  %.0fm", dist);
         else if (state == GuideComponent::State::Moving) snprintf(txt, sizeof(txt), u8"移動中  %.0fm", dist);
         else                                             snprintf(txt, sizeof(txt), "%.0fm", dist);
         const ImVec2 ts = ImGui::CalcTextSize(txt);
@@ -188,6 +192,23 @@ namespace uel {
             const char* hint = u8"F：ロボットを進める";
             const ImVec2 hs = ImGui::CalcTextSize(hint);
             ShadowText(dl, ImVec2(c.x - hs.x * 0.5f, y), IM_COL32(150, 235, 255, 255), hint);
+        }
+
+        // ウェーブを倒した直後（5-2）：「WAVE n」と同じ高さに大きく「WAVE CLEAR」、その下に次にすること。最後の1秒で消えていく
+        const float clear = guide->ClearBannerTime();
+        if (clear > 0.0f) {
+            const float a = (clear > 1.0f) ? 1.0f : clear;
+            ImFont* font = ImGui::GetFont();
+            const char* big = "WAVE CLEAR";
+            const ImVec2 bs = font->CalcTextSizeA(48.0f, FLT_MAX, 0.0f, big);
+            const ImVec2 bp(v.imgPos.x + (v.width - bs.x) * 0.5f, v.imgPos.y + v.height * 0.25f);
+            dl->AddText(font, 48.0f, ImVec2(bp.x + 2.0f, bp.y + 2.0f), IM_COL32(0, 0, 0, (int)(200 * a)), big);
+            dl->AddText(font, 48.0f, bp, IM_COL32(120, 230, 140, (int)(255 * a)), big);
+            const char* sub = u8"ロボットのところで F を押すと、次へ進みます";
+            const ImVec2 ss = ImGui::CalcTextSize(sub);
+            const ImVec2 sp(v.imgPos.x + (v.width - ss.x) * 0.5f, bp.y + bs.y + 6.0f);
+            dl->AddText(ImVec2(sp.x + 1.0f, sp.y + 1.0f), IM_COL32(0, 0, 0, (int)(200 * a)), sub);
+            dl->AddText(sp, IM_COL32(255, 255, 255, (int)(240 * a)), sub);
         }
     }
 

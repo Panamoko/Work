@@ -33,6 +33,10 @@ namespace uel {
         int   GetStopsReached() const { return stopsReached; }  // 着いた「止まる場所」の数（0 = まだ出発していない）
         int   GetStopCount() const { return stopCount; }        // 道にある「止まる場所」の数
         bool  HasError() const { return routeEmpty; }           // 経由点が1つも無い（進めない）
+        // 止まる場所のウェーブ（5-2）：今止まっている場所の Spawner（activateAtStop がその番号）が、まだ終わっていない。
+        // この間は合図を受け付けない（倒してから進む）
+        bool  IsFighting() const { return fighting; }
+        float ClearBannerTime() const { return clearBanner; }  // 倒した直後の「WAVE CLEAR」の表示の残り時間（秒）
 
         // アニメーショングラフに渡すパラメータ（グラフにその名前があれば書く。無ければ何もしない）
         static constexpr const char* kAnimSpeed = "Speed";      // Float：進む速さ（m/秒。止まっていれば 0）
@@ -40,6 +44,7 @@ namespace uel {
 
     private:
         void BuildRoute(World& world);
+        bool StopWaveRemaining(World& world) const;    // 今の止まる場所の Spawner が、まだ終わっていないか
 
         struct RoutePoint { DirectX::XMFLOAT3 pos; bool stop; };
 
@@ -57,6 +62,9 @@ namespace uel {
         float groundY = 0.0f;           // 地面の高さ（この高さへなめらかに寄せる）
         float speedAnim = -1.0f;        // アニメに渡した値（変わったときだけ書く）
         int   waitingAnim = -1;         // 同上（-1 = まだ書いていない）
+        bool  fighting = false;         // 止まる場所のウェーブがまだ残っている（5-2）
+        float waveCheckTimer = 0.0f;    // 次にウェーブが終わったかを調べるまでの残り時間（毎フレームは調べない）
+        float clearBanner = 0.0f;       // 「WAVE CLEAR」の表示の残り時間
     };
 
 } // namespace uel
