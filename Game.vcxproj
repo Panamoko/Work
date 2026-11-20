@@ -206,6 +206,7 @@
     <ClInclude Include="Source\Engine\Graphics\SkinnedRenderModel.h" />
     <ClInclude Include="Source\Engine\Physics\GroundQuery.h" />
     <ClInclude Include="Source\Engine\Physics\HitShapes.h" />
+    <ClInclude Include="Source\Engine\Physics\MeshBVH.h" />
     <ClInclude Include="Source\Engine\Platform\Window.h" />
     <ClInclude Include="Source\Engine\Scene\Entity.h" />
     <ClInclude Include="Source\Engine\Scene\EntityId.h" />
@@ -277,6 +278,7 @@
     <ClCompile Include="Source\Engine\Graphics\SkinnedRenderModel.cpp" />
     <ClCompile Include="Source\Engine\Physics\GroundQuery.cpp" />
     <ClCompile Include="Source\Engine\Physics\HitShapes.cpp" />
+    <ClCompile Include="Source\Engine\Physics\MeshBVH.cpp" />
     <ClCompile Include="Source\Engine\Platform\Window.cpp" />
     <ClCompile Include="Source\Engine\Scene\World.cpp" />
     <ClCompile Include="Source\Engine\Serialization\AnimGraphSerializer.cpp" />
