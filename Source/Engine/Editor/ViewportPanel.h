@@ -32,6 +32,8 @@ namespace uel {
         void RenderScene(ID3D11DeviceContext* context, World& world, MeshCache& cache,
             ID3D11Device* device, const SceneLighting& lighting, const PostProcessSettings& postSettings);
         GameFlow& GetFlow() { return flow; }
+        // 経路探索のグリッドを、次のフレームで作り直す（5-4c。Engine が Scene を読み込んだときに呼ぶ）
+        void RequestNavRebake() { navDirty = true; }
         // シェーダを作り直す（ホットリロードの後に呼ぶ）。作り直せなかったものは前のまま使う。全部できたら true
         bool ReloadShaders(ID3D11Device* device);
     private:
@@ -46,6 +48,7 @@ namespace uel {
         EnvironmentMap  envMap;      // 周りの景色（空の画像）
         SkinnedMeshShader skinnedShader;
         EngineNavGrid nav;
+        bool navDirty = true;           // グリッドを作り直す必要がある（Play の始め・Scene が変わったとき）。毎フレームは作らない
         GameFlow flow;
 
         int viewWidth = 16;

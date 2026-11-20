@@ -380,6 +380,12 @@
     <ClInclude Include="Source\Engine\Physics\MeshBVH.h">
       <Filter>Source\Engine\Physics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Engine\Components\NavBoundsComponent.h">
+      <Filter>Source\Engine\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Engine\Game\NavBake.h">
+      <Filter>Source\Engine\Game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="External\imgui-docking\imgui.cpp">
@@ -585,6 +591,9 @@
     </ClCompile>
     <ClCompile Include="Source\Engine\Physics\MeshBVH.cpp">
       <Filter>Source\Engine\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Engine\Game\NavBake.cpp">
+      <Filter>Source\Engine\Game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

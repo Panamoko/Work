@@ -28,12 +28,14 @@
 #include "Engine/Components/GuideComponent.h"
 #include "Engine/Components/GuidePointComponent.h"
 #include "Engine/Components/BossComponent.h"
+#include "Engine/Components/NavBoundsComponent.h"
 
 #include <imgui.h>
 #include <cctype>
 #include <cstring>
 #include <cstdio>
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -799,6 +801,24 @@ namespace uel {
             }
             ImGui::PopID();
         }
+        // NavBoundsComponent（経路探索のグリッドの範囲。5-4c）
+        if (auto* nb = e->GetComponent<NavBoundsComponent>()) {
+            ImGui::PushID("cmp_navbounds");
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"NavBounds（経路探索の範囲）", &removeIt);
+            if (removeIt) e->RemoveComponent<NavBoundsComponent>();
+            else if (open) {
+                ImGui::DragFloat(u8"横の半分", &nb->halfX, 0.5f, 1.0f, 500.0f, "%.1f m");
+                ImGui::DragFloat(u8"高さの半分", &nb->halfY, 0.1f, 0.5f, 200.0f, "%.1f m");
+                ImGui::DragFloat(u8"奥の半分", &nb->halfZ, 0.5f, 1.0f, 500.0f, "%.1f m");
+                ImGui::DragFloat(u8"マスの大きさ", &nb->cellSize, 0.05f, 0.25f, 5.0f, "%.2f m");
+                ImGui::DragFloat(u8"登れる段差", &nb->maxStep, 0.05f, 0.05f, 5.0f, "%.2f m");
+                const int cols = (int)std::ceil(nb->halfX * 2.0f / (std::max)(0.1f, nb->cellSize));
+                const int rows = (int)std::ceil(nb->halfZ * 2.0f / (std::max)(0.1f, nb->cellSize));
+                ImGui::TextDisabled(u8"%d × %d マス。Play の始めに地面を見て作る（緑の箱の中）", cols, rows);
+            }
+            ImGui::PopID();
+        }
         // GuidePointComponent（案内ロボットの道の経由点。5-1）
         if (auto* gp = e->GetComponent<GuidePointComponent>()) {
             ImGui::PushID("cmp_guidepoint");
@@ -835,6 +855,7 @@ namespace uel {
             if (!e->GetComponent<GuideComponent>() && ImGui::MenuItem(u8"GuideComponent（案内ロボット）")) e->AddComponent<GuideComponent>();
             if (!e->GetComponent<GuidePointComponent>() && ImGui::MenuItem(u8"GuidePointComponent（道の経由点）")) e->AddComponent<GuidePointComponent>();
             if (!e->GetComponent<BossComponent>() && ImGui::MenuItem(u8"BossComponent（ボスの目印）")) e->AddComponent<BossComponent>();
+            if (!e->GetComponent<NavBoundsComponent>() && ImGui::MenuItem(u8"NavBoundsComponent（経路探索の範囲）")) e->AddComponent<NavBoundsComponent>();
             ImGui::EndPopup();
         }
         g_foldRequest = 0;                  // 「すべて開く／閉じる」は押したフレームだけ効かせる

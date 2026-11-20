@@ -31,12 +31,52 @@ namespace uel {
     {
         float ox = center.x - cols * cellSize * 0.5f;
         float oz = center.z - rows * cellSize * 0.5f;
-        return { ox + (cx + 0.5f) * cellSize, center.y, oz + (cz + 0.5f) * cellSize };
+        const float y = (heights.empty() || !InBounds(cx, cz)) ? center.y : heights[Idx(cx, cz)];   // 地面を見て作ったなら、マスの地面の高さ
+        return { ox + (cx + 0.5f) * cellSize, y, oz + (cz + 0.5f) * cellSize };
+    }
+
+    void EngineNavGrid::Bake(World& world, const NavGroundFn& ground, const NavGroundSettings& s)
+    {
+        Bake(world);                                    // まず NavObstacle で塞ぐ（今までと同じ）
+        const int n = cols * rows;
+        heights.assign((size_t)n, center.y);
+        std::vector<uint8_t> hasGround((size_t)n, 0);
+        const float ox = center.x - cols * cellSize * 0.5f;
+        const float oz = center.z - rows * cellSize * 0.5f;
+
+        // (1) マスの真ん中の地面の高さ。無い・範囲の外なら塞ぐ
+        for (int z = 0; z < rows; ++z)
+            for (int x = 0; x < cols; ++x) {
+                const int i = Idx(x, z);
+                float y;
+                if (ground(ox + (x + 0.5f) * cellSize, oz + (z + 0.5f) * cellSize, s.maxY, y) && y >= s.minY) {
+                    heights[i] = y;
+                    hasGround[i] = 1;
+                }
+                else blocked[i] = 1;
+            }
+
+        // (2) 崖：上下左右の隣（地面のあるマス）との段差が maxStep より大きければ塞ぐ（崖の上と下の両方が塞がる）。
+        //     木・岩もそこだけ高くなるので、ここで塞がる（当たり判定なしにした草・花は高さに入らない）
+        const int dx4[4] = { 1, -1, 0, 0 }, dz4[4] = { 0, 0, 1, -1 };
+        std::vector<uint8_t> cliff((size_t)n, 0);
+        for (int z = 0; z < rows; ++z)
+            for (int x = 0; x < cols; ++x) {
+                const int i = Idx(x, z);
+                if (!hasGround[i]) continue;
+                for (int d = 0; d < 4; ++d) {
+                    const int nx = x + dx4[d], nz = z + dz4[d];
+                    if (!InBounds(nx, nz) || !hasGround[Idx(nx, nz)]) continue;
+                    if (std::fabs(heights[i] - heights[Idx(nx, nz)]) > s.maxStep) { cliff[i] = 1; break; }
+                }
+            }
+        for (int i = 0; i < n; ++i) if (cliff[i]) blocked[i] = 1;
     }
 
     void EngineNavGrid::Bake(World& world)
     {
         blocked.assign((size_t)cols * rows, 0);
+        heights.clear();                                // 地面を見ないときは高さを持たない（経路の点は center.y）
         float ox = center.x - cols * cellSize * 0.5f;
         float oz = center.z - rows * cellSize * 0.5f;
         for (const auto& slot : world.Slots()) {

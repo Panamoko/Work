@@ -256,6 +256,7 @@ namespace uel {
     {
         EditorScene& sc = scenes[index];
         playWorld = sc.world.Clone();
+        viewport->RequestNavRebake();       // 新しい Scene の経路探索のグリッドを作り直す（5-4c）
 
         GameFlow& flow = viewport->GetFlow();
         flow.requestedScene.clear();

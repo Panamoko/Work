@@ -154,6 +154,7 @@
     <ClInclude Include="Source\Engine\Components\HPComponent.h" />
     <ClInclude Include="Source\Engine\Components\LifeStateComponent.h" />
     <ClInclude Include="Source\Engine\Components\MeshRendererComponent.h" />
+    <ClInclude Include="Source\Engine\Components\NavBoundsComponent.h" />
     <ClInclude Include="Source\Engine\Components\NavObstacleComponent.h" />
     <ClInclude Include="Source\Engine\Components\OpponentComponent.h" />
     <ClInclude Include="Source\Engine\Components\PartySetupComponent.h" />
@@ -183,6 +184,7 @@
     <ClInclude Include="Source\Engine\Game\GameContext.h" />
     <ClInclude Include="Source\Engine\Game\GameFlow.h" />
     <ClInclude Include="Source\Engine\Game\InputState.h" />
+    <ClInclude Include="Source\Engine\Game\NavBake.h" />
     <ClInclude Include="Source\Engine\Game\Role.h" />
     <ClInclude Include="Source\Engine\Game\Team.h" />
     <ClInclude Include="Source\Engine\Game\Weapon.h" />
@@ -261,6 +263,7 @@
     <ClCompile Include="Source\Engine\Editor\InspectorPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\ViewportPanel.cpp" />
     <ClCompile Include="Source\Engine\Editor\WaveOverlay.cpp" />
+    <ClCompile Include="Source\Engine\Game\NavBake.cpp" />
     <ClCompile Include="Source\Engine\Game\Weapon.cpp" />
     <ClCompile Include="Source\Engine\Game\WeaponTrace.cpp" />
     <ClCompile Include="Source\Engine\Graphics\DdsTexture.cpp" />

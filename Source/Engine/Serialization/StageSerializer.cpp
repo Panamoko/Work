@@ -9,6 +9,7 @@
 #include "Engine/Components/GuideComponent.h"
 #include "Engine/Components/GuidePointComponent.h"
 #include "Engine/Components/BossComponent.h"
+#include "Engine/Components/NavBoundsComponent.h"
 #include "Engine/Components/PlayerComponent.h"
 #include "Engine/Components/SkinnedMeshComponent.h"
 #include "Engine/Components/NavObstacleComponent.h"
@@ -60,7 +61,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 27;
+        constexpr int kSchemaLatest = 28;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -120,6 +121,8 @@ namespace uel {
             bool  hasBoss = false; std::string bsName = "BOSS";   // ボスの目印（v26。5-3）
             // MeshRenderer のサブメッシュごとの「当たり判定なし」（v27。5-4b）。MeshDTO の形を変えないように、ここに置く
             std::vector<int> mshNoCollision;
+            // 経路探索のグリッドの範囲（v28。5-4c）。初期値は NavBoundsComponent と同じ
+            bool  hasNavBounds = false; float nbHalfX = 50.0f, nbHalfY = 10.0f, nbHalfZ = 50.0f, nbCell = 1.0f, nbStep = 1.0f;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -171,6 +174,9 @@ namespace uel {
                     ar(CEREAL_NVP(oppAtkRange), CEREAL_NVP(oppAtkDamage), CEREAL_NVP(oppAtkInterval),
                         CEREAL_NVP(hasBoss), CEREAL_NVP(bsName));                                               // v26
                 if (g_loadSchema >= 27) ar(CEREAL_NVP(mshNoCollision));                                         // v27
+                if (g_loadSchema >= 28)
+                    ar(CEREAL_NVP(hasNavBounds), CEREAL_NVP(nbHalfX), CEREAL_NVP(nbHalfY), CEREAL_NVP(nbHalfZ),
+                        CEREAL_NVP(nbCell), CEREAL_NVP(nbStep));                                                // v28
             }
         };
 
@@ -198,6 +204,10 @@ namespace uel {
                 ed.oppAtkRange = op->attackRange; ed.oppAtkDamage = op->attackDamage; ed.oppAtkInterval = op->attackInterval;
             }
             if (auto* bs = e.GetComponent<BossComponent>()) { ed.hasBoss = true; ed.bsName = bs->displayName; }
+            if (auto* nb = e.GetComponent<NavBoundsComponent>()) {
+                ed.hasNavBounds = true; ed.nbHalfX = nb->halfX; ed.nbHalfY = nb->halfY; ed.nbHalfZ = nb->halfZ;
+                ed.nbCell = nb->cellSize; ed.nbStep = nb->maxStep;
+            }
             if (auto* al = e.GetComponent<AllyComponent>()) {
                 ed.hasAlly = true; ed.alMoveSpeed = al->moveSpeed; ed.alFollowDist = al->followDistance;
                 ed.alResumeDist = al->resumeDistance; ed.alRepath = al->repathInterval;
@@ -291,6 +301,11 @@ namespace uel {
                 op->attackRange = ed.oppAtkRange; op->attackDamage = ed.oppAtkDamage; op->attackInterval = ed.oppAtkInterval;
             }
             if (ed.hasBoss) e.AddComponent<BossComponent>()->displayName = ed.bsName;
+            if (ed.hasNavBounds) {
+                auto* nb = e.AddComponent<NavBoundsComponent>();
+                nb->halfX = ed.nbHalfX; nb->halfY = ed.nbHalfY; nb->halfZ = ed.nbHalfZ;
+                nb->cellSize = ed.nbCell; nb->maxStep = ed.nbStep;
+            }
             if (ed.hasAlly) {
                 auto* al = e.AddComponent<AllyComponent>();
                 al->moveSpeed = ed.alMoveSpeed; al->followDistance = ed.alFollowDist;

@@ -24,6 +24,10 @@
 #include "Engine/Components/LifeStateComponent.h"
 #include "Engine/Editor/GuideOverlay.h"
 #include "Engine/Editor/WaveOverlay.h"
+#include "Engine/Components/NavBoundsComponent.h"
+#include "Engine/Game/NavBake.h"
+#include <algorithm>
+#include <memory>
 
 #include <cfloat>
 #include <cmath>
@@ -127,9 +131,8 @@ namespace uel {
         if (playMode) {
             // プレイヤー = PlayerComponent を持つEntity
             Entity* player = nullptr;
-            // NavGridをbake（Play中の経路探索）
-            nav.Configure({ 0.0f, 0.0f, 0.0f }, 1.0f, 60, 60);
-            nav.Bake(world);
+            // 経路探索のグリッド：Play を始めたとき・Scene が変わったときだけ作る（5-4c。前は毎フレーム作っていた）
+            if (navDirty) { BakeNavForWorld(nav, world, cache, device); navDirty = false; }
 
             for (const auto& slot : world.Slots())
                 if (slot && slot->GetComponent<PlayerComponent>()) { player = slot.get(); break; }
@@ -208,6 +211,7 @@ namespace uel {
                 mouseCaptured = false;
                 ::ClipCursor(nullptr);
             }
+            navDirty = true;                // 編集中：次に Play を始めたら、グリッドを作り直す（5-4c）
             camera.Update(ImGui::IsWindowHovered());
             view = camera.GetView();
         }
@@ -275,6 +279,20 @@ namespace uel {
                     auto* t = se->GetComponent<TransformComponent>();
                     auto* sp = se->GetComponent<SpawnerComponent>();
                     if (t && sp) circle(t->position, sp->spawnRadius, 0, IM_COL32(255, 210, 60, 230));
+                }
+                // 経路探索のグリッドの範囲（NavBounds。5-4c）：箱の 12 本の辺を緑で描く。選んでいるときは明るく
+                for (const auto& slot : world.Slots()) {
+                    if (!slot) continue;
+                    auto* t = slot->GetComponent<TransformComponent>();
+                    auto* nb = slot->GetComponent<NavBoundsComponent>();
+                    if (!t || !nb) continue;
+                    const ImU32 col = (slot->id == selected) ? IM_COL32(120, 255, 140, 255) : IM_COL32(80, 200, 110, 150);
+                    const XMFLOAT3 c = t->position;
+                    XMFLOAT3 p[8];
+                    for (int k = 0; k < 8; ++k)
+                        p[k] = { c.x + ((k & 1) ? nb->halfX : -nb->halfX), c.y + ((k & 2) ? nb->halfY : -nb->halfY), c.z + ((k & 4) ? nb->halfZ : -nb->halfZ) };
+                    const int edges[12][2] = { {0,1},{2,3},{4,5},{6,7}, {0,2},{1,3},{4,6},{5,7}, {0,4},{1,5},{2,6},{3,7} };
+                    for (const auto& e2 : edges) line3(p[e2[0]], p[e2[1]], col);
                 }
             }
         }
