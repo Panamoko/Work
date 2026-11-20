@@ -31,7 +31,7 @@
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | **済み**（2026-11-16）。2-1 射撃を共通の処理に（`Game/WeaponTrace`）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ → b 弾の線の表示 → c Inspector と保存。版 23）→ 2-3 Support の回復（a 選んで回復する → b 回復の線の表示） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | **仕組みは済み**（2026-11-16）。3-1 マウスを固定する視点操作 → 3-2 プレイヤーの Support の回復（右クリック）→ 3-3 武器の仕組み（`Game/Weapon`。連射・装弾数・リロード・HUD の弾数）→ 3-5 AI 仲間も同じ武器で撃つ。**各ロールの武器の種類と値は、キャラのモデルが決まってから**（ユーザーの希望。今は3ロールとも同じ仮の値） |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | **済み**（2026-11-17）。4-1 ダウンの状態（`LifeStateComponent`・ゲームオーバーの判定）→ 4-2 プレイヤーが E 長押しで起こす → 4-3 AI 仲間が起こしに行く（予約）→ 4-4 見た目（ダウンの印・画面の色・低い視点・アニメのパラメータ） |
-| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める（**済み** 2026-11-18。版 25）→ 5-3 仮のボス（**済み** 2026-11-18。版 26）→ 5-4 MP_Island で Stage を作る（a 当たり判定の BVH **済み** 2026-11-20 → b 草・花・海を当たり判定から外す → c NavGrid を島に合わせる → d Stage を置く）→ 5-5 Result の画面 |
+| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める（**済み** 2026-11-18。版 25）→ 5-3 仮のボス（**済み** 2026-11-18。版 26）→ 5-4 MP_Island で Stage を作る（a 当たり判定の BVH **済み** 2026-11-20 → b 草・花・海を当たり判定から外す **済み** 2026-11-20。版 27 → c NavGrid を島に合わせる → d Stage を置く）→ 5-5 Result の画面 |
 | 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
 | 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
@@ -111,7 +111,15 @@
       - BVH（三角形を箱の木に整理。UE の Chaos の静的メッシュの当たり判定と同じ考え方）。真ん中の位置で長い向きを半分ずつに分ける（`nth_element`）、葉は 4 個まで。**木はメッシュの空間で作り、線のほうをメッシュの空間へ移す**（行列は線の t を変えないので、t はそのままワールドの距離・高さ）。近い当たりは手前の箱から、地面は高い箱から見て、見つかった当たりの先の箱は見ない。
       - 作るのはそのメッシュを初めて調べるとき1回（`GroundQuery.cpp` が Mesh のアドレスごとに覚える。メッシュは MeshCache がアプリの終わりまで持つ）。MP_Island で作るのに Release 0.17 秒・Debug 2.8 秒（Play を始めた最初のフレームで止まる）。メモリは十数 MB。
       - 結果は前と同じ（ランダムな線で比べて食い違い 0。回転・拡大を掛けたワールド行列でも）。速さは MP_Island で 1 回 0.009ms（Release）・0.02〜0.04ms（Debug）、約 1100 倍。
-      - `RaycastGroundColumn` に省略できる `maxY`（その高さより上の面は見ない）を足した。今の地面の調べ方は「いちばん高い面」を返すので、木の葉・橋の下では地面が見つからない（呼ぶ側は「足元より 1.5m 以上高い面は無視」で捨てるため）。5-4b で呼ぶ側に `maxY` を渡して直す予定。
+      - `RaycastGroundColumn` に省略できる `maxY`（その高さより上の面は見ない）を足した。5-4b で呼ぶ側が使うようにした。
+    - **5-4b 草・花・海を当たり判定から外す**（済み。コミット `f7751a2`。版 27）：
+      - `MeshRendererComponent::noCollisionSubmesh`（サブメッシュごと。0 以外で「当たり判定なし」。見た目はそのまま。UE の No Collision。保存は `EntityDTO::mshNoCollision`。MeshDTO の形は変えていない）。
+      - BVH が「三角形 → サブメッシュ」の表（`triSubmesh`）を持ち、`SubmeshSkip` を渡されたら葉でその三角形を飛ばす（BVH はメッシュごとに1つのまま）。`RaycastGroundColumn` / `RaycastMesh` の最後に省略できる `noCollision`（`const std::vector<uint8_t>*`）。
+      - 呼ぶ側（Ally・Guide・Opponent の地面、Player の地面と壁、`WeaponTrace` の弾の線）が `&gm->noCollisionSubmesh` を渡す。**地面は「足元より上の決まった高さまでで、いちばん高い面」**を探すようにした（Ally・Guide・Opponent は +1.5m、Player は +目の高さ。前は「いちばん高い面」をもらってから捨てていたので、木の葉・橋の下で地面が見つからなかった）。
+      - Inspector（MeshRenderer）：「当たり判定なし：N / M 個」、「名前に含む」欄（既定 `Grass,Flower,Ocean,Ocaen,Water`。カンマで複数・大文字小文字は区別しない）と「当たり判定を外す／戻す」ボタン（一覧を閉じたままでも使える）、一覧の各行に「当たり」のチェック（表示 ／ 当たり ／ 役割 ／ 名前）。
+      - **サブメッシュの名前を「メッシュの名前 (ノードの名前)」にした**（`Assets/GltfMeshLoader.cpp`。ノードとメッシュの名前が同じか片方が空なら1つだけ）。島の草などはノードの名前が `FoliageInstancedStaticMeshComponent_10:0` で何の物か分からず、`Grass` で探しても 9 個しか見つからなかったため。設定は番号で保存しているので、名前が変わっても設定はそのまま。
+      - 確かめたこと：MP_Island で 2287 個のうち 1220 個が外れる。島の外の海の点は「地面なし」になる。保存して読み直しても残る。
+    - 2026-11-20 時点の Stage：島は `Data/Model/Stage/MP_Island2.glb`（ユーザーが入れた。ノード 2272・三角形 約 71 万 5 千・サブメッシュ 2254。草・木・花は同じ）。y = −8 に 1500 × 1500 の立方体（海の底の床）。**MP_Island2 の「当たり判定なし」はまだ 0 個**（Inspector で外して保存する必要がある）。
 - **画面に出すゲームの文字**：「**蘇**」は ImGui の日本語の範囲（`GetGlyphRangesJapanese`）に入っていない（「?」になる。`imgui_draw.cpp` の表で確かめた）。HUD では「起こす」と書く。ほかの漢字も、HUD に新しく使うときは範囲に入っているか確かめる（仲・間・助・待・長・押は入っている）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
@@ -372,7 +380,7 @@ Source/Engine/
 | Component | 役割 | 主な項目 |
 |---|---|---|
 | Transform | 位置・回転（度）・スケール | `position, rotationEuler, scale` |
-| MeshRenderer | 静的メッシュの描画。壁・床・地面の判定にも使う | `assetId, color, visible, hiddenSubmesh, submeshRole, firstPerson` |
+| MeshRenderer | 静的メッシュの描画。壁・床・地面の判定にも使う | `assetId, color, visible, hiddenSubmesh, submeshRole, firstPerson, noCollisionSubmesh`（当たり判定なし。版 27。5-4b） |
 | SkinnedMesh | スキン付きメッシュ（どのモデルか）と「いまの姿勢」。姿勢は AnimationSystem が書く | `assetPath, animPath`（追加のアニメ GLB。複数可）, `clipIndex, time, speed, playing, loop, visible, color, fpHideBone`（一人称で潰す骨）。実行時：`firstPerson, boneGlobal, palette` |
 | Animator | アニメの制御（UE の AnimInstance）。グラフが空ならクリップ1つをクロスフェード再生、グラフがあればグラフが姿勢を決める（6章） | `clipIndex, speed, loop, playing, blendTime, params, graph, graphPath, montages`。`Play()`, `PlayMontage("名前")`, `StopMontage()`, `WasFired("通知名")` |
 | Shader | その Entity の MeshRenderer / SkinnedMesh を**どう描くか**。付けていなければ既定（Lit）。中身は `ShadingParams` 1つ | `mode`(Lit / Unlit / Toon), `receiveShadow`, `metallic`, `roughness`, `specularStrength`, `rim*`, `toon*`（しきい値・ぼかし・陰の色・テクスチャの単純化）, `outline*`（背面法の輪郭線） |
@@ -403,7 +411,7 @@ Source/Engine/
 - HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブとボスの HP バー（5-3。`WaveOverlay.cpp`）、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）、Support の回復の線（黒い縁＋脈打つ緑。回復している間ずっと。自分を回復しているときは胸に緑の輪。プレイヤーが回復されているときは HP バーの右に「+ HEAL」。2-3b）、右下に弾数（3-3）、AI 仲間の HP の横に弾数・DOWNED・REVIVING・DEAD、ダウンの表示と印（段階 4。0章「ダウン・蘇生」）、案内ロボットの印と「F：ロボットを進める」（5-1。`GuideOverlay.cpp`）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体（眠っている Spawner は終わっていない扱い。5-2）。HP の無い敵は倒せないので、クリアできなくなる
   - Scene遷移は `GameFlow::requestedScene` に名前を入れる（次のフレームの頭で切り替わる）
-- 当たり判定に使う地面・壁は「Visible な MeshRenderer」。スキンドのキャラは MeshRenderer を非表示にして使う。
+- 当たり判定に使う地面・壁は「Visible な MeshRenderer」。「当たり判定なし」のサブメッシュは除く（5-4b）。スキンドのキャラは MeshRenderer を非表示にして使う。
 - 一人称：プレイヤーの `SkinnedMesh::fpHideBone`（頭など）のスケールをほぼ 0 にして、カメラの前に自分の頭が映らないようにする。
 
 ---
@@ -498,7 +506,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 26。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 27。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -526,6 +534,7 @@ Source/Engine/
 | 24 | 案内ロボットと経由点（`hasGuide, gdSpeed, gdSignal, gdMarker, hasGuidePt, gpOrder, gpStop`） |
 | 25 | Spawner の始める止まる場所（`spStop`） |
 | 26 | 敵の攻撃の値（`oppAtkRange, oppAtkDamage, oppAtkInterval`）と Boss（`hasBoss, bsName`） |
+| 27 | MeshRenderer のサブメッシュごとの当たり判定なし（`mshNoCollision`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -655,7 +664,6 @@ Source/Engine/
   - Animation パネルのタイムラインは、グラフを使っていない Entity のときだけ。
   - Anim Graph パネルは選んだ Entity のグラフを直接編集する。同じグラフのファイルを使うほかの Entity には、保存して読み込み直すまで反映されない。
 - ヒットボックスは体の中心線に固定。ボーン（頭など）に追従しない。
-- 地面の高さ（`RaycastGroundColumn`）は「その (x, z) でいちばん高い面」を返す。呼ぶ側は足元より 1.5m 以上高い面を捨てるので、木の葉・橋の下では地面が見つからない（5-4b で `maxY` を使って直す予定）。
 - 足元の地面の高さを調べる関数（`FindGround`）が、`AllyComponent.cpp`・`OpponentComponent.cpp`・`GuideComponent.cpp` に同じ形で3つある（それぞれ無名の namespace）。直すときは1か所（`Physics/GroundQuery` など）にまとめる。
 - NavGrid の範囲が固定（原点中心、60×60）。Play 中は毎フレーム作り直している。
 - プレイヤーの移動・攻撃・カメラ・射撃は `PlayerComponent` 1つに全部入っている（ロールごとの差は未対応）。
@@ -672,7 +680,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1 道と案内ロボット・5-2 止まる場所でウェーブ・5-3 仮のボス・5-4a 当たり判定の BVH は済み。次は 5-4b 草・花・海を当たり判定から外す。2026-11-20）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1 道と案内ロボット・5-2 止まる場所でウェーブ・5-3 仮のボス・5-4a 当たり判定の BVH・5-4b 当たり判定なしは済み。次は 5-4c NavGrid を島に合わせる。2026-11-20）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 
