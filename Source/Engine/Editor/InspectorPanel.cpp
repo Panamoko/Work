@@ -32,6 +32,8 @@
 #include <imgui.h>
 #include <cctype>
 #include <cstring>
+#include <cstdio>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,6 +43,28 @@ namespace uel {
 
     namespace {
         std::string g_prefabRefresh;         // Apply されたPrefab（Engineが全Sceneへ反映）
+
+        // 「すべて開く／すべて閉じる」の頼み（0 = 無し、1 = 開く、-1 = 閉じる）。ボタンを押したフレームだけ入る
+        int g_foldRequest = 0;
+
+        // Component の見出し（折りたためる。UE / Unity の Inspector で Component ごとに開け閉めできるのと同じ）。
+        // 開いていれば true。removeClicked を渡すと、見出しの右端に「削除」ボタンを出し、押されたら true を入れる
+        // （Transform のように外せない物は nullptr）。
+        // 開け閉めの状態は ImGui が ID ごとに覚える。ID は Component の種類（PushID("cmp_...")）なので、
+        // 別の Entity を選んでも同じ種類は同じ開け閉めのまま（Unity の Inspector と同じ）。初めは開いている
+        bool ComponentHeader(const char* label, bool* removeClicked)
+        {
+            if (g_foldRequest != 0) ImGui::SetNextItemOpen(g_foldRequest > 0);
+            const bool open = ImGui::CollapsingHeader(label,
+                ImGuiTreeNodeFlags_DefaultOpen | (removeClicked ? ImGuiTreeNodeFlags_AllowItemOverlap : 0));
+            if (removeClicked) {
+                // 見出しの上に重ねて、右端にボタンを置く（AllowItemOverlap で、ボタンのクリックが見出しより先に取られる）
+                const float bw = ImGui::CalcTextSize(u8"削除").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+                ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - bw);
+                *removeClicked = ImGui::SmallButton(u8"削除");
+            }
+            return open;
+        }
     }
 
     std::string ConsumePrefabRefreshRequest()
@@ -55,7 +79,7 @@ namespace uel {
     {
         ImGui::Begin("Inspector");
         Entity* e = world.Get(selected);
-        if (!e) { ImGui::TextUnformatted(u8"（何も選んでいません）"); ImGui::End(); return; }
+        if (!e) { ImGui::TextUnformatted(u8"（何も選んでいません）"); g_foldRequest = 0; ImGui::End(); return; }
 
         {
             static std::string renameOld;
@@ -116,26 +140,36 @@ namespace uel {
                 ImGui::SameLine(); ImGui::TextUnformatted(prefabMsg.c_str());
             }
         }
+        // すべての Component の見出しを、まとめて開く／閉じる
+        ImGui::Separator();
+        if (ImGui::SmallButton(u8"すべて開く")) g_foldRequest = 1;
+        ImGui::SameLine();
+        if (ImGui::SmallButton(u8"すべて閉じる")) g_foldRequest = -1;
+
         if (TransformComponent* t = e->GetComponent<TransformComponent>())
         {
-            ImGui::Separator(); ImGui::TextUnformatted("Transform");
-            ImGui::DragFloat3(u8"位置", &t->position.x, 0.05f);
-            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
-            ImGui::DragFloat3(u8"回転", &t->rotationEuler.x, 0.5f);
-            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
-            ImGui::DragFloat3(u8"スケール", &t->scale.x, 0.05f, 0.001f, 1000.0f);
-            if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
-            if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
+            ImGui::PushID("cmp_transform");
+            if (ComponentHeader("Transform", nullptr)) {             // Transform は外せないので「削除」は無し
+                ImGui::DragFloat3(u8"位置", &t->position.x, 0.05f);
+                if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+                if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
+                ImGui::DragFloat3(u8"回転", &t->rotationEuler.x, 0.5f);
+                if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+                if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
+                ImGui::DragFloat3(u8"スケール", &t->scale.x, 0.05f, 0.001f, 1000.0f);
+                if (ImGui::IsItemActivated())            BeginTransformEdit(session, selected, *t);
+                if (ImGui::IsItemDeactivatedAfterEdit()) CommitTransformEdit(session, world, history);
+            }
+            ImGui::PopID();
         }
 
         if (MeshRendererComponent* m = e->GetComponent<MeshRendererComponent>())
         {
             ImGui::PushID("cmp_meshrenderer");
-            ImGui::Separator(); ImGui::TextUnformatted("MeshRenderer"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<MeshRendererComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("MeshRenderer", &removeIt);
+            if (removeIt) e->RemoveComponent<MeshRendererComponent>();
+            else if (open) {
                 char buf[260]; strncpy_s(buf, sizeof(buf), m->assetId.c_str(), _TRUNCATE);
                 if (ImGui::InputText(u8"モデル（GLB）", buf, sizeof(buf))) m->assetId = buf;
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の GLB をここへドロップ
@@ -154,35 +188,54 @@ namespace uel {
                         if (m->hiddenSubmesh.size() < subs.size()) m->hiddenSubmesh.resize(subs.size(), 0);
                         if (m->submeshRole.size() < subs.size()) m->submeshRole.resize(subs.size(), 0);
 
-                        ImGui::Separator();
-                        ImGui::TextUnformatted(u8"サブメッシュと役割（この Entity だけ）");
                         ImGui::Checkbox(u8"一人称表示（「一人称で隠す」を表示しない）", &m->firstPerson);
 
-                        if (ImGui::Button(u8"頭を自動で判定")) {
-                            for (size_t i = 0; i < subs.size(); ++i) {
-                                std::string low = subs[i].name;
-                                for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
-                                bool headLike = (low.find("head") != std::string::npos)
-                                    || (low.find("face") != std::string::npos)
-                                    || (low.find("skull") != std::string::npos);
-                                m->submeshRole[i] = headLike ? (uint8_t)1 : (uint8_t)0;
+                        // サブメッシュの一覧は、別に折りたためるようにする（ステージのモデルは数千個ある。MP_Island は約 2300）。
+                        // 12 個以下なら初めから開き、多ければ閉じておく。開いたときも、見えている行だけを作る
+                        // （ImGuiListClipper。数千行を毎フレーム作ると重いので、高さを決めた枠の中でスクロールさせる）
+                        char subTitle[96];
+                        snprintf(subTitle, sizeof(subTitle), u8"サブメッシュと役割（%d 個。この Entity だけ）###submeshes", (int)subs.size());
+                        ImGui::PushID(m->assetId.c_str());       // 開け閉めはモデルごとに覚える（キャラとステージで別々）
+                        if (g_foldRequest != 0) ImGui::SetNextItemOpen(g_foldRequest > 0);
+                        else ImGui::SetNextItemOpen(subs.size() <= 12, ImGuiCond_Once);
+                        const bool subOpen = ImGui::TreeNode(subTitle);
+                        if (subOpen) {
+                            if (ImGui::Button(u8"頭を自動で判定")) {
+                                for (size_t i = 0; i < subs.size(); ++i) {
+                                    std::string low = subs[i].name;
+                                    for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
+                                    bool headLike = (low.find("head") != std::string::npos)
+                                        || (low.find("face") != std::string::npos)
+                                        || (low.find("skull") != std::string::npos);
+                                    m->submeshRole[i] = headLike ? (uint8_t)1 : (uint8_t)0;
+                                }
                             }
-                        }
 
-                        const char* roleNames[] = { u8"なし", u8"一人称で隠す" };
-                        for (size_t i = 0; i < subs.size(); ++i) {
-                            ImGui::PushID((int)i);
-                            bool vis = (m->hiddenSubmesh[i] == 0);
-                            if (ImGui::Checkbox("##vis", &vis)) m->hiddenSubmesh[i] = vis ? 0 : 1;
-                            ImGui::SameLine();
-                            int role = m->submeshRole[i];
-                            ImGui::SetNextItemWidth(110);
-                            if (ImGui::Combo("##role", &role, roleNames, 2)) m->submeshRole[i] = (uint8_t)role;
-                            ImGui::SameLine();
-                            std::string nm = subs[i].name.empty() ? (u8"サブメッシュ " + std::to_string(i)) : subs[i].name;
-                            ImGui::TextUnformatted(nm.c_str());
-                            ImGui::PopID();
+                            const char* roleNames[] = { u8"なし", u8"一人称で隠す" };
+                            const float rowH = ImGui::GetFrameHeightWithSpacing();
+                            const int   rows = (int)(std::min)(subs.size(), (size_t)12);   // 枠の高さは 12 行ぶんまで
+                            ImGui::BeginChild("##submeshList", ImVec2(0.0f, rowH * rows + ImGui::GetStyle().WindowPadding.y), true);
+                            ImGuiListClipper clipper;
+                            clipper.Begin((int)subs.size(), rowH);
+                            while (clipper.Step()) {
+                                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                                    ImGui::PushID(i);
+                                    bool vis = (m->hiddenSubmesh[i] == 0);
+                                    if (ImGui::Checkbox("##vis", &vis)) m->hiddenSubmesh[i] = vis ? 0 : 1;
+                                    ImGui::SameLine();
+                                    int role = m->submeshRole[i];
+                                    ImGui::SetNextItemWidth(110);
+                                    if (ImGui::Combo("##role", &role, roleNames, 2)) m->submeshRole[i] = (uint8_t)role;
+                                    ImGui::SameLine();
+                                    if (subs[i].name.empty()) ImGui::Text(u8"サブメッシュ %d", i);
+                                    else ImGui::TextUnformatted(subs[i].name.c_str());
+                                    ImGui::PopID();
+                                }
+                            }
+                            ImGui::EndChild();
+                            ImGui::TreePop();
                         }
+                        ImGui::PopID();                          // モデルごとの ID（上の PushID と対）
                     }
                 }
             }
@@ -193,9 +246,10 @@ namespace uel {
         if (SkinnedMeshComponent* sk = e->GetComponent<SkinnedMeshComponent>())
         {
             ImGui::PushID("cmp_skinnedmesh");
-            ImGui::Separator(); ImGui::TextUnformatted(u8"SkinnedMesh（アニメ付きメッシュ）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SkinnedMeshComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"SkinnedMesh（アニメ付きメッシュ）", &removeIt);
+            if (removeIt) e->RemoveComponent<SkinnedMeshComponent>();
+            else if (open) {
                 char sbuf[260]; strncpy_s(sbuf, sizeof(sbuf), sk->assetPath.c_str(), _TRUNCATE);
                 if (ImGui::InputText(u8"モデル（GLB）", sbuf, sizeof(sbuf))) sk->assetPath = sbuf;
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の GLB をここへドロップ
@@ -329,9 +383,10 @@ namespace uel {
         // AnimatorComponent（クリップの切り替えとクロスフェード）
         if (auto* an = e->GetComponent<AnimatorComponent>()) {
             ImGui::PushID("cmp_animator");
-            ImGui::BulletText("AnimatorComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<AnimatorComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("AnimatorComponent", &removeIt);
+            if (removeIt) e->RemoveComponent<AnimatorComponent>();
+            else if (open) {
                 SkinnedMeshComponent* ask = e->GetComponent<SkinnedMeshComponent>();
                 std::shared_ptr<SkinnedRenderModel> amodel;
                 if (ask && !ask->assetPath.empty()) amodel = GlobalSkinnedCache().GetOrLoad(device, ask->assetPath, ask->animPath);
@@ -468,9 +523,10 @@ namespace uel {
         // ShaderComponent（描き方・材質）
         if (auto* shc = e->GetComponent<ShaderComponent>()) {
             ImGui::PushID("cmp_shader");
-            ImGui::BulletText("ShaderComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ShaderComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("ShaderComponent", &removeIt);
+            if (removeIt) e->RemoveComponent<ShaderComponent>();
+            else if (open) {
                 ShadingParams& p = shc->params;
                 const char* modeNames[] = { "Lit", "Unlit", "Toon" };   // same order as ShadingMode
                 int mode = (int)p.mode;
@@ -502,9 +558,10 @@ namespace uel {
         // PlayerComponent
         if (auto* pc = e->GetComponent<PlayerComponent>()) {
             ImGui::PushID("cmp_player");
-            ImGui::BulletText("PlayerComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PlayerComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("PlayerComponent", &removeIt);
+            if (removeIt) e->RemoveComponent<PlayerComponent>();
+            else if (open) {
                 ImGui::DragFloat(u8"移動速度##pl", &pc->moveSpeed, 0.1f, 0.0f, 50.0f);
                 ImGui::DragFloat(u8"目の高さ", &pc->eyeHeight, 0.05f, 0.0f, 20.0f);
                 ImGui::DragFloat(u8"目の前方へのずれ", &pc->eyeForward, 0.05f, 0.0f, 10.0f);
@@ -515,9 +572,10 @@ namespace uel {
         // OpponentComponent
         if (auto* ec = e->GetComponent<OpponentComponent>()) {
             ImGui::PushID("cmp_opponent");
-            ImGui::BulletText("OpponentComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<OpponentComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("OpponentComponent", &removeIt);
+            if (removeIt) e->RemoveComponent<OpponentComponent>();
+            else if (open) {
                 ImGui::DragFloat(u8"移動速度##en", &ec->moveSpeed, 0.1f, 0.0f, 50.0f);
                 ImGui::DragFloat(u8"止まる距離", &ec->stopRange, 0.1f, 0.0f, 20.0f);
                 // 攻撃（5-3 から保存する。版 26）。届く距離は止まる距離より長くする（短いと、届かない所で止まって攻撃しない）
@@ -533,9 +591,10 @@ namespace uel {
         // AllyComponent（AI 仲間）
         if (auto* al = e->GetComponent<AllyComponent>()) {
             ImGui::PushID("cmp_ally");
-            ImGui::BulletText(u8"AllyComponent（AI 仲間）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<AllyComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"AllyComponent（AI 仲間）", &removeIt);
+            if (removeIt) e->RemoveComponent<AllyComponent>();
+            else if (open) {
                 ImGui::DragFloat(u8"移動速度", &al->moveSpeed, 0.1f, 0.0f, 50.0f);
                 ImGui::DragFloat(u8"止まる距離", &al->followDistance, 0.1f, 0.5f, 30.0f);
                 ImGui::DragFloat(u8"動き出す距離", &al->resumeDistance, 0.1f, 0.5f, 30.0f);
@@ -561,9 +620,10 @@ namespace uel {
         // HPComponent（表示＋削除）
         if (auto* hpc = e->GetComponent<HPComponent>()) {
             ImGui::PushID("cmp_hp");
-            ImGui::BulletText("HPComponent"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HPComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader("HPComponent", &removeIt);
+            if (removeIt) e->RemoveComponent<HPComponent>();
+            else if (open) {
                 ImGui::DragFloat("HP", &hpc->hp, 1.0f, 0.0f, hpc->maxHp);
                 ImGui::DragFloat(u8"最大HP", &hpc->maxHp, 1.0f, 1.0f, 10000.0f);
             }
@@ -573,9 +633,10 @@ namespace uel {
         // HitboxComponent（当たり判定）
         if (auto* hb = e->GetComponent<HitboxComponent>()) {
             ImGui::PushID("cmp_hitbox");
-            ImGui::BulletText(u8"Hitbox（胴体のカプセル＋頭の球）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<HitboxComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"Hitbox（胴体のカプセル＋頭の球）", &removeIt);
+            if (removeIt) e->RemoveComponent<HitboxComponent>();
+            else if (open) {
                 ImGui::DragFloat(u8"胴体の下端", &hb->bodyBottom, 0.01f, 0.0f, 10.0f);
                 ImGui::DragFloat(u8"胴体の上端", &hb->bodyTop, 0.01f, 0.0f, 10.0f);
                 ImGui::DragFloat(u8"胴体の半径", &hb->bodyRadius, 0.01f, 0.01f, 5.0f);
@@ -589,18 +650,20 @@ namespace uel {
         // NavObstacleComponent（NavGrid を塞ぐ箱）
         if (auto* ob = e->GetComponent<NavObstacleComponent>()) {
             ImGui::PushID("cmp_nav");
-            ImGui::BulletText("NavObstacle"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<NavObstacleComponent>();
-            else { ImGui::DragFloat(u8"半分の幅 X", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat(u8"半分の幅 Z", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
+            bool removeIt = false;
+            const bool open = ComponentHeader("NavObstacle", &removeIt);
+            if (removeIt) e->RemoveComponent<NavObstacleComponent>();
+            else if (open) { ImGui::DragFloat(u8"半分の幅 X", &ob->halfX, 0.05f, 0.05f, 50.0f); ImGui::DragFloat(u8"半分の幅 Z", &ob->halfZ, 0.05f, 0.05f, 50.0f); }
             ImGui::PopID();
         }
 
         // SpawnerComponent（敵をウェーブで湧かせる）
         if (auto* sp = e->GetComponent<SpawnerComponent>()) {
             ImGui::PushID("cmp_spawner");
-            ImGui::BulletText(u8"Spawner（ウェーブ）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<SpawnerComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"Spawner（ウェーブ）", &removeIt);
+            if (removeIt) e->RemoveComponent<SpawnerComponent>();
+            else if (open) {
                 editStr("Prefab", sp->prefabPath);
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
                     if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
@@ -624,9 +687,10 @@ namespace uel {
         // GameRuleComponent（勝敗判定 → Scene 遷移）
         if (auto* gr = e->GetComponent<GameRuleComponent>()) {
             ImGui::PushID("cmp_rule");
-            ImGui::BulletText(u8"GameRule（勝敗判定）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GameRuleComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"GameRule（勝敗判定）", &removeIt);
+            if (removeIt) e->RemoveComponent<GameRuleComponent>();
+            else if (open) {
                 editStr(u8"勝ったときの Scene", gr->winScene);
                 editStr(u8"負けたときの Scene", gr->loseScene);
                 ImGui::DragFloat(u8"決着後の待ち時間", &gr->endDelay, 0.05f, 0.0f, 10.0f);
@@ -637,9 +701,10 @@ namespace uel {
         // ScreenUIComponent（タイトル・リザルト画面）
         if (auto* ui = e->GetComponent<ScreenUIComponent>()) {
             ImGui::PushID("cmp_ui");
-            ImGui::BulletText(u8"ScreenUI（タイトル・リザルト画面）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<ScreenUIComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"ScreenUI（タイトル・リザルト画面）", &removeIt);
+            if (removeIt) e->RemoveComponent<ScreenUIComponent>();
+            else if (open) {
                 editStr(u8"タイトル", ui->title);
                 editStr(u8"サブタイトル", ui->subtitle);
                 editStr(u8"ボタンの文字", ui->buttonText);
@@ -652,9 +717,10 @@ namespace uel {
         // PartySetupComponent（Stage の開始時に3人のチームをそろえる）
         if (auto* ps = e->GetComponent<PartySetupComponent>()) {
             ImGui::PushID("cmp_party");
-            ImGui::BulletText(u8"PartySetup（3人のチーム）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<PartySetupComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"PartySetup（3人のチーム）", &removeIt);
+            if (removeIt) e->RemoveComponent<PartySetupComponent>();
+            else if (open) {
                 editStr(u8"AI 仲間の Prefab", ps->allyPrefab);
                 if (ImGui::BeginDragDropTarget()) {                     // Asset Browser の Prefab をここへドロップ
                     if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("ASSET_PREFAB"))
@@ -669,9 +735,10 @@ namespace uel {
         // GuideComponent（案内ロボット。経由点を順に進み、止まる場所でプレイヤーの合図を待つ。5-1）
         if (auto* gd = e->GetComponent<GuideComponent>()) {
             ImGui::PushID("cmp_guide");
-            ImGui::BulletText(u8"Guide（案内ロボット）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GuideComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"Guide（案内ロボット）", &removeIt);
+            if (removeIt) e->RemoveComponent<GuideComponent>();
+            else if (open) {
                 ImGui::DragFloat(u8"進む速さ", &gd->moveSpeed, 0.05f, 0.1f, 20.0f, "%.2f m/s");
                 ImGui::DragFloat(u8"合図できる距離", &gd->signalRange, 0.05f, 0.5f, 20.0f, "%.1f m");
                 ImGui::DragFloat(u8"印の高さ", &gd->markerHeight, 0.05f, 0.0f, 10.0f, "%.2f m");
@@ -682,9 +749,10 @@ namespace uel {
         // BossComponent（ボスの目印。画面の上に HP バーを出す。5-3）
         if (auto* bs = e->GetComponent<BossComponent>()) {
             ImGui::PushID("cmp_boss");
-            ImGui::BulletText(u8"Boss（ボスの目印）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<BossComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"Boss（ボスの目印）", &removeIt);
+            if (removeIt) e->RemoveComponent<BossComponent>();
+            else if (open) {
                 editStr(u8"表示する名前", bs->displayName);
                 ImGui::TextDisabled(u8"OpponentComponent と HPComponent も付ける");
             }
@@ -693,9 +761,10 @@ namespace uel {
         // GuidePointComponent（案内ロボットの道の経由点。5-1）
         if (auto* gp = e->GetComponent<GuidePointComponent>()) {
             ImGui::PushID("cmp_guidepoint");
-            ImGui::BulletText(u8"GuidePoint（道の経由点）"); ImGui::SameLine();
-            if (ImGui::SmallButton(u8"削除")) e->RemoveComponent<GuidePointComponent>();
-            else {
+            bool removeIt = false;
+            const bool open = ComponentHeader(u8"GuidePoint（道の経由点）", &removeIt);
+            if (removeIt) e->RemoveComponent<GuidePointComponent>();
+            else if (open) {
                 ImGui::DragInt(u8"順番", &gp->order, 0.1f, 0, 999);
                 ImGui::Checkbox(u8"ここで止まる", &gp->stopHere);
             }
@@ -727,6 +796,7 @@ namespace uel {
             if (!e->GetComponent<BossComponent>() && ImGui::MenuItem(u8"BossComponent（ボスの目印）")) e->AddComponent<BossComponent>();
             ImGui::EndPopup();
         }
+        g_foldRequest = 0;                  // 「すべて開く／閉じる」は押したフレームだけ効かせる
         ImGui::End();
     }
 
