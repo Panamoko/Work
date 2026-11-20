@@ -52,7 +52,7 @@ namespace uel {
                 if (!mp || !mp->IsValid()) continue;
                 XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
                 float tt;
-                if (RaycastMesh(*mp, gw, origin, dir, meshT, tt)) { meshT = tt; meshE = ge; }
+                if (RaycastMesh(*mp, gw, origin, dir, meshT, tt, &gm->noCollisionSubmesh)) { meshT = tt; meshE = ge; }   // 当たり判定なしのサブメッシュは素通り（5-4b）
             }
             outT = meshT;
             return meshE;

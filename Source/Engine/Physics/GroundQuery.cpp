@@ -22,6 +22,14 @@ namespace uel {
             return *p;
         }
 
+        // 「当たり判定なし」の配列を BVH に渡す形へ（空なら「全部見る」）
+        MeshBVH::SubmeshSkip SkipOf(const std::vector<uint8_t>* v)
+        {
+            MeshBVH::SubmeshSkip s;
+            if (v && !v->empty()) { s.flags = v->data(); s.count = v->size(); }
+            return s;
+        }
+
         // ワールド行列の逆。大きさ 0 などで逆が無ければ false（そのメッシュには当たらない）
         bool Inverse(const XMMATRIX& world, XMMATRIX& inv)
         {
@@ -34,7 +42,8 @@ namespace uel {
 
     // 真上向きの線（ワールドの (x, *, z)）をメッシュの空間へ移して、いちばん高い当たりを BVH で探す。
     // ワールドで (x, 0, z) から (0, 1, 0) 向きの線は、移した後も「t = ワールドの高さ」のまま（行列は線の t を変えない）
-    bool RaycastGroundColumn(const Mesh& mesh, const XMMATRIX& world, float x, float z, float& outY, float maxY)
+    bool RaycastGroundColumn(const Mesh& mesh, const XMMATRIX& world, float x, float z, float& outY, float maxY,
+        const std::vector<uint8_t>* noCollision)
     {
         XMMATRIX inv;
         if (!Inverse(world, inv)) return false;
@@ -42,7 +51,7 @@ namespace uel {
         XMStoreFloat3(&o, XMVector3TransformCoord(XMVectorSet(x, 0.0f, z, 1.0f), inv));
         XMStoreFloat3(&d, XMVector3TransformNormal(XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f), inv));
         float t;
-        if (!BVHFor(mesh).LineHighest(mesh, o, d, maxY, t)) return false;
+        if (!BVHFor(mesh).LineHighest(mesh, o, d, maxY, t, SkipOf(noCollision))) return false;
         outY = t;
         return true;
     }
@@ -50,7 +59,7 @@ namespace uel {
     // ワールドの線（向きは長さ 1 にそろえる）をメッシュの空間へ移して、いちばん近い当たりを BVH で探す。
     // 向きは長さ 1 に直さずに移すので、見つかった t はそのままワールドの距離（今までと同じ意味）
     bool RaycastMesh(const Mesh& mesh, const XMMATRIX& world,
-        const XMFLOAT3& origin, const XMFLOAT3& dir, float maxDist, float& outDist)
+        const XMFLOAT3& origin, const XMFLOAT3& dir, float maxDist, float& outDist, const std::vector<uint8_t>* noCollision)
     {
         XMMATRIX inv;
         if (!Inverse(world, inv)) return false;
@@ -58,7 +67,7 @@ namespace uel {
         XMStoreFloat3(&o, XMVector3TransformCoord(XMLoadFloat3(&origin), inv));
         XMStoreFloat3(&d, XMVector3TransformNormal(XMVector3Normalize(XMLoadFloat3(&dir)), inv));
         float t;
-        if (!BVHFor(mesh).RayClosest(mesh, o, d, 1e-6f, maxDist, t)) return false;
+        if (!BVHFor(mesh).RayClosest(mesh, o, d, 1e-6f, maxDist, t, SkipOf(noCollision))) return false;
         outDist = t;
         return true;
     }

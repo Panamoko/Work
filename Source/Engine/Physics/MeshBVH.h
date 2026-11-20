@@ -20,13 +20,20 @@ namespace uel {
         void Build(const Mesh& mesh);
         bool IsBuiltFor(const Mesh& mesh) const;     // このメッシュ用に作ったか（中身が入れ替わっていないか）
 
+        // 「当たり判定なし」のサブメッシュ（5-4b）。skip[サブメッシュの番号] が 0 以外なら、その三角形は見ない。
+        // nullptr なら全部見る（MeshRendererComponent::noCollisionSubmesh をそのまま渡す。長さが足りない所は「見る」）
+        struct SubmeshSkip {
+            const uint8_t* flags = nullptr;
+            size_t         count = 0;
+        };
+
         // メッシュの空間の線 o + t * d で、いちばん小さい t（tMin < t < tMax）の三角形を探す。見つかれば outT に入れて true
         bool RayClosest(const Mesh& mesh, const DirectX::XMFLOAT3& o, const DirectX::XMFLOAT3& d,
-            float tMin, float tMax, float& outT) const;
+            float tMin, float tMax, float& outT, SubmeshSkip skip = {}) const;
         // メッシュの空間の線 o + t * d と交わる三角形のうち、いちばん大きい t（t <= tMax）を探す（向きは問わない）。
         // 地面の高さ用：ワールドの真上向きの線をメッシュの空間へ移すと、t がそのままワールドの高さになる
         bool LineHighest(const Mesh& mesh, const DirectX::XMFLOAT3& o, const DirectX::XMFLOAT3& d,
-            float tMax, float& outT) const;
+            float tMax, float& outT, SubmeshSkip skip = {}) const;
 
         size_t NodeCount() const { return nodes.size(); }
         size_t TriangleCount() const { return triIds.size(); }
@@ -40,6 +47,13 @@ namespace uel {
         };
         std::vector<Node>     nodes;
         std::vector<uint32_t> triIds;           // 三角形の番号（葉ごとに並べ替えてある）
+        std::vector<uint32_t> triSubmesh;       // 三角形 → サブメッシュの番号（5-4b。どれにも入らない三角形は kNoSubmesh）
+        static constexpr uint32_t kNoSubmesh = 0xFFFFFFFFu;
+        bool Skipped(uint32_t tri, const SubmeshSkip& skip) const {
+            if (!skip.flags) return false;
+            const uint32_t s = triSubmesh[tri];
+            return s < skip.count && skip.flags[s] != 0;
+        }
         const void* builtPositions = nullptr;   // 作ったときのメッシュの配列（入れ替わったら作り直す印）
         size_t      builtIndexCount = 0;
     };

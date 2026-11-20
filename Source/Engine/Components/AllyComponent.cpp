@@ -64,7 +64,7 @@ namespace uel {
                 if (!mp || !mp->IsValid()) continue;
                 XMFLOAT4X4 wm = gt->GetWorldMatrix();
                 float y;
-                if (RaycastGroundColumn(*mp, XMLoadFloat4x4(&wm), p.x, p.z, y) && y <= p.y + 1.5f && y > best) {
+                if (RaycastGroundColumn(*mp, XMLoadFloat4x4(&wm), p.x, p.z, y, p.y + 1.5f, &gm->noCollisionSubmesh) && y > best) {
                     best = y;
                     found = true;
                 }

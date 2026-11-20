@@ -159,7 +159,7 @@ namespace uel {
                 if (!mp || !mp->IsValid()) continue;
                 XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
                 float hit;
-                if (RaycastMesh(*mp, gw, o, d, radius + len, hit)) return true;
+                if (RaycastMesh(*mp, gw, o, d, radius + len, hit, &gm->noCollisionSubmesh)) return true;
             }
             return false;
             };
@@ -179,8 +179,8 @@ namespace uel {
             if (!mp || !mp->IsValid()) continue;
             XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
             float gy;
-            if (RaycastGroundColumn(*mp, gw, t->position.x, t->position.z, gy))
-                if (gy <= t->position.y + eyeHeight && gy > ground) ground = gy;
+            if (RaycastGroundColumn(*mp, gw, t->position.x, t->position.z, gy, t->position.y + eyeHeight, &gm->noCollisionSubmesh))   // 目の高さまで・当たり判定なしは見ない（5-4b）
+                if (gy > ground) ground = gy;
         }
 
         // 重力・接地・ジャンプ

@@ -207,8 +207,8 @@ namespace uel {
             if (!mp || !mp->IsValid()) continue;
             XMFLOAT4X4 gwm = gt->GetWorldMatrix(); XMMATRIX gw = XMLoadFloat4x4(&gwm);
             float gy;
-            if (RaycastGroundColumn(*mp, gw, t->position.x, t->position.z, gy))
-                if (gy <= t->position.y + 1.5f && gy > ground) ground = gy;
+            if (RaycastGroundColumn(*mp, gw, t->position.x, t->position.z, gy, t->position.y + 1.5f, &gm->noCollisionSubmesh))   // 足元より 1.5m 上まで・当たり判定なしは見ない（5-4b）
+                if (gy > ground) ground = gy;
         }
 
         // 重力→着地

@@ -89,6 +89,7 @@ namespace uel {
         triIds.resize(n);
         builtPositions = pos.data();
         builtIndexCount = idx.size();
+        triSubmesh.clear();
         if (n == 0) return;
 
         std::vector<XMFLOAT3> tmin(n), tmax(n), center(n);
@@ -100,6 +101,16 @@ namespace uel {
             tmax[i] = { (std::max)({ a.x, b.x, c.x }), (std::max)({ a.y, b.y, c.y }), (std::max)({ a.z, b.z, c.z }) };
             center[i] = { (tmin[i].x + tmax[i].x) * 0.5f, (tmin[i].y + tmax[i].y) * 0.5f, (tmin[i].z + tmax[i].z) * 0.5f };
             triIds[i] = i;
+        }
+        // 三角形 → サブメッシュの番号（5-4b）。サブメッシュは添字の範囲（indexOffset から indexCount 個）で決まる
+        triSubmesh.assign(n, kNoSubmesh);
+        {
+            const auto& subs = mesh.GetSubmeshes();
+            for (size_t s = 0; s < subs.size(); ++s) {
+                const uint32_t first = subs[s].indexOffset / 3;
+                const uint32_t last = (std::min)(n, (subs[s].indexOffset + subs[s].indexCount) / 3);
+                for (uint32_t t = first; t < last; ++t) triSubmesh[t] = static_cast<uint32_t>(s);
+            }
         }
         nodes.reserve(static_cast<size_t>(n / kLeafSize) * 2 + 2);
         BuildCtx ctx{ tmin.data(), tmax.data(), center.data(), triIds.data() };
@@ -148,7 +159,7 @@ namespace uel {
     }
 
     bool MeshBVH::RayClosest(const Mesh& mesh, const XMFLOAT3& o, const XMFLOAT3& d,
-        float tMin, float tMax, float& outT) const
+        float tMin, float tMax, float& outT, SubmeshSkip skip) const
     {
         if (nodes.empty()) return false;
         const auto& pos = mesh.Positions();
@@ -169,6 +180,7 @@ namespace uel {
             if (nd.count > 0) {
                 for (uint32_t i = nd.start; i < nd.start + nd.count; ++i) {
                     const uint32_t tri = triIds[i];
+                    if (Skipped(tri, skip)) continue;                  // 当たり判定なしのサブメッシュ（5-4b）
                     float t;
                     if (LineTriangle(o, d, pos[idx[tri * 3]], pos[idx[tri * 3 + 1]], pos[idx[tri * 3 + 2]], t)
                         && t > tMin && t < best) {
@@ -195,7 +207,7 @@ namespace uel {
     }
 
     bool MeshBVH::LineHighest(const Mesh& mesh, const XMFLOAT3& o, const XMFLOAT3& d,
-        float tMax, float& outT) const
+        float tMax, float& outT, SubmeshSkip skip) const
     {
         if (nodes.empty()) return false;
         const auto& pos = mesh.Positions();
@@ -216,6 +228,7 @@ namespace uel {
             if (nd.count > 0) {
                 for (uint32_t i = nd.start; i < nd.start + nd.count; ++i) {
                     const uint32_t tri = triIds[i];
+                    if (Skipped(tri, skip)) continue;                  // 当たり判定なしのサブメッシュ（5-4b）
                     float t;
                     if (LineTriangle(o, d, pos[idx[tri * 3]], pos[idx[tri * 3 + 1]], pos[idx[tri * 3 + 2]], t)
                         && t <= tMax && (!found || t > best)) {

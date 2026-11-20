@@ -187,8 +187,45 @@ namespace uel {
                         const auto& subs = mesh->GetSubmeshes();
                         if (m->hiddenSubmesh.size() < subs.size()) m->hiddenSubmesh.resize(subs.size(), 0);
                         if (m->submeshRole.size() < subs.size()) m->submeshRole.resize(subs.size(), 0);
+                        if (m->noCollisionSubmesh.size() < subs.size()) m->noCollisionSubmesh.resize(subs.size(), 0);
 
                         ImGui::Checkbox(u8"一人称表示（「一人称で隠す」を表示しない）", &m->firstPerson);
+
+                        // 当たり判定（5-4b）：見た目はそのまま、地面・壁・弾の線に当たらなくする（草・花・海など。UE の「No Collision」）。
+                        // サブメッシュが数千個あるステージ用に、名前でまとめて外す／戻す（カンマで区切ると複数。大文字・小文字は区別しない）。
+                        // 一覧を閉じたままでも使えるように、折りたたみの外に置く
+                        {
+                            int noCol = 0;
+                            for (size_t i = 0; i < subs.size(); ++i) if (m->noCollisionSubmesh[i]) ++noCol;
+                            ImGui::Text(u8"当たり判定なし：%d / %d 個", noCol, (int)subs.size());
+                            static char colFilter[128] = "Grass,Flower,Ocean,Ocaen,Water";
+                            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.6f);
+                            ImGui::InputText(u8"名前に含む##colFilter", colFilter, sizeof(colFilter));
+                            int setTo = -1;
+                            if (ImGui::Button(u8"当たり判定を外す")) setTo = 1;
+                            ImGui::SameLine();
+                            if (ImGui::Button(u8"当たり判定を戻す")) setTo = 0;
+                            if (setTo >= 0) {
+                                // 欄の文字をカンマで分けて小文字にし、名前（小文字）にどれかを含むサブメッシュを変える
+                                std::vector<std::string> words;
+                                std::string cur;
+                                for (const char* p = colFilter; ; ++p) {
+                                    if (*p == ',' || *p == '\0') {
+                                        size_t a = cur.find_first_not_of(' '), b = cur.find_last_not_of(' ');
+                                        if (a != std::string::npos) words.push_back(cur.substr(a, b - a + 1));
+                                        cur.clear();
+                                        if (*p == '\0') break;
+                                    }
+                                    else cur += (char)std::tolower((unsigned char)*p);
+                                }
+                                for (size_t i = 0; i < subs.size(); ++i) {
+                                    std::string low = subs[i].name;
+                                    for (char& ch : low) ch = (char)std::tolower((unsigned char)ch);
+                                    for (const std::string& w : words)
+                                        if (low.find(w) != std::string::npos) { m->noCollisionSubmesh[i] = (uint8_t)setTo; break; }
+                                }
+                            }
+                        }
 
                         // サブメッシュの一覧は、別に折りたためるようにする（ステージのモデルは数千個ある。MP_Island は約 2300）。
                         // 12 個以下なら初めから開き、多ければ閉じておく。開いたときも、見えている行だけを作る
@@ -212,6 +249,7 @@ namespace uel {
                             }
 
                             const char* roleNames[] = { u8"なし", u8"一人称で隠す" };
+                            ImGui::TextDisabled(u8"表示 ／ 当たり ／ 役割 ／ 名前");
                             const float rowH = ImGui::GetFrameHeightWithSpacing();
                             const int   rows = (int)(std::min)(subs.size(), (size_t)12);   // 枠の高さは 12 行ぶんまで
                             ImGui::BeginChild("##submeshList", ImVec2(0.0f, rowH * rows + ImGui::GetStyle().WindowPadding.y), true);
@@ -222,6 +260,9 @@ namespace uel {
                                     ImGui::PushID(i);
                                     bool vis = (m->hiddenSubmesh[i] == 0);
                                     if (ImGui::Checkbox("##vis", &vis)) m->hiddenSubmesh[i] = vis ? 0 : 1;
+                                    ImGui::SameLine();
+                                    bool col = (m->noCollisionSubmesh[i] == 0);          // チェック ＝ 当たり判定あり（5-4b）
+                                    if (ImGui::Checkbox("##col", &col)) m->noCollisionSubmesh[i] = col ? 0 : 1;
                                     ImGui::SameLine();
                                     int role = m->submeshRole[i];
                                     ImGui::SetNextItemWidth(110);

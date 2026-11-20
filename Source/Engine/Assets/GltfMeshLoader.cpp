@@ -171,7 +171,13 @@ namespace uel {
             XMMATRIX world = NodeLocalMatrix(node) * parentWorld;
             if (node.mesh >= 0 && node.mesh < (int)c.model.meshes.size()) {
                 const auto& mesh = c.model.meshes[node.mesh];
-                std::string nm = !node.name.empty() ? node.name : mesh.name;
+                // サブメッシュの名前：メッシュの名前（同じ物の印。SM_GrassA など）と、ノードの名前（置き場所ごと）の両方を入れる（5-4b）。
+                // ステージのモデルはノードの名前が「FoliageInstancedStaticMeshComponent_10:0」のようで、何の物か分からないため。
+                // Inspector の「名前に含む」でまとめて当たり判定を外すときに、メッシュの名前で探せる
+                std::string nm;
+                if (node.name.empty() || node.name == mesh.name) nm = mesh.name;
+                else if (mesh.name.empty()) nm = node.name;
+                else nm = mesh.name + " (" + node.name + ")";
                 for (const auto& prim : mesh.primitives) AppendPrimitive(c, prim, world, nm);
             }
             for (int child : node.children) ProcessNode(c, child, world);

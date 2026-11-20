@@ -60,7 +60,7 @@ namespace uel {
         };
 
         // 読み込み中ファイルの schemaVersion（保存時は最新）。古い版に無い項目は読まない
-        constexpr int kSchemaLatest = 26;
+        constexpr int kSchemaLatest = 27;
         int g_loadSchema = kSchemaLatest;
 
         // 版 12〜15 のファイルは「Specular Power」で保存されている。版 16 からの roughness に換算する。
@@ -118,6 +118,8 @@ namespace uel {
             // 敵の攻撃の値（v26。5-3）。初期値は OpponentComponent の初期値と同じ（版 25 以前のファイルはこの値で読まれ、今までどおり動く）
             float oppAtkRange = 1.5f, oppAtkDamage = 10.0f, oppAtkInterval = 1.0f;
             bool  hasBoss = false; std::string bsName = "BOSS";   // ボスの目印（v26。5-3）
+            // MeshRenderer のサブメッシュごとの「当たり判定なし」（v27。5-4b）。MeshDTO の形を変えないように、ここに置く
+            std::vector<int> mshNoCollision;
             template<class A> void serialize(A& ar) {
                 ar(CEREAL_NVP(name), CEREAL_NVP(transform), CEREAL_NVP(hasMesh), CEREAL_NVP(mesh),
                     CEREAL_NVP(hasHP), CEREAL_NVP(hp), CEREAL_NVP(maxHp),
@@ -168,6 +170,7 @@ namespace uel {
                 if (g_loadSchema >= 26)
                     ar(CEREAL_NVP(oppAtkRange), CEREAL_NVP(oppAtkDamage), CEREAL_NVP(oppAtkInterval),
                         CEREAL_NVP(hasBoss), CEREAL_NVP(bsName));                                               // v26
+                if (g_loadSchema >= 27) ar(CEREAL_NVP(mshNoCollision));                                         // v27
             }
         };
 
@@ -187,6 +190,7 @@ namespace uel {
                 ed.mesh.firstPerson = m->firstPerson;
                 ed.mesh.hiddenSubmesh.assign(m->hiddenSubmesh.begin(), m->hiddenSubmesh.end());
                 ed.mesh.submeshRole.assign(m->submeshRole.begin(), m->submeshRole.end());
+                ed.mshNoCollision.assign(m->noCollisionSubmesh.begin(), m->noCollisionSubmesh.end());
             }
             if (auto* hpc = e.GetComponent<HPComponent>()) { ed.hasHP = true; ed.hp = hpc->hp; ed.maxHp = hpc->maxHp; }
             if (auto* op = e.GetComponent<OpponentComponent>()) {
@@ -279,6 +283,7 @@ namespace uel {
                 m->firstPerson = ed.mesh.firstPerson;
                 m->hiddenSubmesh.assign(ed.mesh.hiddenSubmesh.begin(), ed.mesh.hiddenSubmesh.end());
                 m->submeshRole.assign(ed.mesh.submeshRole.begin(), ed.mesh.submeshRole.end());
+                m->noCollisionSubmesh.assign(ed.mshNoCollision.begin(), ed.mshNoCollision.end());
             }
             if (ed.hasHP) { auto* hpc = e.AddComponent<HPComponent>(); hpc->hp = ed.hp; hpc->maxHp = ed.maxHp; }
             if (ed.hasOpponent) {
