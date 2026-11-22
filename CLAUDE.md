@@ -31,7 +31,7 @@
 | 2 基本の AI 戦闘 | AI の攻撃、Support の回復 | 追従・攻撃・回復が動く | **済み**（2026-11-16）。2-1 射撃を共通の処理に（`Game/WeaponTrace`）→ 2-2 AI 仲間の攻撃（a 狙う・撃つ → b 弾の線の表示 → c Inspector と保存。版 23）→ 2-3 Support の回復（a 選んで回復する → b 回復の線の表示） |
 | 3 武器 | ロール専用武器、リロード | 3ロールの戦い方が違う | **仕組みは済み**（2026-11-16）。3-1 マウスを固定する視点操作 → 3-2 プレイヤーの Support の回復（右クリック）→ 3-3 武器の仕組み（`Game/Weapon`。連射・装弾数・リロード・HUD の弾数）→ 3-5 AI 仲間も同じ武器で撃つ。**各ロールの武器の種類と値は、キャラのモデルが決まってから**（ユーザーの希望。今は3ロールとも同じ仮の値） |
 | 4 ダウン・蘇生 | 相互蘇生、制限時間、復帰時の HP | プレイヤーも AI も蘇生できる | **済み**（2026-11-17）。4-1 ダウンの状態（`LifeStateComponent`・ゲームオーバーの判定）→ 4-2 プレイヤーが E 長押しで起こす → 4-3 AI 仲間が起こしに行く（予約）→ 4-4 見た目（ダウンの印・画面の色・低い視点・アニメのパラメータ） |
-| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める（**済み** 2026-11-18。版 25）→ 5-3 仮のボス（**済み** 2026-11-18。版 26）→ 5-4 MP_Island で Stage を作る（a 当たり判定の BVH **済み** 2026-11-20 → b 草・花・海を当たり判定から外す **済み** 2026-11-20。版 27 → c NavGrid を島に合わせる → d Stage を置く）→ 5-5 Result の画面 |
+| 5 ウェーブ・勝敗 | 全滅で次のウェーブ、ボス、クリア・ゲームオーバー | Title から Result まで一周 | **作業中**。5-1 道と案内ロボット（**済み** 2026-11-17。版 24）→ 5-2 止まる場所でウェーブを始める（**済み** 2026-11-18。版 25）→ 5-3 仮のボス（**済み** 2026-11-18。版 26）→ 5-4 MP_Island で Stage を作る（a 当たり判定の BVH **済み** 2026-11-20 → b 草・花・海を当たり判定から外す **済み** 2026-11-20。版 27 → c NavGrid を島に合わせる **済み** 2026-11-20。版 28 → d Stage を置く）→ 5-5 Result の画面 |
 | 6 アビリティ | 通常アビリティ、クールダウン、ULT | ロールの能力が戦闘に出る | |
 | 7 ボス・敵 | 攻撃パターン、敵の種類 | 役割分担でボスを倒せる | |
 | 8 UI・演出・調整 | HUD、音、エフェクト、難易度 | 説明なしで遊び方が分かる | |
@@ -119,7 +119,21 @@
       - Inspector（MeshRenderer）：「当たり判定なし：N / M 個」、「名前に含む」欄（既定 `Grass,Flower,Ocean,Ocaen,Water`。カンマで複数・大文字小文字は区別しない）と「当たり判定を外す／戻す」ボタン（一覧を閉じたままでも使える）、一覧の各行に「当たり」のチェック（表示 ／ 当たり ／ 役割 ／ 名前）。
       - **サブメッシュの名前を「メッシュの名前 (ノードの名前)」にした**（`Assets/GltfMeshLoader.cpp`。ノードとメッシュの名前が同じか片方が空なら1つだけ）。島の草などはノードの名前が `FoliageInstancedStaticMeshComponent_10:0` で何の物か分からず、`Grass` で探しても 9 個しか見つからなかったため。設定は番号で保存しているので、名前が変わっても設定はそのまま。
       - 確かめたこと：MP_Island で 2287 個のうち 1220 個が外れる。島の外の海の点は「地面なし」になる。保存して読み直しても残る。
-    - 2026-11-20 時点の Stage：島は `Data/Model/Stage/MP_Island2.glb`（ユーザーが入れた。ノード 2272・三角形 約 71 万 5 千・サブメッシュ 2254。草・木・花は同じ）。y = −8 に 1500 × 1500 の立方体（海の底の床）。**MP_Island2 の「当たり判定なし」はまだ 0 個**（Inspector で外して保存する必要がある）。
+    - **5-4c NavGrid を島に合わせる**（済み。コミット `462a186`。版 28）：
+      - `NavBoundsComponent`（ヘッダだけ。UE の NavMeshBoundsVolume。Entity の位置を真ん中にした箱 `halfX / halfY / halfZ`、`cellSize`（1m）、`maxStep`（登れる段差 1m。キャラは足元 +1.5m まで乗れるので、それより小さく）。保存する（版 28 の `hasNavBounds, nbHalfX/Y/Z, nbCell, nbStep`）。編集中は緑の線の箱（選んでいると明るい）。Inspector にマスの数。
+      - **グリッドを作るのは Play を始めたとき・Scene が変わったときだけ**（`ViewportPanel::navDirty`。編集中は毎フレーム true にしておき、Play の最初のフレームで作る。`Engine::LoadPlayScene` が `RequestNavRebake()` を呼ぶ）。前は毎フレーム作り直していた。
+      - 作るのは `Game/NavBake`（`BakeNavForWorld`。`ViewportPanel.cpp` が 900 行を超えないように分けた）：NavBounds が無ければ今までどおり原点中心の 60m 四方で NavObstacle だけ。あれば箱の範囲で `EngineNavGrid::Bake(world, 地面の関数, NavGroundSettings)`。
+      - `EngineNavGrid` は地面の調べ方を知らない（`NavGroundFn` を受け取る。依存を逆にした）。マスの真ん中の地面（表示中の MeshRenderer、当たり判定なしは除く、箱の上より上の面は見ない）が無い・箱の底より低い（海の底の床）ものを塞ぎ、上下左右の隣との段差が `maxStep` より大きいものも塞ぐ（崖。木・岩もここで塞がる）。経路の点の高さはマスの地面の高さ（`CellCenterWorld`）。
+      - 確かめたこと：島に合わせた箱（中心 (−52, 4, −52)、半分 54, 10, 54 → 108 × 108 マス）で 41% が歩ける。ロボットから2つ目の止まる場所への経路が見つかる。作る時間は Debug 0.07〜0.1 秒（島の BVH を初めて作るときはさらに 2.8 秒）。
+      - 制限：2D のグリッドなので上下に重なった道は1つだけ。1m より細い道は塞がることがある。段差は上下左右だけで見る。プレイヤーは経路探索を使わないので海へ歩いていける。NavGrid パネル（エディタ）は Play のグリッドとは別。
+      - **島の位置**：MP_Island2 のメッシュは Entity の位置 (−52.6, 0, −51.8) から ±50m ほど＝**ワールドの x −102〜+5・z −102〜+5 あたり**。原点（ロボット・プレイヤーの場所）は島の北東の角。地面はだいたい −6〜+12m。
+    - 2026-11-20 時点の Stage：島は `Data/Model/Stage/MP_Island2.glb`（ユーザーが入れた。ノード 2272・三角形 約 71 万 5 千・サブメッシュ 2254。草・木・花は同じ）。y = −8 に 1500 × 1500 の立方体（海の底の床）。MP_Island2 の「当たり判定なし」は 1215 個（コミット `11a8a8a`）。
+    - **5-4d Stage を置く**（作業中。2026-11-22 に差し替え用の `Json/Stage.json` と配置案を `Claude_deliver/5-4d` に渡した。ユーザーの適用・コミット待ち）：
+      - 決め方：Play と同じ `BakeNavForWorld` で島の NavGrid（0.5m）を書き出し、スタートから歩ける所を Dijkstra で調べた（いちばん遠い所まで約 180m）。止まる場所は周り 6m に歩けるマスが多い所、道は止まる場所の間の最短経路を見通しで間引いた点（ロボットは壁を避けないので、各区間の直線が歩けるマスだけを通る）。Spawner は自分の止まる場所から歩いて 11〜17m で、ほかの止まる場所よりはっきり近い所。作業用の道具（`RoutePlanner.cs`）はリポジトリに入れていない。
+      - 止まる場所：STOP 1 (−13.8, 0, −43.8)・STOP 2 (−41.3, 5, −68.3)・STOP 3 (−79.8, 10, −91.8)・STOP 4 ボス (−92.8, 10, −75.3。南西の高台の広場)。経由点 18 個（`Guide 00`〜`17`）、道は約 172m。Spawner は `Spawner 1`〜`3`（Enemy）と `Spawner 4 (Boss)`（BOSSVer2）。NavBounds は (−50, 4, −50)・半分 (57, 10, 57)。GameRule の Entity から Spawner を外し、`GameRule2` と前の経由点 3 個を消した。
+      - **敵の数は今は 5 / 6 / 8・ボス 1（各ウェーブ 1 回）**。ユーザーが選んだ（2026-11-22）。1 ステージは約 3〜4 分の見込み（机の上の見積もり）で、10 分には短い。数は武器（モデルが決まってから）とアビリティ（段階 6）で手ごわさが変わるので、段階 8 で調整する。長くする案は「止まる場所で小さい波を続ける」（Spawner のウェーブ数・増え方。例 2 回 5→7 / 3 回 6→8→10 / 3 回 8→10→12）。
+      - 作業用フォルダで確かめたこと：経路はすべて見つかる。自動で進めるテスト（ロボットの速さ 5）で、4 か所で止まり、敵 19 体とボスが詰まらずにパーティーまで来て、結果が CLEAR。本当の速さでの時間と、エディタの画面の見た目は未確認。
+      - **BOSSVer2 に HP と Hitbox が無いままだとクリアできない**（テストでは複製の Prefab に足した）。
 - **画面に出すゲームの文字**：「**蘇**」は ImGui の日本語の範囲（`GetGlyphRangesJapanese`）に入っていない（「?」になる。`imgui_draw.cpp` の表で確かめた）。HUD では「起こす」と書く。ほかの漢字も、HUD に新しく使うときは範囲に入っているか確かめる（仲・間・助・待・長・押は入っている）。
 
 ### コードを調べて分かったこと（新しいゲームで効いてくる所）
@@ -134,7 +148,7 @@
 - 経路探索のグリッドは Play 中に毎フレーム作り直している（原点中心の 60m 四方で固定）。AI の追従には使えるが、ステージを広くするなら直す。
 
 ### 決まっていないこと（資料の 12章）
-キャラの見た目、各ロールの武器・能力の中身（武器の種類・装弾数・リロード時間はモデルが決まってから）、通常の敵の種類と数、ULT のゲージの量と増え方、ウェーブごとの敵の数（ウェーブ数は 3＋ボスに決まった）、ボスの攻撃の中身、集合の指示（将来）、TPS（必要になったら）。**決まっていないことは勝手に決めず、案を出してユーザーに選んでもらう。**
+キャラの見た目、各ロールの武器・能力の中身（武器の種類・装弾数・リロード時間はモデルが決まってから）、通常の敵の種類と数、ULT のゲージの量と増え方、ウェーブごとの敵の数（ウェーブ数は 3＋ボスに決まった。今は仮に 5 / 6 / 8・ボス 1 で、段階 8 で調整する）、ボスの攻撃の中身、集合の指示（将来）、TPS（必要になったら）。**決まっていないことは勝手に決めず、案を出してユーザーに選んでもらう。**
 
 ---
 
@@ -310,11 +324,11 @@ Source/Engine/
                  Transform / MeshRenderer / SkinnedMesh / Animator / Shader / HP / Player / Ally / Opponent /
                  Hitbox / NavObstacle / Spawner / GameRule / ScreenUI / PrefabInstance /
                  Role（ロールの親）/ Tank / DPS / Support / PartySetup / LifeState（ダウン・蘇生）/
-                 Guide（案内ロボット）/ GuidePoint（道の経由点。ヘッダだけ）/ Boss（ボスの目印。ヘッダだけ）
+                 Guide（案内ロボット）/ GuidePoint（道の経由点。ヘッダだけ）/ Boss（ボスの目印。ヘッダだけ） / NavBounds（経路探索の範囲。ヘッダだけ）
   Scene/         EntityId, Entity, World
   Game/          GameContext, InputState, GameFlow（Component が使う、ゲーム側の受け渡し用の型）,
                  Team（陣営。ヘッダだけ）, Role（ロール。ヘッダだけ）, WeaponTrace（弾の線とダメージ、壁でさえぎられているか。プレイヤーと AI 仲間で共用）,
-                 Weapon（武器の値の表・状態・撃つ／リロードの共通の関数。3-3）
+                 Weapon（武器の値の表・状態・撃つ／リロードの共通の関数。3-3）, NavBake（Scene から経路探索のグリッドを作る。5-4c）
   Animation/     Skeleton, AnimationClip, SkinnedModel, AnimationPose（ポーズの計算・ブレンド）,
                  AnimParams, AnimNode（基底・AnimNodePtr・AnimClipNode）, AnimBlendSpaceNode,
                  AnimStateMachineNode, AnimLayeredBlendNode（骨ごとに2つの姿勢を混ぜる）,
@@ -329,7 +343,7 @@ Source/Engine/
                  ShaderHotReload（実行中に .hlsl を保存するとコンパイルし直す。作業中：コミット済みだが、2026-11-09 時点では Engine からまだ呼ばれていない）
   Assets/        GltfMeshLoader, MeshCache, GltfSkinnedLoader, SkinnedModelCache,
                  TinyGltfImpl（tinygltf / stb_image の実装の埋め込み。プロジェクトで1か所だけ）
-  AI/            EngineNavGrid（A*）
+  AI/            EngineNavGrid（A*。5-4c から地面を見て作れる。地面の調べ方は関数で受け取る）
   Physics/       GroundQuery（メッシュへのレイ。中身は MeshBVH で調べる）, MeshBVH（三角形の箱の木。5-4a）, HitShapes（球・カプセルへのレイ）
   Serialization/ StageSerializer（Scene・Scene一覧・Prefab・Environment）, AnimGraphSerializer（アニメーショングラフ）
   Editor/        ImGuiLayer（フォント・ドッキング）, ViewportPanel, EditorCamera,
@@ -396,6 +410,7 @@ Source/Engine/
 | Boss | ボスの目印（5-3）。HUD が画面の上に HP バーを出す。HPComponent と OpponentComponent も要る | `displayName`（保存する。版 26） |
 | Hitbox | 当たり判定（胴体カプセル＋頭の球） | `bodyBottom, bodyTop, bodyRadius, headHeight, headRadius, headMultiplier` |
 | NavObstacle | NavGrid を塞ぐ箱 | `halfX, halfZ` |
+| NavBounds | 経路探索のグリッドを作る範囲（5-4c。UE の NavMeshBoundsVolume）。Play の始めに、箱の中で地面を見てグリッドを作る | `halfX, halfY, halfZ, cellSize, maxStep`（保存する。版 28） |
 | Spawner | Prefab から敵をウェーブで湧かせる。`activateAtStop` が 1 以上なら、案内ロボットがその止まる場所に着いたら始まる（5-2） | `prefabPath, waveCount, baseCount, countIncrease, spawnInterval, firstDelay, waveDelay, spawnRadius, activateAtStop`（版 25）。`IsFinished, IsDormant, HasError, ErrorText, CurrentWave, BannerTime` |
 | GameRule | 勝敗判定 → Scene遷移 | `winScene, loseScene, endDelay` |
 | ScreenUI | Title / Result / ロール選択の画面 | `title, subtitle, buttonText, nextScene, showResult, roleSelect`（オンで3つのロールのボタン。1-3b） |
@@ -406,7 +421,7 @@ Source/Engine/
 - 操作：Viewport をクリックしてマウスを固定（Esc で離す）、マウスで視点、WASD 移動、Space ジャンプ、左クリック（押している間）で射撃、R でリロード、右クリックで回復（Support）、E 長押しでダウンした味方を起こす、F で案内ロボットに合図（5-1）
 - 射撃：ダメージ・連射・装弾数はロールの武器（0章「武器」。今は3ロールとも 34 ダメージの仮の値）。ヒットボックスの頭は倍率（既定2倍）。壁の向こうには当たらない。ヒットボックスが無くHPを持つ物はメッシュで判定。倒れている最中の敵には当たらない。
 - 敵：0.25秒ごとに A* で経路を再計算。攻撃は `attackInterval` ごと。ダメージは、グラフに通知 `Hit` があればその瞬間、無ければ `attackHitDelay` 秒後。HP が 0 になったら `Dead` を立て、`deathDelay` 秒後に `DestroyLater`。
-- NavGrid（Play中）：中心 (0,0,0)、セル 1m、60×60 で固定。塞ぐのは NavObstacle を付けたEntityだけ。
+- NavGrid（Play中）：Play の始め・Scene が変わったときに1回だけ作る。NavBounds があればその箱の範囲で地面を見て作る（海・崖・木・岩を自動で塞ぐ）。無ければ中心 (0,0,0)、セル 1m、60×60 で、塞ぐのは NavObstacle だけ（5-4c）。
 - 流れ：Title →(START)→ RoleSelect →(ロールを選ぶ)→ Stage →(全ウェーブ撃破 or 死亡)→ Result →(RETRY)→ RoleSelect
 - HUD（ImGui。`ViewportPanel` のオーバーレイ）：照準、ヒットマーカー、左上に「ROLE: …」、左下にプレイヤーの HP、その上に AI 仲間の HP（緑。名前と数値）、上の中央にウェーブとボスの HP バー（5-3。`WaveOverlay.cpp`）、AI 仲間の頭の上に名札、AI 仲間が撃った直後の弾の線（黒い縁＋明るい線。0.08 秒。2-2b）、Support の回復の線（黒い縁＋脈打つ緑。回復している間ずっと。自分を回復しているときは胸に緑の輪。プレイヤーが回復されているときは HP バーの右に「+ HEAL」。2-3b）、右下に弾数（3-3）、AI 仲間の HP の横に弾数・DOWNED・REVIVING・DEAD、ダウンの表示と印（段階 4。0章「ダウン・蘇生」）、案内ロボットの印と「F：ロボットを進める」（5-1。`GuideOverlay.cpp`）。3D の点・線は `project`（点）と `projectSegment`（線。カメラの near の面で切ってから写すので、端がカメラの後ろでも描ける）で画面に写す。ImGui で上に描くので、壁に隠れない。明るい背景でも読めるよう、文字に黒い影を付けている（`shadowText`）
   - クリア条件：全 Spawner が最終ウェーブまで終了、かつ敵が0体（眠っている Spawner は終わっていない扱い。5-2）。HP の無い敵は倒せないので、クリアできなくなる
@@ -506,7 +521,7 @@ Source/Engine/
 - Environment（ライトとポストプロセスの設定）：`Json/Environment.json`。**Scene を保存（Ctrl+S）したときに一緒に保存**し、起動時に読む。版は `kEnvSchemaLatest = 2`（1 最初 / 2 空の明るさ `skyExposure` と回転 `skyRotation`）。Scene と同じく「その版以降だけ読む」ので、版 1 のファイルは空の2つが既定値（1 / 0）になる。確認用の表示モード（`debugView`）だけは保存しない。
 - Prefab：`Data/Prefabs/<名前>.prefab.json`（Entity 1個ぶん。位置は 0 で保存）
 - アニメーショングラフ：`Data/Anim/<名前>.animgraph.json`（6章）
-- **Scene の schemaVersion は現在 27。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
+- **Scene の schemaVersion は現在 28。** ファイルの版に存在する項目だけを読む方式なので、古いファイルもそのまま読める。
 
 | 版 | 追加した項目 |
 |---|---|
@@ -535,6 +550,7 @@ Source/Engine/
 | 25 | Spawner の始める止まる場所（`spStop`） |
 | 26 | 敵の攻撃の値（`oppAtkRange, oppAtkDamage, oppAtkInterval`）と Boss（`hasBoss, bsName`） |
 | 27 | MeshRenderer のサブメッシュごとの当たり判定なし（`mshNoCollision`） |
+| 28 | 経路探索の範囲 NavBounds（`hasNavBounds, nbHalfX, nbHalfY, nbHalfZ, nbCell, nbStep`） |
 
 - **項目を置き換えたときの読み方（版 16 の例）**：`shSpecPower` は `if (g_loadSchema >= 12 && g_loadSchema <= 15)` で古い版のときだけ読む。`shRoughness` は初期値 −1（ファイルに無かった印）にしておき、`FromDTO` でマイナスなら `RoughnessFromSpecularPower` で換算する。cereal の JSON は名前で探すので、読む順番がファイルの並びと違っても読める。
 - `ShadingMode` は数値で保存している。**並び順を変えない**（増やすときは末尾）。
@@ -665,7 +681,7 @@ Source/Engine/
   - Anim Graph パネルは選んだ Entity のグラフを直接編集する。同じグラフのファイルを使うほかの Entity には、保存して読み込み直すまで反映されない。
 - ヒットボックスは体の中心線に固定。ボーン（頭など）に追従しない。
 - 足元の地面の高さを調べる関数（`FindGround`）が、`AllyComponent.cpp`・`OpponentComponent.cpp`・`GuideComponent.cpp` に同じ形で3つある（それぞれ無名の namespace）。直すときは1か所（`Physics/GroundQuery` など）にまとめる。
-- NavGrid の範囲が固定（原点中心、60×60）。Play 中は毎フレーム作り直している。
+- NavGrid は 2D（上下に重なった道は1つ）。範囲は NavBounds で決める（無ければ原点中心 60×60）。作るのは Play の始めだけ（5-4c）。
 - プレイヤーの移動・攻撃・カメラ・射撃は `PlayerComponent` 1つに全部入っている（ロールごとの差は未対応）。
 - 新しいゲームで足りない土台（0章も参照）：ダウン・蘇生の状態、武器・リロード・アビリティ・クールダウン、親子付け（Attach。`Entity` に `parent` / `children` の欄はあるが未使用。武器を手に持たせるのに要る）、物理（剛体・衝突・トリガ）、ゲーム用の UI（今の HUD は ImGui）、音、エフェクト。
 - Play中にコンポーネントを足した／消した結果は、編集用Worldにしか入らない。
@@ -680,7 +696,7 @@ Source/Engine/
 
 ## 11. これからやる予定（セッションを分けて進める）
 
-**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1 道と案内ロボット・5-2 止まる場所でウェーブ・5-3 仮のボス・5-4a 当たり判定の BVH・5-4b 当たり判定なしは済み。次は 5-4c NavGrid を島に合わせる。2026-11-20）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
+**最優先は 0章のロードマップ**（協力型 PvE のゲーム作り）。段階 1「3人チーム」・2「基本の AI 戦闘」・4「ダウン・蘇生」は済み。段階 3「武器」は仕組みだけ済み（武器の種類と値はキャラのモデルが決まってから）。今は段階 5「ウェーブ・勝敗」（5-1〜5-3、5-4a 当たり判定の BVH・5-4b 当たり判定なし・5-4c NavGrid を島に合わせるは済み。5-4d 島に Stage を置くは配置案と Stage.json を渡した。2026-11-22）。各段階はさらに小さく分け、1つずつビルドと動作確認をする。資料の優先度は、ロール選択・チームと AI 仲間が最優先、武器・HP と蘇生・ウェーブ・HUD が高、アビリティが中〜高、敵・ボスと演出が中、AI の集合指示が低〜中（基本の AI ができてから）。
 
 **AI Editor**（12章）：AI を本格的にするための計画（Blackboard → Pathfinding の確認 → Perception → BT の Runtime → BT のエディタ → Utility AI → EQS → Debugger）。始める時期と、ゲームのロードマップとの順番は未定（12章の最後の「ぶつかる所」を先にユーザーと決める）。
 
