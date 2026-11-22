@@ -1,5 +1,5 @@
 {
-    "schemaVersion": 26,
+    "schemaVersion": 28,
     "prefab": {
         "name": "BOSSVer2",
         "transform": {
@@ -33,9 +33,9 @@
             "hiddenSubmesh": [],
             "submeshRole": []
         },
-        "hasHP": false,
-        "hp": 100.0,
-        "maxHp": 100.0,
+        "hasHP": true,
+        "hp": 402.0,
+        "maxHp": 402.0,
         "hasOpponent": true,
         "oppMoveSpeed": 2.0,
         "oppStopRange": 1.2000000476837159,
@@ -67,13 +67,13 @@
         "ruleLose": "",
         "ruleDelay": 2.0,
         "prefabPath": "",
-        "hasHitbox": false,
+        "hasHitbox": true,
         "hbBodyBottom": 0.30000001192092898,
-        "hbBodyTop": 1.2999999523162842,
+        "hbBodyTop": 2.0899999141693117,
         "hbBodyRadius": 0.3499999940395355,
-        "hbHeadHeight": 1.600000023841858,
-        "hbHeadRadius": 0.2199999988079071,
-        "hbHeadMul": 2.0,
+        "hbHeadHeight": 2.3499999046325685,
+        "hbHeadRadius": 0.49000000953674319,
+        "hbHeadMul": 5.050000190734863,
         "hasSpawner": false,
         "spPrefab": "",
         "spWaves": 3,
@@ -147,6 +147,13 @@
         "oppAtkDamage": 39.0,
         "oppAtkInterval": 1.0,
         "hasBoss": true,
-        "bsName": "BOSS"
+        "bsName": "BOSS",
+        "mshNoCollision": [],
+        "hasNavBounds": false,
+        "nbHalfX": 50.0,
+        "nbHalfY": 10.0,
+        "nbHalfZ": 50.0,
+        "nbCell": 1.0,
+        "nbStep": 1.0
     }
 }
